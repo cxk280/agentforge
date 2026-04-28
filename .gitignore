@@ -1,6 +1,11 @@
 # logs
 /logs
 
+# python
+__pycache__/
+*.pyc
+*.pyo
+
 # environment vars
 .env
 
