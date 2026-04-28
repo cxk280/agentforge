@@ -1,3 +1,102 @@
+# AgentForge: Clinical Co-Pilot
+
+An AI agent embedded in OpenEMR that gives physicians fast, patient-specific clinical context in the 90-second window between patient rooms. The agent retrieves real patient data (medications, labs, vitals, visit history) and answers conversational questions with source attribution.
+
+**Live deployment:** https://openemr-production-971e.up.railway.app/ — login `admin` / `admin`
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
+- Git
+
+### 1. Clone
+
+```bash
+git clone https://github.com/cxk280/agentforge.git
+cd agentforge
+```
+
+### 2. Start OpenEMR
+
+```bash
+cd docker/development-easy-light
+docker compose up --detach --wait
+```
+
+**First boot takes 10–20 minutes.** Docker pulls the `openemr/openemr:flex` image, then runs `composer install` (~200 packages) and `npm install` + Gulp SCSS compilation inside the container. Subsequent starts are fast.
+
+The `--wait` flag blocks until the healthcheck passes. You can watch progress with:
+
+```bash
+docker compose logs -f openemr
+```
+
+### 3. Access the application
+
+| Service | URL | Credentials |
+|---|---|---|
+| OpenEMR | http://localhost:8300/ | `admin` / `pass` |
+| OpenEMR (HTTPS) | https://localhost:9300/ | `admin` / `pass` |
+| phpMyAdmin | http://localhost:8310/ | root / `root` |
+
+### 4. Seed demo patient data
+
+The dev database starts empty. Import the demo patients and clinical data:
+
+```bash
+# From the repo root — run from a second terminal while the container is up
+
+# Demo patients (Ted Shaw, Farrah Rolle, Nora Cohen)
+docker exec -i development-easy-light-openemr-1 mariadb \
+  -u root -proot openemr \
+  < sql/seed_patients_railway.sql
+
+# Encounters, SOAP notes, vitals (lines 1–186 only)
+head -186 sql/seed_clinical_data.sql | \
+  docker exec -i development-easy-light-openemr-1 mariadb \
+  -u root -proot openemr
+
+# Labs, conditions, allergies, medications
+docker exec -i development-easy-light-openemr-1 mariadb \
+  -u root -proot openemr \
+  < sql/seed_clinical_data_part2.sql
+```
+
+After seeding you should have 3 patients, 15 encounters, 40 lab observations, 10 conditions, 7 allergies, and 16 medications.
+
+### 5. Stop
+
+```bash
+cd docker/development-easy-light
+docker compose down
+```
+
+Data persists in Docker volumes. To reset to a clean state:
+
+```bash
+docker compose down --volumes
+```
+
+---
+
+## Project layout
+
+```
+copilot/agent/   - Python FastAPI agent backend (in progress)
+evals/           - Eval framework and test cases
+sql/             - Seed data for demo patients
+AUDIT.md         - Security, performance, and architecture audit
+USERS.md         - Target user and use case definitions
+ARCHITECTURE.md  - AI integration plan
+COST_ANALYSIS.md - Token cost projections
+```
+
+---
+
 [![Syntax Status](https://github.com/openemr/openemr/actions/workflows/syntax.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/syntax.yml)
 [![Styling Status](https://github.com/openemr/openemr/actions/workflows/styling.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/styling.yml)
 [![Testing Status](https://github.com/openemr/openemr/actions/workflows/test.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/test.yml)
