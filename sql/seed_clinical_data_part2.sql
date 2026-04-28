@@ -95,25 +95,25 @@ INSERT INTO lists (date, type, subtype, title, begdate, reaction, severity_al, a
 -- MEDICATIONS (prescriptions)
 -- ============================================================
 
-INSERT INTO prescriptions (patient_id, date_added, provider_id, encounter, start_date, drug, dosage, quantity, route, note, active, indication) VALUES
+INSERT INTO prescriptions (patient_id, date_added, provider_id, encounter, start_date, drug, dosage, quantity, route, note, active, indication, txDate, usage_category_title, request_intent_title) VALUES
 -- Ted Shaw
-(1, '2023-10-15', 1, 1001, '2023-10-15', 'Metformin HCl', '1000mg', '60', 'Oral', 'Take twice daily with meals', 1, 'Type 2 Diabetes Mellitus'),
-(1, '2023-10-15', 1, 1001, '2023-10-15', 'Lisinopril', '10mg', '30', 'Oral', 'Take once daily; dose increased Oct 2024', 0, 'Hypertension, CKD renal protection'),
-(1, '2024-10-30', 1, 1005, '2024-10-30', 'Lisinopril', '20mg', '30', 'Oral', 'Increased from 10mg - take once daily', 1, 'Hypertension - inadequate control on 10mg'),
-(1, '2024-07-17', 1, 1004, '2024-07-17', 'Atorvastatin', '20mg', '30', 'Oral', 'Take once daily at bedtime', 1, 'Hyperlipidemia, cardiovascular risk reduction'),
-(1, '2024-10-30', 1, 1005, '2024-10-30', 'Empagliflozin (Jardiance)', '10mg', '30', 'Oral', 'Take once daily in the morning', 1, 'T2DM management, CKD renal protection'),
+(1, '2023-10-15', 1, 1001, '2023-10-15', 'Metformin HCl', '1000mg', '60', 'Oral', 'Take twice daily with meals', 1, 'Type 2 Diabetes Mellitus', '2023-10-15', '', ''),
+(1, '2023-10-15', 1, 1001, '2023-10-15', 'Lisinopril', '10mg', '30', 'Oral', 'Take once daily; dose increased Oct 2024', 0, 'Hypertension, CKD renal protection', '2023-10-15', '', ''),
+(1, '2024-10-30', 1, 1005, '2024-10-30', 'Lisinopril', '20mg', '30', 'Oral', 'Increased from 10mg - take once daily', 1, 'Hypertension - inadequate control on 10mg', '2024-10-30', '', ''),
+(1, '2024-07-17', 1, 1004, '2024-07-17', 'Atorvastatin', '20mg', '30', 'Oral', 'Take once daily at bedtime', 1, 'Hyperlipidemia, cardiovascular risk reduction', '2024-07-17', '', ''),
+(1, '2024-10-30', 1, 1005, '2024-10-30', 'Empagliflozin (Jardiance)', '10mg', '30', 'Oral', 'Take once daily in the morning', 1, 'T2DM management, CKD renal protection', '2024-10-30', '', ''),
 -- Farrah Rolle
-(5, '2023-09-05', 1, 2001, '2023-09-05', 'Fluticasone/Salmeterol (Advair)', '250/50 mcg', '1', 'Inhalation', 'Inhale 1 puff twice daily, rinse mouth after use', 0, 'Asthma, moderate persistent; stepped up Nov 2024'),
-(5, '2024-07-02', 1, 2004, '2024-07-02', 'Fluticasone/Salmeterol (Advair)', '500/50 mcg', '1', 'Inhalation', 'Stepped up from 250/50 - inhale 1 puff twice daily', 1, 'Asthma, partially controlled'),
-(5, '2023-09-05', 1, 2001, '2023-09-05', 'Albuterol HFA', '90 mcg/actuation', '1', 'Inhalation', 'Use 2 puffs every 4-6 hours as needed for rescue', 1, 'Asthma - rescue inhaler'),
-(5, '2023-12-11', 1, 2002, '2023-12-11', 'Omeprazole', '20mg', '30', 'Oral', 'Take once daily 30 min before breakfast', 1, 'GERD'),
-(5, '2023-12-11', 1, 2002, '2023-12-11', 'Rosuvastatin (Crestor)', '10mg', '30', 'Oral', 'Take once daily', 1, 'Hyperlipidemia'),
+(5, '2023-09-05', 1, 2001, '2023-09-05', 'Fluticasone/Salmeterol (Advair)', '250/50 mcg', '1', 'Inhalation', 'Inhale 1 puff twice daily, rinse mouth after use', 0, 'Asthma, moderate persistent; stepped up Nov 2024', '2023-09-05', '', ''),
+(5, '2024-07-02', 1, 2004, '2024-07-02', 'Fluticasone/Salmeterol (Advair)', '500/50 mcg', '1', 'Inhalation', 'Stepped up from 250/50 - inhale 1 puff twice daily', 1, 'Asthma, partially controlled', '2024-07-02', '', ''),
+(5, '2023-09-05', 1, 2001, '2023-09-05', 'Albuterol HFA', '90 mcg/actuation', '1', 'Inhalation', 'Use 2 puffs every 4-6 hours as needed for rescue', 1, 'Asthma - rescue inhaler', '2023-09-05', '', ''),
+(5, '2023-12-11', 1, 2002, '2023-12-11', 'Omeprazole', '20mg', '30', 'Oral', 'Take once daily 30 min before breakfast', 1, 'GERD', '2023-12-11', '', ''),
+(5, '2023-12-11', 1, 2002, '2023-12-11', 'Rosuvastatin (Crestor)', '10mg', '30', 'Oral', 'Take once daily', 1, 'Hyperlipidemia', '2023-12-11', '', ''),
 -- Nora Cohen
-(8, '2023-08-22', 1, 3001, '2023-08-22', 'Levothyroxine', '100 mcg', '30', 'Oral', 'Take on empty stomach, 30 min before breakfast; dose increased Oct 2024', 0, 'Hypothyroidism'),
-(8, '2024-10-08', 1, 3005, '2024-10-08', 'Levothyroxine', '112 mcg', '30', 'Oral', 'Increased from 100mcg - take on empty stomach, 30 min before breakfast', 1, 'Hypothyroidism - TSH drifting up'),
-(8, '2023-08-22', 1, 3001, '2023-08-22', 'Sertraline (Zoloft)', '50mg', '30', 'Oral', 'Take once daily in the morning; dose increased Feb 2024', 0, 'Major Depressive Disorder'),
-(8, '2024-02-14', 1, 3003, '2024-02-14', 'Sertraline (Zoloft)', '100mg', '30', 'Oral', 'Increased from 50mg - take once daily in the morning', 1, 'MDD - residual anhedonia on 50mg'),
-(8, '2024-06-19', 1, 3004, '2024-06-19', 'Alendronate', '70mg', '4', 'Oral', 'Take once weekly same day, full glass of water, remain upright 30 min', 1, 'Osteoporosis'),
-(8, '2023-11-07', 1, 3002, '2023-11-07', 'Calcium Carbonate + Vitamin D3', '1200mg/2000IU', '30', 'Oral', 'Take daily with food', 1, 'Osteoporosis prevention, Vitamin D deficiency');
+(8, '2023-08-22', 1, 3001, '2023-08-22', 'Levothyroxine', '100 mcg', '30', 'Oral', 'Take on empty stomach, 30 min before breakfast; dose increased Oct 2024', 0, 'Hypothyroidism', '2023-08-22', '', ''),
+(8, '2024-10-08', 1, 3005, '2024-10-08', 'Levothyroxine', '112 mcg', '30', 'Oral', 'Increased from 100mcg - take on empty stomach, 30 min before breakfast', 1, 'Hypothyroidism - TSH drifting up', '2024-10-08', '', ''),
+(8, '2023-08-22', 1, 3001, '2023-08-22', 'Sertraline (Zoloft)', '50mg', '30', 'Oral', 'Take once daily in the morning; dose increased Feb 2024', 0, 'Major Depressive Disorder', '2023-08-22', '', ''),
+(8, '2024-02-14', 1, 3003, '2024-02-14', 'Sertraline (Zoloft)', '100mg', '30', 'Oral', 'Increased from 50mg - take once daily in the morning', 1, 'MDD - residual anhedonia on 50mg', '2024-02-14', '', ''),
+(8, '2024-06-19', 1, 3004, '2024-06-19', 'Alendronate', '70mg', '4', 'Oral', 'Take once weekly same day, full glass of water, remain upright 30 min', 1, 'Osteoporosis', '2024-06-19', '', ''),
+(8, '2023-11-07', 1, 3002, '2023-11-07', 'Calcium Carbonate + Vitamin D3', '1200mg/2000IU', '30', 'Oral', 'Take daily with food', 1, 'Osteoporosis prevention, Vitamin D deficiency', '2023-11-07', '', '');
 
 SET FOREIGN_KEY_CHECKS=1;
