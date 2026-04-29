@@ -76,19 +76,22 @@ nav.navbar.navbar-expand-xl.navbar-light.bg-light,
   padding: 0 !important;
 }
 
-/* The KO-rendered top menu uses .menuLabel divs and .menuEntries dropdowns */
-nav.navbar .menuLabel,
-nav.navbar .menuLabel a,
-nav.navbar .navbar-brand,
-nav.navbar .navbar-brand a,
-nav.navbar .navbar-toggler,
-nav.navbar .nav-link,
-nav.navbar .appMenu,
-nav.navbar .appMenu a,
-nav.navbar .btn-link,
-nav.navbar #username,
-nav.navbar .menuLabel.dropdown-toggle,
-nav.navbar .menuLabel .caret {
+/* The KO-rendered top menu uses .menuLabel divs and .menuEntries dropdowns.
+ * Scope to body.body_top so this white-on-navy treatment ONLY applies to
+ * the outer navbar, not the patient-chart navtab inside the iframe (which
+ * is also a <nav class="navbar"> but should keep dark text on white). */
+body.body_top nav.navbar .menuLabel,
+body.body_top nav.navbar .menuLabel a,
+body.body_top nav.navbar .navbar-brand,
+body.body_top nav.navbar .navbar-brand a,
+body.body_top nav.navbar .navbar-toggler,
+body.body_top nav.navbar .nav-link,
+body.body_top nav.navbar .appMenu,
+body.body_top nav.navbar .appMenu a,
+body.body_top nav.navbar .btn-link,
+body.body_top nav.navbar #username,
+body.body_top nav.navbar .menuLabel.dropdown-toggle,
+body.body_top nav.navbar .menuLabel .caret {
   color: rgba(255, 255, 255, 0.92) !important;
 }
 /* Top-level header items: ONLY change text color on hover, never add a
@@ -682,19 +685,9 @@ table.table td {
   color: var(--cp-text) !important;
 }
 
-/* ── Co-Pilot tab — make it pop ──────────────────────────────────────────── */
-ul.menu > li > a[href*="copilot"],
-ul.menu_horizontal > li > a[href*="copilot"] {
-  position: relative;
-}
-ul.menu > li > a[href*="copilot"]::before,
-ul.menu_horizontal > li > a[href*="copilot"]::before {
-  content: '✦';
-  margin-right: 6px;
-  color: var(--cp-teal);
-  font-size: 11px;
-  vertical-align: middle;
-}
+/* Co-Pilot navtab item carries the ✦ glyph in its label string
+ * (interface/main/tabs/menu/menus/patient_menus/standard.json).
+ * No CSS pseudo-element needed. */
 
 /* ── Modal-ish popovers cleanup ──────────────────────────────────────────── */
 .modal-content,
