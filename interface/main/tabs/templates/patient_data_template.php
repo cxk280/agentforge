@@ -48,6 +48,7 @@ switch ($search_any_type) {
 
 ?>
 <script type="text/html" id="patient-data-template">
+    <!-- ko if: patient -->
     <div class="d-lg-inline-flex w-100 cp-demographics-banner">
         <div class="flex-fill">
             <div class="float-left mx-2">
@@ -247,4 +248,5 @@ switch ($search_any_type) {
             <!-- /ko --><!-- user -->
         </div>
     </div>
+    <!-- /ko --><!-- patient (outer banner gate) -->
 </script>

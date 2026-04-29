@@ -353,10 +353,11 @@ ul.menu > li > a.activeMenu {
   background: linear-gradient(90deg, var(--cp-navy) 0%, var(--cp-navy-2) 100%) !important;
   color: #fff !important;
   padding: 10px 18px !important;
-  border-radius: 10px !important;
-  margin: 6px 8px !important;
+  border-radius: 0 !important;
+  margin: 0 !important;
   align-items: center !important;
   gap: 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
 }
 .cp-demographics-banner .cp-patient-photo {
   margin: 0 12px 0 0 !important;
