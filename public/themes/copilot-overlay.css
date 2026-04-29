@@ -245,10 +245,12 @@ nav.navbar .userfunctions .dropdown-item:hover {
  * .menuSection while transiting from trigger to panel and the dropdown
  * disappears. Add a transparent pseudo-element that fills that gap so
  * the hover state stays continuous. */
-nav.navbar .menuSection.dropdown {
+nav.navbar .menuSection.dropdown,
+nav.navbar #username-container {
   position: relative;
 }
-nav.navbar .menuSection.dropdown::before {
+nav.navbar .menuSection.dropdown::before,
+nav.navbar #username-container::before {
   content: '';
   position: absolute;
   top: 100%;
@@ -258,6 +260,13 @@ nav.navbar .menuSection.dropdown::before {
   background: transparent;
   pointer-events: auto;
   z-index: 1001;
+}
+
+/* Open the user-profile dropdown on hover with the same UX as the menu
+ * dropdowns (the user wrapper is #username-container, not .menuSection,
+ * so OpenEMR's tab-CSS hover-open rule doesn't apply to it by default). */
+nav.navbar #username-container:hover > .userfunctions {
+  display: block !important;
 }
 
 /* The "Search by any demographic" pill — separate the input from the
