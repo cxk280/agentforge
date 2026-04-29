@@ -346,78 +346,17 @@ nav.navbar form[name="frm_search_globals"] button#search_globals i.fa-search {
 }
 .body_top .navbar .btn-primary:hover { background: #006f6f !important; }
 
-/* ── App-level tab strip (the row below header2) ─────────────────────────
- * OpenEMR's tabs ship as bordered "card" tabs with refresh / lock / close
- * icon clusters. Figma Screen 5 shows a flat, text-only section nav with
- * a teal-underline on the active section. Override the visuals here:
- * - flat tabs with no border box and a subtle bottom border on the strip
- * - text-only labels at rest (icons hidden) — close/refresh/lock removed
- *   from the visual layer; the click handlers remain wired in the DOM
- * - active tab gets a teal-text + teal-underline treatment
- */
+/* ── App-level tab strip ────────────────────────────────────────────────
+ * Hidden entirely — the top-nav header already exposes the same set of
+ * destinations (Calendar, Messages, Reports, Admin, More, etc.), so the
+ * iframe-switcher tab strip below header2 was redundant. Knockout still
+ * renders #tabs_div and tracks which frame is active, but the strip is
+ * not painted. Switching between sections is done from the header menu,
+ * which navigates the existing iframe/tab collection underneath. */
+#tabs_div,
 .body_top .tabControls {
-  background: var(--cp-surface) !important;
-  border-bottom: 1px solid var(--cp-border) !important;
-  padding: 0 12px !important;
-  margin: 0 !important;
-  overflow: hidden !important;
-}
-.body_top .tabSpan {
-  background: transparent !important;
-  border: none !important;
-  border-bottom: 3px solid transparent !important;
-  border-radius: 0 !important;
-  padding: 12px 16px !important;
-  margin: 0 !important;
-  font-size: 13px !important;
-  font-weight: 500 !important;
-  color: var(--cp-text-2) !important;
-  transition: color 0.12s, border-color 0.12s;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex: 0 0 auto;
-}
-.body_top .tabSpan:hover {
-  color: var(--cp-teal) !important;
-}
-.body_top .tabSpan.bgcolor2 {
-  background: transparent !important;
-}
-/* Active tab — Knockout adds .visible class via tabsNoHover toggling, but
- * the canonical "selected" styling is the absence of .tabsNoHover plus
- * being focused. OpenEMR also marks the visible tab via the
- * `.tabSpan:not(.tabsNoHover)` pattern paired with the iframe display. */
-.body_top .tabSpan:not(.tabsNoHover):focus,
-.body_top .tabSpan.active,
-.body_top .tabSpan.tabSpanSelected {
-  color: var(--cp-teal) !important;
-  font-weight: 600 !important;
-  border-bottom-color: var(--cp-teal) !important;
-}
-.body_top .tabSpan .tabTitle {
-  color: inherit !important;
-  font-weight: inherit !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-/* Hide the refresh / lock / close icon cluster — the Knockout click
- * handlers stay attached but the visual chrome is gone, matching the
- * mockup's clean section nav. */
-.body_top .tabSpan .fa-sync,
-.body_top .tabSpan .fa-lock,
-.body_top .tabSpan .fa-unlock,
-.body_top .tabSpan .fa-times {
   display: none !important;
 }
-/* The leftmost tabsNoHover "spacer" cell that used to host the toggle
- * caret — collapse it now that #patient_caret is hidden */
-.body_top .tabControls > .tabsNoHover.w-1 {
-  width: 0 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-}
-
 /* ── Patient menu / tab strip ────────────────────────────────────────────── */
 ul.menu,
 ul.menu.menu_horizontal,
