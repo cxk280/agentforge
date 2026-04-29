@@ -1,0 +1,164 @@
+# Self-hosted Langfuse v3 stack — used by the Clinical Co-Pilot agent for
+# observability per ARCHITECTURE.md ("Self-hosted Langfuse vs cloud →
+# Self-host. Avoids PHI in third-party trace storage.").
+#
+# Bring up:    docker compose -f docker-compose.yml up -d
+# Bring down:  docker compose -f docker-compose.yml down
+# Reset data:  docker compose -f docker-compose.yml down -v
+#
+# After first start, the LANGFUSE_INIT_* envs below auto-provision a single
+# org / project / admin user. Then set in copilot/agent/.env:
+#   LANGFUSE_HOST=http://localhost:3001
+#   LANGFUSE_PUBLIC_KEY=<the LANGFUSE_INIT_PROJECT_PUBLIC_KEY value below>
+#   LANGFUSE_SECRET_KEY=<the LANGFUSE_INIT_PROJECT_SECRET_KEY value below>
+# and restart the agent.
+#
+# Web UI:      http://localhost:3001  (login admin@example.com / password123)
+# MinIO UI:    http://localhost:9091  (minio / miniosecret)
+#
+# ⚠ The SALT / ENCRYPTION_KEY / passwords below are local-dev placeholders.
+# Rotate them before any non-local deployment.
+
+x-langfuse-shared-env: &langfuse-shared-env
+  DATABASE_URL: postgresql://postgres:postgres@postgres:5432/postgres
+  SALT: copilot-dev-salt
+  # 64 hex chars (256 bits). Generate with: `openssl rand -hex 32`. Must be
+  # quoted so YAML doesn't lossily parse all-zero strings as integer 0.
+  ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+  TELEMETRY_ENABLED: "true"
+  LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: "true"
+  CLICKHOUSE_MIGRATION_URL: clickhouse://clickhouse:9000
+  CLICKHOUSE_URL: http://clickhouse:8123
+  CLICKHOUSE_USER: clickhouse
+  CLICKHOUSE_PASSWORD: clickhouse
+  CLICKHOUSE_CLUSTER_ENABLED: "false"
+  LANGFUSE_S3_EVENT_UPLOAD_ENABLED: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_EVENT_UPLOAD_REGION: auto
+  LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+  LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_EVENT_UPLOAD_PREFIX: events/
+  LANGFUSE_S3_MEDIA_UPLOAD_ENABLED: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: langfuse
+  LANGFUSE_S3_MEDIA_UPLOAD_REGION: auto
+  LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID: minio
+  LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY: miniosecret
+  LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT: http://minio:9000
+  LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE: "true"
+  LANGFUSE_S3_MEDIA_UPLOAD_PREFIX: media/
+  REDIS_HOST: redis
+  REDIS_PORT: 6379
+  REDIS_AUTH: myredissecret
+
+services:
+  langfuse-web:
+    image: langfuse/langfuse:3
+    restart: always
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    ports:
+      - "3001:3000"
+    environment:
+      <<: *langfuse-shared-env
+      NEXTAUTH_URL: http://localhost:3001
+      NEXTAUTH_SECRET: copilot-dev-nextauth-secret
+      # Auto-provision an org/project/admin so traces start working
+      # immediately after `docker compose up -d` (no UI registration step).
+      LANGFUSE_INIT_ORG_ID: agentforge-dev
+      LANGFUSE_INIT_ORG_NAME: AgentForge Local
+      LANGFUSE_INIT_PROJECT_ID: clinical-copilot
+      LANGFUSE_INIT_PROJECT_NAME: Clinical Co-Pilot
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: pk-lf-copilot-local
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: sk-lf-copilot-local-secret-change-me
+      LANGFUSE_INIT_USER_EMAIL: admin@example.com
+      LANGFUSE_INIT_USER_NAME: Admin
+      LANGFUSE_INIT_USER_PASSWORD: password123
+
+  langfuse-worker:
+    image: langfuse/langfuse-worker:3
+    restart: always
+    depends_on:
+      postgres: { condition: service_healthy }
+      clickhouse: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      <<: *langfuse-shared-env
+
+  postgres:
+    image: postgres:15
+    restart: always
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.10
+    restart: always
+    user: "101:101"
+    # `start_period` must be long enough for the entrypoint's user-bootstrap
+    # routine to finish before the healthcheck runs. The bootstrap briefly
+    # starts clickhouse-server in the foreground to apply user/password
+    # settings, then restarts the main server; if the healthcheck races in
+    # during the restart the container is killed and the restart never
+    # completes ("Address already in use" cycles).
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: clickhouse
+      CLICKHOUSE_PASSWORD: clickhouse
+    volumes:
+      - langfuse_clickhouse_data:/var/lib/clickhouse
+      - langfuse_clickhouse_logs:/var/log/clickhouse-server
+
+  minio:
+    image: minio/minio
+    restart: always
+    entrypoint: sh
+    command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    ports:
+      - "9091:9001"  # admin console only — Langfuse hits :9000 over the compose network
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: miniosecret
+    volumes:
+      - langfuse_minio_data:/data
+
+  redis:
+    image: redis:7
+    restart: always
+    command: --requirepass myredissecret
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "myredissecret", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  langfuse_postgres_data:
+  langfuse_clickhouse_data:
+  langfuse_clickhouse_logs:
+  langfuse_minio_data:

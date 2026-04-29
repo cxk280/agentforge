@@ -81,8 +81,8 @@ async def trace_request(
 ) -> AsyncIterator[Any]:
     """Async context manager that opens a top-level trace for one chat turn.
 
-    Yields the Langfuse span (or None when disabled) so callers can call
-    `span.update(output=...)` before the trace closes.
+    Yields the Langfuse observation (or None when disabled) so callers
+    can call `span.update(output=...)` before the trace closes.
     """
     lf = get_langfuse()
     if lf is None:
@@ -96,13 +96,13 @@ async def trace_request(
     if extra:
         metadata.update(extra)
 
-    with lf.start_as_current_span(
+    # Langfuse v4 unifies spans and generations under
+    # start_as_current_observation. as_type="span" for the request root.
+    with lf.start_as_current_observation(
         name=name,
+        as_type="span",
         input={"messages_in_request": True},  # boolean, not the content
     ) as span:
-        # update_current_trace sets attributes on the enclosing trace, not
-        # just this span. Safe to mark user/session IDs here — neither is
-        # PHI on its own.
         try:
             lf.update_current_trace(
                 user_id=user_id or "anonymous",
@@ -130,7 +130,11 @@ def span_tool_call(tool_name: str, *, fhir_resource: str = "") -> Iterator[Any]:
     if fhir_resource:
         inputs["fhir_resource"] = fhir_resource
 
-    with lf.start_as_current_span(name=f"tool:{tool_name}", input=inputs) as span:
+    with lf.start_as_current_observation(
+        name=f"tool:{tool_name}",
+        as_type="span",
+        input=inputs,
+    ) as span:
         yield span
 
 
@@ -152,8 +156,9 @@ def span_generation(
         yield None
         return
 
-    with lf.start_as_current_generation(
+    with lf.start_as_current_observation(
         name=name,
+        as_type="generation",
         model=model,
         input=input_summary or {},
     ) as gen:
