@@ -226,28 +226,14 @@ nav.navbar .userfunctions.dropdown-menu {
   padding: 4px 0 !important;
 }
 /* Override the white menuLabel color rule above when text is inside any
- * dropdown panel. Sweep aggressively — the navbar's white-color rule on
- * .menuLabel.dropdown-toggle ties on specificity with simpler dropdown
- * selectors, so target every reasonable child element of .menuEntries
- * /.userfunctions and every common text-bearing inner element to make
- * sure dropdown text is pure black at rest. */
-nav.navbar .menuEntries,
-nav.navbar .menuEntries .menuLabel,
-nav.navbar .menuEntries .menuLabel.dropdown-toggle,
-nav.navbar .menuEntries li,
-nav.navbar .menuEntries li > .menuLabel,
-nav.navbar .menuEntries li > a,
-nav.navbar .menuEntries li > span,
-nav.navbar .menuEntries li .menuSection,
-nav.navbar .menuEntries li .menuSection > .menuLabel,
-nav.navbar .menuEntries .dropdown-item,
-nav.navbar .menuEntries .dropdown-item > span,
-nav.navbar .userfunctions,
-nav.navbar .userfunctions li,
-nav.navbar .userfunctions li > a,
-nav.navbar .userfunctions li > .menuLabel,
-nav.navbar .userfunctions .dropdown-item,
-nav.navbar .userfunctions .dropdown-item > span {
+ * dropdown panel. Use a universal-descendant sweep with a :not() chain
+ * for icons — this gives us specificity of 0,5,2 which beats the
+ * navbar's white-on-menuLabel rule (0,3,1) for every text element
+ * inside any .menuEntries / .userfunctions dropdown. */
+nav.navbar .menuEntries.dropdown-menu,
+nav.navbar .userfunctions.dropdown-menu,
+nav.navbar .menuEntries.dropdown-menu *:not(i):not(.fa-stack):not([class*=" fa-"]):not([class^="fa-"]),
+nav.navbar .userfunctions.dropdown-menu *:not(i):not(.fa-stack):not([class*=" fa-"]):not([class^="fa-"]) {
   color: #000 !important;
   font-weight: 600 !important;
 }
@@ -256,10 +242,10 @@ nav.navbar .userfunctions .dropdown-item {
   padding: 6px 14px !important;
 }
 /* Keep the FA icons next to dropdown items in their original muted gray */
+nav.navbar .menuEntries i,
+nav.navbar .userfunctions i,
 nav.navbar .menuEntries .text-muted,
-nav.navbar .userfunctions .text-muted,
-nav.navbar .menuEntries i.fa,
-nav.navbar .userfunctions i.fa {
+nav.navbar .userfunctions .text-muted {
   color: #6b7280 !important;
 }
 nav.navbar .menuEntries li:hover,
@@ -462,12 +448,7 @@ ul.menu > li > a.activeMenu {
   font-weight: 500 !important;
   line-height: 20px;
 }
-.cp-demographics-banner .cp-pt-dob::before {
-  content: 'DOB ';
-  color: rgba(255, 255, 255, 0.55) !important;
-  margin-right: 4px;
-  font-weight: 500;
-}
+/* str_dob() already includes a "DOB:" label, so no ::before prefix here */
 /* Action buttons in the banner — inline pills */
 .cp-demographics-banner .btn,
 .cp-demographics-banner .btn-secondary {
