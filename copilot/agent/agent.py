@@ -4,6 +4,12 @@ import json
 import anthropic
 from tools import TOOL_SCHEMAS, TOOL_DISPATCH
 from config import settings
+from observability import (
+    hash_id,
+    span_generation,
+    span_tool_call,
+    trace_request,
+)
 
 client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
 
@@ -35,38 +41,90 @@ def _system_prompt(patient_id: str) -> str:
 async def run_agent(
     patient_id: str,
     messages: list[dict],
+    *,
+    session_id: str = "",
+    user_id: str = "anonymous",
 ) -> tuple[str, list[dict]]:
     """
     Run one turn of the agent loop.
 
     Returns (response_text, updated_messages).
     messages should be the full conversation history in Claude format.
+
+    `session_id` and `user_id` correlate Langfuse traces across turns;
+    `patient_id` is hashed before being included in trace metadata.
     """
     working_messages = list(messages)
 
-    while True:
-        response = await client.messages.create(
-            model=settings.model,
-            max_tokens=1024,
-            system=_system_prompt(patient_id),
-            tools=TOOL_SCHEMAS,
-            messages=working_messages,
-        )
+    async with trace_request(
+        name="copilot_chat_turn",
+        session_id=session_id,
+        user_id=user_id,
+        patient_id=patient_id,
+    ) as turn_span:
+        loop_index = 0
+        while True:
+            loop_index += 1
+            with span_generation(
+                f"claude_messages_create_{loop_index}",
+                model=settings.model,
+                input_summary={
+                    "messages_count": len(working_messages),
+                    "tools_count": len(TOOL_SCHEMAS),
+                },
+            ) as gen:
+                response = await client.messages.create(
+                    model=settings.model,
+                    max_tokens=1024,
+                    system=_system_prompt(patient_id),
+                    tools=TOOL_SCHEMAS,
+                    messages=working_messages,
+                )
+                if gen is not None:
+                    try:
+                        gen.update(
+                            usage_details={
+                                "input": getattr(response.usage, "input_tokens", 0),
+                                "output": getattr(response.usage, "output_tokens", 0),
+                            },
+                            output={"stop_reason": response.stop_reason},
+                        )
+                    except Exception:
+                        pass
 
-        # Append assistant turn to history
-        working_messages.append({"role": "assistant", "content": response.content})
+            # Append assistant turn to history
+            working_messages.append({"role": "assistant", "content": response.content})
 
-        if response.stop_reason == "end_turn":
-            text = _extract_text(response.content)
-            return text, working_messages
+            if response.stop_reason == "end_turn":
+                text = _extract_text(response.content)
+                if turn_span is not None:
+                    try:
+                        turn_span.update(
+                            output={
+                                "stop_reason": "end_turn",
+                                "loops": loop_index,
+                                "reply_length": len(text),
+                            }
+                        )
+                    except Exception:
+                        pass
+                return text, working_messages
 
-        if response.stop_reason == "tool_use":
-            tool_results = await _execute_tools(response.content, patient_id)
-            working_messages.append({"role": "user", "content": tool_results})
-            continue
+            if response.stop_reason == "tool_use":
+                tool_results = await _execute_tools(response.content, patient_id)
+                working_messages.append({"role": "user", "content": tool_results})
+                continue
 
-        # Unexpected stop reason — surface it
-        return f"[Agent stopped: {response.stop_reason}]", working_messages
+            # Unexpected stop reason — surface it
+            if turn_span is not None:
+                try:
+                    turn_span.update(
+                        level="WARNING",
+                        output={"stop_reason": response.stop_reason, "loops": loop_index},
+                    )
+                except Exception:
+                    pass
+            return f"[Agent stopped: {response.stop_reason}]", working_messages
 
 
 async def _execute_tools(content: list, patient_id: str) -> list[dict]:
@@ -76,17 +134,43 @@ async def _execute_tools(content: list, patient_id: str) -> list[dict]:
     tool_blocks = [b for b in content if b.type == "tool_use"]
 
     async def call_one(block) -> dict:
-        tool_fn = TOOL_DISPATCH.get(block.name)
-        if tool_fn is None:
-            result = {"error": f"Unknown tool: {block.name}"}
-        else:
-            try:
-                inputs = dict(block.input)
-                # Enforce the active patient — tool cannot query other patients
-                inputs["patient_id"] = patient_id
-                result = await tool_fn(**inputs)
-            except Exception as exc:
-                result = {"error": str(exc)}
+        with span_tool_call(block.name) as span:
+            tool_fn = TOOL_DISPATCH.get(block.name)
+            error_type: str | None = None
+            success = True
+            if tool_fn is None:
+                result = {"error": f"Unknown tool: {block.name}"}
+                error_type = "unknown_tool"
+                success = False
+            else:
+                try:
+                    inputs = dict(block.input)
+                    # Enforce the active patient — tool cannot query other patients
+                    inputs["patient_id"] = patient_id
+                    result = await tool_fn(**inputs)
+                    if isinstance(result, dict) and "error" in result:
+                        error_type = "tool_error"
+                        success = False
+                except Exception as exc:
+                    result = {"error": str(exc)}
+                    error_type = type(exc).__name__
+                    success = False
+
+            # Record outcome (no PHI — only counts and error types)
+            if span is not None:
+                try:
+                    output_summary: dict = {"success": success}
+                    if error_type:
+                        output_summary["error_type"] = error_type
+                    if isinstance(result, dict) and not error_type:
+                        # Just the shape, never the values
+                        output_summary["result_keys"] = list(result.keys())
+                    span.update(
+                        output=output_summary,
+                        level="ERROR" if not success else "DEFAULT",
+                    )
+                except Exception:
+                    pass
 
         return {
             "type": "tool_result",

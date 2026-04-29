@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from agent import run_agent
 from fhir_client import fhir_get, bundle_entries
+from observability import flush as langfuse_flush
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -18,6 +19,8 @@ STATIC_DIR = Path(__file__).parent / "static"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     yield
+    # Drain queued Langfuse events on shutdown so traces aren't lost
+    langfuse_flush()
 
 
 app = FastAPI(title="Clinical Co-Pilot", lifespan=lifespan)
@@ -112,7 +115,11 @@ async def chat(req: ChatRequest):
     history.append({"role": "user", "content": req.message})
 
     try:
-        reply, updated_history = await run_agent(req.patient_id, history)
+        reply, updated_history = await run_agent(
+            req.patient_id,
+            history,
+            session_id=req.session_id,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
