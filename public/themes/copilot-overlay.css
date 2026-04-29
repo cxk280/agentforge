@@ -207,15 +207,18 @@ nav.navbar .userfunctions.dropdown-menu {
   padding: 4px 0 !important;
 }
 /* Override the white menuLabel color rule above when the label is inside
- * a dropdown panel — text needs to be dark on the white surface */
+ * a dropdown panel — text needs to be dark on the white surface and a
+ * touch heavier than the standard #0D1B2A so it reads cleanly */
 nav.navbar .menuEntries .menuLabel,
 nav.navbar .menuEntries li .menuLabel,
 nav.navbar .menuEntries li {
-  color: var(--cp-text) !important;
+  color: #050a14 !important;
+  font-weight: 500 !important;
 }
 nav.navbar .menuEntries .dropdown-item,
 nav.navbar .userfunctions .dropdown-item {
-  color: var(--cp-text) !important;
+  color: #050a14 !important;
+  font-weight: 500 !important;
   padding: 6px 14px !important;
 }
 nav.navbar .menuEntries li:hover,
@@ -224,6 +227,27 @@ nav.navbar .menuEntries .dropdown-item:hover,
 nav.navbar .userfunctions .dropdown-item:hover {
   background: var(--cp-teal-soft) !important;
   color: var(--cp-teal) !important;
+}
+
+/* Hover bridge — OpenEMR's tab CSS uses .menuSection:hover > .menuEntries
+ * to open the dropdown on hover. Bootstrap positions the dropdown with a
+ * small visible gap below the trigger, so the cursor briefly leaves the
+ * .menuSection while transiting from trigger to panel and the dropdown
+ * disappears. Add a transparent pseudo-element that fills that gap so
+ * the hover state stays continuous. */
+nav.navbar .menuSection.dropdown {
+  position: relative;
+}
+nav.navbar .menuSection.dropdown::before {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  height: 8px;
+  background: transparent;
+  pointer-events: auto;
+  z-index: 1001;
 }
 
 /* The "Search by any demographic" pill — separate the input from the
