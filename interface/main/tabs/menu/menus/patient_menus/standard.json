@@ -26,11 +26,7 @@
         "url": "interface/copilot/index.php?pid=",
         "pid":"true",
         "children": [],
-        "requirement": 0,
-        "acl_req": [
-            "patients",
-            "demo"
-        ]
+        "requirement": 0
     },
     {
         "label": "Assessments",
