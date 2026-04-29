@@ -126,10 +126,14 @@ if (OEGlobalsBag::getInstance()->getBoolean('enable_cdr')) {
         }
     }
     SessionUtil::setSession('alert_notify_pid', $pid);
-    // can not output html until after above setSession call
-    if (!empty($allergyWarningMessage)) {
-        echo $allergyWarningMessage;
-    }
+    // The legacy <script>alert(...)</script> popup for new-allergy conflicts
+    // is suppressed here. The active allergies are surfaced gracefully in
+    // the demographics banner (see header2 allergy pill) and the chart's
+    // Allergies card. TODO: surface medication/allergy conflicts inline in
+    // the banner or via the Co-Pilot panel when one is detected.
+    // if (!empty($allergyWarningMessage)) {
+    //     echo $allergyWarningMessage;
+    // }
 }
 //Check to see is only one insurance is allowed
 $insurance_array = OEGlobalsBag::getInstance()->getBoolean('insurance_only_one') ? ['primary'] : ['primary', 'secondary', 'tertiary'];
@@ -860,12 +864,13 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 url: $("#birthday_popup").attr('href')
             });
 
-                <?php } elseif ($active_reminders || $all_allergy_alerts) { ?>
-            openReminderPopup();
-            <?php } ?>
-            <?php } elseif ($active_reminders || $all_allergy_alerts) { ?>
-            openReminderPopup();
-            <?php } ?>
+                <?php } /* elseif ($active_reminders || $all_allergy_alerts) {
+                    Active-reminder popup suppressed — info to be surfaced
+                    inline in header2 / Co-Pilot rather than as a modal.
+                } */ ?>
+            <?php } /* elseif ($active_reminders || $all_allergy_alerts) {
+                Active-reminder popup suppressed — same reason as above.
+            } */ ?>
         });
 
         /**
