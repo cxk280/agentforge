@@ -257,21 +257,93 @@ ul.menu > li > a.activeMenu {
 }
 
 /* ── Patient demographics banner ─────────────────────────────────────────── */
-#patient_caption,
-.patient_caption,
-.patient-caption-bar,
-.patient_information {
-  background: var(--cp-navy-2) !important;
+/* The Knockout patient-data-template renders into the secondary frame.
+ * Styling .cp-demographics-banner turns it into the navy band from
+ * Figma Screen 5: patient name (bold white) + MRN + DOB inline. */
+.cp-demographics-banner {
+  background: linear-gradient(90deg, var(--cp-navy) 0%, var(--cp-navy-2) 100%) !important;
   color: #fff !important;
-  border-radius: var(--cp-radius) !important;
-  padding: 10px 16px !important;
-  margin: 8px !important;
-  border: none !important;
+  padding: 10px 18px !important;
+  border-radius: 10px !important;
+  margin: 6px 8px !important;
+  align-items: center !important;
+  gap: 16px;
 }
-#patient_caption a,
-#patient_caption .label,
-.patient_caption a {
+.cp-demographics-banner .cp-patient-photo {
+  margin: 0 12px 0 0 !important;
+}
+.cp-demographics-banner .cp-patient-photo .img-thumbnail {
+  width: 40px !important; height: 40px !important;
+  border-radius: 50% !important;
+  border: 2px solid rgba(255, 255, 255, 0.18) !important;
+  background: rgba(255, 255, 255, 0.06) !important;
+  padding: 0 !important;
+  object-fit: cover;
+}
+.cp-demographics-banner .ptName {
+  color: #fff !important;
+  text-decoration: none !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.1px;
+}
+.cp-demographics-banner .cp-pt-name { color: #fff !important; }
+.cp-demographics-banner .cp-pt-mrn {
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-weight: 500 !important;
+  font-size: 12px !important;
+  margin-left: 8px;
+}
+.cp-demographics-banner .cp-pt-mrn::before {
+  content: 'MRN ';
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+.cp-demographics-banner .cp-pt-dob {
+  display: inline-block !important;
+  margin-top: 2px !important;
+  margin-left: 0 !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 12px !important;
+}
+.cp-demographics-banner .cp-pt-dob::before {
+  content: 'DOB ';
+  color: rgba(255, 255, 255, 0.5) !important;
+  margin-right: 4px;
+  font-weight: 500;
+}
+/* Action buttons in the banner — inline pills */
+.cp-demographics-banner .btn,
+.cp-demographics-banner .btn-secondary {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #fff !important;
+  border-radius: 999px !important;
+  font-size: 12px !important;
+  padding: 4px 12px !important;
+}
+.cp-demographics-banner .btn:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+.cp-demographics-banner .badge-primary,
+.cp-demographics-banner .badge-success,
+.cp-demographics-banner .badge-danger {
+  border-radius: 999px !important;
+  padding: 2px 8px;
+}
+.cp-demographics-banner .text-muted,
+.cp-demographics-banner small.text-muted {
+  color: rgba(255, 255, 255, 0.55) !important;
+}
+.cp-demographics-banner .patientCurrentEncounter {
+  color: rgba(255, 255, 255, 0.85) !important;
+  font-size: 12px !important;
+}
+.cp-demographics-banner .patientCurrentEncounter a {
   color: var(--cp-teal-accent) !important;
+}
+.cp-demographics-banner .fa-times {
+  color: rgba(255, 255, 255, 0.4) !important;
 }
 
 /* ── Cards & widgets in the patient chart ────────────────────────────────── */

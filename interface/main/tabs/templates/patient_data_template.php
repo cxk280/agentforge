@@ -48,15 +48,15 @@ switch ($search_any_type) {
 
 ?>
 <script type="text/html" id="patient-data-template">
-    <div class="d-lg-inline-flex w-100">
+    <div class="d-lg-inline-flex w-100 cp-demographics-banner">
         <div class="flex-fill">
             <div class="float-left mx-2">
                 <!-- ko if: patient -->
-                <div data-bind="with: patient" class="patientPicture">
+                <div data-bind="with: patient" class="patientPicture cp-patient-photo">
                     <img data-bind="attr: {src: patient_picture}"
                         class="img-thumbnail"
-                        width="75"
-                        height="75"
+                        width="48"
+                        height="48"
                         onError="this.src = '<?php echo OEGlobalsBag::getInstance()->getKernel()->getImagesRelative(); ?>/patient-picture-default.png'" />
                 </div>
                 <!-- /ko -->
@@ -98,8 +98,8 @@ switch ($search_any_type) {
                 echo "<$wrapperElement class=\"$wrapperElementClass\">";
                 ?>
                     <a class="ptName <?php echo $classes ?? ''; ?> " data-bind="click:refreshPatient,with: patient" href="#" title="<?php echo xla("To Dashboard") ?>">
-                        <span data-bind="text: pname()"></span>
-                        <<?php echo $pubpidElement;?> class="text-muted">(<span data-bind="text: pubpid"></span>)</<?php echo $pubpidElement;?>>
+                        <span class="cp-pt-name" data-bind="text: pname()"></span>
+                        <<?php echo $pubpidElement;?> class="text-muted cp-pt-mrn">#<span data-bind="text: pubpid"></span></<?php echo $pubpidElement;?>>
                     </a>
                     <?php echo ($closeElement !== '') ? "<$closeElement class=\"$closeElementClass\">" : ''; ?>
                     <a href="#" class="pt-1<?php echo (($classes ?? '') !== "") ? " " . $classes : "";?> <?php echo ($closeAnchorClasses !== "") ? " " . $closeAnchorClasses : ""; ?>" data-bind="click:clearPatient" title="<?php echo xla("Close Patient Chart") ?>">
@@ -108,7 +108,7 @@ switch ($search_any_type) {
                     <?php echo ($closeElement !== '') ? "</$closeElement>" : ''; ?>
                 <?php echo "</$wrapperElement>"; ?>
 
-                <div class="mt-2">
+                <div class="mt-2 cp-pt-dob">
                     <span data-bind="text:patient().str_dob()"></span>
                 </div>
                 <!-- /ko -->
