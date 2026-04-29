@@ -925,7 +925,29 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 echo js_escape(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " (" . getPatientAgeDisplay($result['DOB_YMD']) . " " . xl('yrs') . ")");
             } else {
                 echo js_escape(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " (" . xl('Age at death') . ": " . oeFormatAge($result['DOB_YMD'], $date_of_death) . ")");
-            } ?>);
+            }
+            // Provider / Insurance / Allergies for the demographics banner
+            $cpProviderName = '';
+            if (!empty($result['providerID'])) {
+                $cpProviderName = trim(getProviderName($result['providerID']));
+            }
+            $cpInsuranceName = $insco_name ?? '';
+            $cpAllergies = [];
+            $cpAllergyRes = sqlStatement(
+                "SELECT title FROM lists WHERE pid = ? AND type = 'allergy' "
+                . "AND (enddate IS NULL OR enddate = '0000-00-00' OR enddate > CURDATE()) "
+                . "ORDER BY date DESC",
+                [$pid]
+            );
+            while ($row = sqlFetchArray($cpAllergyRes)) {
+                if (!empty($row['title'])) {
+                    $cpAllergies[] = $row['title'];
+                }
+            }
+            echo "," . js_escape($cpProviderName)
+                . "," . js_escape($cpInsuranceName)
+                . "," . json_encode($cpAllergies);
+            ?>);
             var EncounterDateArray = [];
             var CalendarCategoryArray = [];
             var EncounterIdArray = [];

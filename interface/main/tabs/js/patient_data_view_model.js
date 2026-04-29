@@ -19,13 +19,16 @@ function encounter_data(id,date,category)
     return this;
 }
 
-function patient_data_view_model(pname,pid,pubpid,str_dob)
+function patient_data_view_model(pname,pid,pubpid,str_dob,provider,insurance,allergies)
 {
     var self=this;
     self.pname=ko.observable(pname);
     self.pid=ko.observable(pid);
     self.pubpid=ko.observable(pubpid);
     self.str_dob=ko.observable(str_dob);
+    self.provider=ko.observable(provider || '');
+    self.insurance=ko.observable(insurance || '');
+    self.allergies=ko.observableArray(allergies || []);
     self.patient_picture=ko.computed(function(){
       return webroot_url + '/controller.php' +
              '?document&retrieve' +

@@ -437,7 +437,9 @@ ul.menu > li > a.activeMenu {
   margin-right: 4px;
   font-weight: 500;
 }
-.cp-demographics-banner .cp-pt-dob {
+.cp-demographics-banner .cp-pt-dob,
+.cp-demographics-banner .cp-pt-provider,
+.cp-demographics-banner .cp-pt-insurance {
   display: inline-flex !important;
   align-items: center;
   margin-left: 16px !important;
@@ -449,6 +451,38 @@ ul.menu > li > a.activeMenu {
   line-height: 20px;
 }
 /* str_dob() already includes a "DOB:" label, so no ::before prefix here */
+
+.cp-demographics-banner .cp-pt-provider::before {
+  content: 'Provider: ';
+  color: rgba(255, 255, 255, 0.55) !important;
+  margin-right: 4px;
+  font-weight: 500;
+}
+.cp-demographics-banner .cp-pt-insurance::before {
+  content: 'Insurance: ';
+  color: rgba(255, 255, 255, 0.55) !important;
+  margin-right: 4px;
+  font-weight: 500;
+}
+
+/* Allergy alert pill — pushed to the far right of the banner via auto margin */
+.cp-demographics-banner .cp-pt-allergy-pill {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto !important;
+  background: rgba(214, 62, 46, 0.18) !important;
+  color: #ffb7ad !important;
+  border: 1px solid rgba(214, 62, 46, 0.35) !important;
+  border-radius: 999px !important;
+  padding: 4px 12px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+.cp-demographics-banner .cp-pt-allergy-pill .cp-allergy-icon {
+  font-size: 13px;
+  color: #ff8c7d !important;
+}
 /* Action buttons in the banner — inline pills */
 .cp-demographics-banner .btn,
 .cp-demographics-banner .btn-secondary {
