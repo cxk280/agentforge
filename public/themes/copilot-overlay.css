@@ -82,10 +82,31 @@ nav.navbar .menuLabel.dropdown-toggle,
 nav.navbar .menuLabel .caret {
   color: rgba(255, 255, 255, 0.92) !important;
 }
+/* Top-level header items: ONLY change text color on hover, never add a
+ * background. OpenEMR's compiled style_light.css ships an
+ *   .appMenu li:hover, .appMenu>span:hover { background-color:#e5e7eb }
+ * rule that flashes light gray on certain elements; suppress any
+ * background change for the navbar items themselves. */
+nav.navbar .menuLabel,
+nav.navbar .menuSection,
+nav.navbar .menuSection .menuLabel,
+nav.navbar .appMenu > div,
+nav.navbar .appMenu > div .menuLabel {
+  background: transparent !important;
+  background-color: transparent !important;
+}
 nav.navbar .menuLabel:hover,
 nav.navbar .menuLabel a:hover,
+nav.navbar .menuLabel:focus,
 nav.navbar .nav-link:hover,
-nav.navbar .appMenu a:hover {
+nav.navbar .appMenu a:hover,
+nav.navbar .appMenu > div:hover,
+nav.navbar .appMenu > div:hover .menuLabel,
+nav.navbar .menuSection:hover,
+nav.navbar .menuSection:hover .menuLabel,
+nav.navbar .menuSection.show .menuLabel {
+  background: transparent !important;
+  background-color: transparent !important;
   color: var(--cp-teal-accent) !important;
 }
 nav.navbar .navbar-toggler-icon {
@@ -203,11 +224,6 @@ nav.navbar .menuEntries .dropdown-item:hover,
 nav.navbar .userfunctions .dropdown-item:hover {
   background: var(--cp-teal-soft) !important;
   color: var(--cp-teal) !important;
-}
-/* Pad the dropdown-toggle so a hover reaching the panel passes through
- * a continuous hit zone */
-nav.navbar .menuSection.dropdown {
-  padding-bottom: 4px;
 }
 
 /* The "Search by any demographic" pill — separate the input from the
