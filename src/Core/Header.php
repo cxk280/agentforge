@@ -126,6 +126,17 @@ class Header
             $output .= "<!-- Module Styles Ended -->";
         }
 
+        // Clinical Co-Pilot visual overlay — restyles login, main shell, and the
+        // patient chart chrome to match the AgentForge Figma mockups. Loaded
+        // last so it cascades over the active OpenEMR theme.
+        $webRoot = $GLOBALS['web_root'] ?? '';
+        $overlayPath = ($GLOBALS['webserver_root'] ?? '') . '/public/themes/copilot-overlay.css';
+        if (is_file($overlayPath)) {
+            $version = filemtime($overlayPath);
+            $output .= "<link rel=\"stylesheet\" href=\"" . attr($webRoot)
+                . "/public/themes/copilot-overlay.css?v=" . attr((string)$version) . "\" />\n";
+        }
+
         if ($echoOutput) {
             echo $output;
         }

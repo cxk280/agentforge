@@ -1,0 +1,381 @@
+/*
+ * Clinical Co-Pilot visual overlay
+ *
+ * Layered on top of OpenEMR's compiled theme to bring the chrome in line with
+ * the AgentForge / Clinical Co-Pilot Figma mockups. Loaded globally by
+ * src/Core/Header.php::setupHeader() so login, main shell, and every patient
+ * chart page picks it up.
+ *
+ * Palette and component shapes mirror copilot/agent/static/chat.html so the
+ * embedded chat panel and the EHR around it read as one product.
+ */
+
+/* Inter is loaded by the embedded Co-Pilot iframe; the EHR chrome falls back
+ * to the system stack to avoid an extra blocking request on every page load.
+ * If you want Inter everywhere, add a non-blocking <link> to Google Fonts in
+ * src/Core/Header.php instead of @import-ing here. */
+
+:root {
+  --cp-navy:        #0D1B2A;
+  --cp-navy-2:      #152A42;
+  --cp-teal:        #008C8C;
+  --cp-teal-soft:   rgba(0, 140, 140, 0.10);
+  --cp-teal-accent: #5FD0D0;
+  --cp-bg:          #F5F7F8;
+  --cp-surface:     #FFFFFF;
+  --cp-border:      #E4E5E8;
+  --cp-text:        #0D1B2A;
+  --cp-text-2:      #4F5662;
+  --cp-text-3:      #8A91A0;
+  --cp-red:         #D63E2E;
+  --cp-amber:       #F08C33;
+  --cp-green:       #26A65B;
+  --cp-radius:      10px;
+  --cp-radius-pill: 999px;
+  --cp-shadow:      0 1px 2px rgba(13, 27, 42, 0.04), 0 4px 12px rgba(13, 27, 42, 0.04);
+}
+
+/* ── Typography ──────────────────────────────────────────────────────────── */
+html,
+body,
+.body_top,
+.body_bottom,
+.body_title,
+.title,
+input,
+select,
+textarea,
+button,
+.btn,
+.appMenu a,
+.dropdown-item {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--cp-bg) !important;
+  color: var(--cp-text);
+}
+
+/* ── Top navbar (main shell) ─────────────────────────────────────────────── */
+nav.navbar.navbar-expand-xl.navbar-light.bg-light,
+.body_top .navbar.bg-light {
+  background: var(--cp-navy) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  padding: 6px 16px !important;
+}
+
+/* The KO-rendered top menu uses .menuLabel divs and .menuEntries dropdowns */
+nav.navbar .menuLabel,
+nav.navbar .menuLabel a,
+nav.navbar .navbar-brand,
+nav.navbar .navbar-brand a,
+nav.navbar .navbar-toggler,
+nav.navbar .nav-link,
+nav.navbar .appMenu,
+nav.navbar .appMenu a,
+nav.navbar .btn-link,
+nav.navbar #username,
+nav.navbar .menuLabel.dropdown-toggle,
+nav.navbar .menuLabel .caret {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+nav.navbar .menuLabel:hover,
+nav.navbar .menuLabel a:hover,
+nav.navbar .nav-link:hover,
+nav.navbar .appMenu a:hover {
+  color: var(--cp-teal-accent) !important;
+}
+nav.navbar .navbar-toggler-icon {
+  filter: invert(1) brightness(2);
+}
+nav.navbar .navbar-brand img {
+  filter: brightness(0) invert(1);
+  opacity: 0.95;
+}
+
+/* Dropdown items that fly out from the top nav stay on white surfaces */
+nav.navbar .menuEntries.dropdown-menu,
+nav.navbar .userfunctions.dropdown-menu {
+  background: var(--cp-surface) !important;
+  border: 1px solid var(--cp-border) !important;
+  border-radius: 10px !important;
+  box-shadow: var(--cp-shadow) !important;
+}
+nav.navbar .menuEntries .dropdown-item,
+nav.navbar .userfunctions .dropdown-item {
+  color: var(--cp-text) !important;
+}
+nav.navbar .menuEntries .dropdown-item:hover,
+nav.navbar .userfunctions .dropdown-item:hover {
+  background: var(--cp-teal-soft) !important;
+  color: var(--cp-teal) !important;
+}
+
+/* The "Search by any demographic" pill */
+.body_top .navbar input[type="text"],
+.body_top .navbar input[type="search"],
+.body_top .navbar .form-control {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border-radius: var(--cp-radius-pill) !important;
+  padding: 6px 14px !important;
+  height: auto !important;
+}
+.body_top .navbar input::placeholder { color: rgba(255, 255, 255, 0.55) !important; }
+.body_top .navbar input:focus {
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: var(--cp-teal-accent) !important;
+  box-shadow: 0 0 0 3px var(--cp-teal-soft) !important;
+}
+
+/* Top-nav primary buttons — pill teal */
+.body_top .navbar .btn-primary,
+.body_top .navbar .btn-secondary {
+  border-radius: var(--cp-radius-pill) !important;
+  font-weight: 500 !important;
+  border-color: transparent !important;
+}
+.body_top .navbar .btn-primary {
+  background: var(--cp-teal) !important;
+  color: #fff !important;
+}
+.body_top .navbar .btn-primary:hover { background: #006f6f !important; }
+
+/* ── Patient menu / tab strip ────────────────────────────────────────────── */
+ul.menu,
+ul.menu.menu_horizontal,
+ul.menu_horizontal {
+  background: var(--cp-surface) !important;
+  border-bottom: 1px solid var(--cp-border) !important;
+  padding: 0 12px !important;
+}
+ul.menu > li > a,
+ul.menu_horizontal > li > a {
+  color: var(--cp-text-2) !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+  letter-spacing: 0.1px !important;
+  padding: 12px 16px !important;
+  border: none !important;
+  border-bottom: 3px solid transparent !important;
+  transition: color 0.12s, border-color 0.12s;
+}
+ul.menu > li > a:hover,
+ul.menu_horizontal > li > a:hover {
+  color: var(--cp-teal) !important;
+  background: transparent !important;
+}
+ul.menu > li > a.active,
+ul.menu > li.active > a,
+ul.menu_horizontal > li.active > a,
+ul.menu > li > a.activeMenu {
+  color: var(--cp-teal) !important;
+  font-weight: 600 !important;
+  border-bottom-color: var(--cp-teal) !important;
+  background: transparent !important;
+}
+
+/* ── Patient demographics banner ─────────────────────────────────────────── */
+#patient_caption,
+.patient_caption,
+.patient-caption-bar,
+.patient_information {
+  background: var(--cp-navy-2) !important;
+  color: #fff !important;
+  border-radius: var(--cp-radius) !important;
+  padding: 10px 16px !important;
+  margin: 8px !important;
+  border: none !important;
+}
+#patient_caption a,
+#patient_caption .label,
+.patient_caption a {
+  color: var(--cp-teal-accent) !important;
+}
+
+/* ── Cards & widgets in the patient chart ────────────────────────────────── */
+.summary_item,
+.summary_box,
+.card,
+.widget {
+  background: var(--cp-surface) !important;
+  border: 1px solid var(--cp-border) !important;
+  border-radius: var(--cp-radius) !important;
+  box-shadow: var(--cp-shadow) !important;
+}
+.summary_title,
+.card-header,
+.widget-header {
+  background: transparent !important;
+  border-bottom: 1px solid var(--cp-border) !important;
+  color: var(--cp-navy) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.6px !important;
+  text-transform: uppercase !important;
+  padding: 10px 14px !important;
+}
+.summary_title a,
+.summary_title .title,
+.summary_title b {
+  color: var(--cp-navy) !important;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.btn-primary,
+button.submit,
+input[type="submit"].btn-primary {
+  background: var(--cp-teal) !important;
+  border-color: var(--cp-teal) !important;
+  color: #fff !important;
+  border-radius: var(--cp-radius-pill) !important;
+  padding: 6px 18px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.1px !important;
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background: #006f6f !important;
+  border-color: #006f6f !important;
+  box-shadow: 0 0 0 3px var(--cp-teal-soft) !important;
+}
+.btn-secondary,
+.btn-outline-secondary {
+  border-radius: var(--cp-radius-pill) !important;
+  font-weight: 500 !important;
+}
+.btn-link { color: var(--cp-teal) !important; }
+.btn-link:hover { color: #006f6f !important; }
+
+/* ── Form inputs ─────────────────────────────────────────────────────────── */
+.form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+select,
+textarea {
+  border: 1px solid var(--cp-border) !important;
+  border-radius: var(--cp-radius) !important;
+  background: var(--cp-surface) !important;
+  color: var(--cp-text) !important;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.form-control:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--cp-teal) !important;
+  box-shadow: 0 0 0 3px var(--cp-teal-soft) !important;
+  outline: none !important;
+}
+
+/* ── Login page ──────────────────────────────────────────────────────────── */
+body.login {
+  background: var(--cp-bg) !important;
+}
+/* Decorative side bands only — never the main form container */
+.horizontal-band > .band,
+.horizontal-band-left-logo > .band,
+.horizontal-band-right-logo > .band {
+  background: linear-gradient(135deg, var(--cp-navy) 0%, var(--cp-navy-2) 100%) !important;
+  color: #fff !important;
+}
+.band .tagline,
+.band h1,
+.band h2 {
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+/* The .box container in box-style layouts gets the white card treatment */
+.horizontal-box .box,
+.vertical-box .box,
+.login-box {
+  background: var(--cp-surface) !important;
+  border: 1px solid var(--cp-border) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 6px 24px rgba(13, 27, 42, 0.10) !important;
+  padding: 28px !important;
+}
+/* Login submit button across all layouts */
+.box .btn-primary,
+.vertical-band .btn-primary,
+.login-form .btn-primary {
+  background: var(--cp-teal) !important;
+  border-color: var(--cp-teal) !important;
+  border-radius: var(--cp-radius-pill) !important;
+  padding: 10px 18px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* ── Source-citation chips (matches the copilot UI) ──────────────────────── */
+.cp-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--cp-teal-soft);
+  color: var(--cp-teal);
+  border-radius: var(--cp-radius-pill);
+  padding: 3px 10px;
+  font-size: 11px; font-weight: 500;
+}
+.cp-chip::before {
+  content: ''; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--cp-teal);
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+table.table,
+.summary_box table,
+.dehead,
+.dehead2 {
+  border-color: var(--cp-border) !important;
+}
+table.table thead th,
+.summary_box table th {
+  background: rgba(13, 27, 42, 0.04) !important;
+  color: var(--cp-navy) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.4px !important;
+  text-transform: uppercase !important;
+  border-color: var(--cp-border) !important;
+}
+table.table td {
+  border-color: var(--cp-border) !important;
+  color: var(--cp-text) !important;
+}
+
+/* ── Co-Pilot tab — make it pop ──────────────────────────────────────────── */
+ul.menu > li > a[href*="copilot"],
+ul.menu_horizontal > li > a[href*="copilot"] {
+  position: relative;
+}
+ul.menu > li > a[href*="copilot"]::before,
+ul.menu_horizontal > li > a[href*="copilot"]::before {
+  content: '✦';
+  margin-right: 6px;
+  color: var(--cp-teal);
+  font-size: 11px;
+  vertical-align: middle;
+}
+
+/* ── Modal-ish popovers cleanup ──────────────────────────────────────────── */
+.modal-content,
+.popover {
+  border-radius: 14px !important;
+  border-color: var(--cp-border) !important;
+  box-shadow: var(--cp-shadow) !important;
+}
+.modal-header { border-bottom-color: var(--cp-border) !important; }
+.modal-footer { border-top-color: var(--cp-border) !important; }
+
+/* ── Scrollbar polish ────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(13, 27, 42, 0.18); border-radius: 8px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(13, 27, 42, 0.30); }
+::-webkit-scrollbar-track { background: transparent; }
