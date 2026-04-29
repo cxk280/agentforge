@@ -519,10 +519,15 @@ $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->get
         <div class="mainFrames d-flex flex-row" id="mainFrames_div">
             <div id="framesDisplay" data-bind="template: {name: 'tabs-frames', data: application_data}"></div>
         </div>
-        <?php echo $twig->render("product_registration/product_registration_modal.html.twig", [
+        <?php /* TEMP-DISABLED-PRODUCT-REGISTRATION — re-enable before Railway deploy.
+         * Suppressed during local UI work (2026-04-29) so the dev cycle isn't
+         * interrupted by the registration modal on every fresh login. Restore
+         * by removing the comment markers around the twig render below.
+        echo $twig->render("product_registration/product_registration_modal.html.twig", [
             'webroot' => $webroot,
             'allowEmail' => $allowEmail ?? false,
-            'allowTelemetry' => $allowTelemetry ?? false]); ?>
+            'allowTelemetry' => $allowTelemetry ?? false]);
+        */ ?>
     </div>
     <div id="versionFooter" class="text-muted" style="position:fixed; bottom:4px; inset-inline-end:8px; font-size:11px; pointer-events:none; z-index:4;">
         <?php echo $softwareVersion; ?>
@@ -561,10 +566,17 @@ $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->get
     // fire off an event here
     $dispatcher->dispatch(new RenderEvent(), RenderEvent::EVENT_BODY_RENDER_POST);
 
+    // TEMP-DISABLED-PRODUCT-REGISTRATION — re-enable before Railway deploy.
+    // The modal HTML above and this JS launcher were both suppressed
+    // 2026-04-29 to keep the dev login flow uninterrupted while iterating
+    // on the UI. Restore the original `if (...) { echo ...; }` block to
+    // bring the registration popup back.
+    /*
     if ($allowRegisterDialog !== false) { // disable if running unit tests.
         // Include the product registration js, telemetry and usage data reporting dialog
         echo $twig->render("product_registration/product_reg.js.twig", ['webroot' => $webroot]);
     }
+    */
 
     ?>
 </body>
