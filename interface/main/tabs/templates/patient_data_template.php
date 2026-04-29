@@ -102,11 +102,6 @@ switch ($search_any_type) {
                         <span class="cp-pt-name" data-bind="text: pname()"></span>
                         <<?php echo $pubpidElement;?> class="text-muted cp-pt-mrn">#<span data-bind="text: pubpid"></span></<?php echo $pubpidElement;?>>
                     </a>
-                    <?php echo ($closeElement !== '') ? "<$closeElement class=\"$closeElementClass\">" : ''; ?>
-                    <a href="#" class="pt-1<?php echo (($classes ?? '') !== "") ? " " . $classes : "";?> <?php echo ($closeAnchorClasses !== "") ? " " . $closeAnchorClasses : ""; ?>" data-bind="click:clearPatient" title="<?php echo xla("Close Patient Chart") ?>">
-                        <i class="fa fa-times<?php echo ($closeIconClass !== "") ? " " . $closeIconClass : ""; ?>"></i>
-                    </a>
-                    <?php echo ($closeElement !== '') ? "</$closeElement>" : ''; ?>
                 <?php echo "</$wrapperElement>"; ?>
 
                 <span class="cp-pt-dob">

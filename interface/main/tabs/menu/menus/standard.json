@@ -1280,7 +1280,7 @@
     "menu_id": "morimg",
     "children": [
       {
-        "label": "Finder",
+        "label": "Patient Finder",
         "menu_id": "fin0",
         "target": "fin",
         "url": "/interface/main/finder/dynamic_finder.php",
