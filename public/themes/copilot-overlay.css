@@ -176,6 +176,9 @@ nav.navbar #username-container .username-display {
   font-weight: 500 !important;
   font-size: 13px !important;
 }
+nav.navbar #username-container:hover .username-display {
+  color: var(--cp-teal-accent) !important;
+}
 /* The user icon stack already exists in the markup — give it the gradient
  * avatar look from the mockup */
 nav.navbar #username-container .fa-stack {
