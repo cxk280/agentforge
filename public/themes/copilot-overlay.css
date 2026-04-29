@@ -207,18 +207,19 @@ nav.navbar .userfunctions.dropdown-menu {
   padding: 4px 0 !important;
 }
 /* Override the white menuLabel color rule above when the label is inside
- * a dropdown panel — text needs to be dark on the white surface and a
- * touch heavier than the standard #0D1B2A so it reads cleanly */
+ * a dropdown panel — text needs to be near-black on the white surface
+ * and heavier so it reads confidently against the panel */
 nav.navbar .menuEntries .menuLabel,
 nav.navbar .menuEntries li .menuLabel,
-nav.navbar .menuEntries li {
-  color: #050a14 !important;
-  font-weight: 500 !important;
+nav.navbar .menuEntries li,
+nav.navbar .menuEntries li a {
+  color: #000 !important;
+  font-weight: 600 !important;
 }
 nav.navbar .menuEntries .dropdown-item,
 nav.navbar .userfunctions .dropdown-item {
-  color: #050a14 !important;
-  font-weight: 500 !important;
+  color: #000 !important;
+  font-weight: 600 !important;
   padding: 6px 14px !important;
 }
 nav.navbar .menuEntries li:hover,
