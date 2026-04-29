@@ -91,10 +91,66 @@ nav.navbar .appMenu a:hover {
 nav.navbar .navbar-toggler-icon {
   filter: invert(1) brightness(2);
 }
-nav.navbar .navbar-brand img {
-  filter: brightness(0) invert(1);
-  opacity: 0.95;
+
+/* Replace the default OpenEMR orbit logo with a teal-square brand mark
+ * + "OpenEMR" wordmark, matching the Figma Screen 5 header. */
+nav.navbar .navbar-brand {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px !important;
+  text-decoration: none !important;
 }
+nav.navbar .navbar-brand img { display: none !important; }
+nav.navbar .navbar-brand::before {
+  content: '✦';
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px;
+  background: var(--cp-teal);
+  color: #fff;
+  border-radius: 8px;
+  font-size: 14px; font-weight: 700;
+  line-height: 1;
+}
+nav.navbar .navbar-brand::after {
+  content: 'OpenEMR';
+  color: #fff;
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.2px;
+}
+
+/* Tighter, more readable nav links matching the mockup spacing */
+nav.navbar .menuLabel,
+nav.navbar .nav-link {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  padding: 8px 10px !important;
+}
+
+/* Username + caret next to the user avatar (mockup shows the name visibly) */
+nav.navbar #username-container {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+}
+nav.navbar #username-container .menuLabel {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+/* The user icon stack already exists in the markup — give it the gradient
+ * avatar look from the mockup */
+nav.navbar #username-container .fa-stack {
+  width: 32px; height: 32px;
+  background: linear-gradient(135deg, var(--cp-teal) 0%, var(--cp-teal-accent) 100%);
+  border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+nav.navbar #username-container .fa-stack .fa-circle { display: none !important; }
+nav.navbar #username-container .fa-stack .fa-user { color: #fff !important; }
 
 /* Dropdown items that fly out from the top nav stay on white surfaces */
 nav.navbar .menuEntries.dropdown-menu,
