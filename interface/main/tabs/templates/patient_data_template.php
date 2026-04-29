@@ -107,16 +107,12 @@ switch ($search_any_type) {
                 <span class="cp-pt-dob">
                     <span data-bind="text:patient().str_dob()"></span>
                 </span>
-                <!-- ko if: patient().provider && patient().provider() -->
                 <span class="cp-pt-provider">
-                    <span data-bind="text: patient().provider()"></span>
+                    <span data-bind="text: (patient().provider && patient().provider()) ? patient().provider() : 'N/A'"></span>
                 </span>
-                <!-- /ko -->
-                <!-- ko if: patient().insurance && patient().insurance() -->
                 <span class="cp-pt-insurance">
-                    <span data-bind="text: patient().insurance()"></span>
+                    <span data-bind="text: (patient().insurance && patient().insurance()) ? patient().insurance() : 'N/A'"></span>
                 </span>
-                <!-- /ko -->
                 <!-- /ko -->
             </div>
         </div>
