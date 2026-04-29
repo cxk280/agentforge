@@ -207,6 +207,11 @@ nav.navbar #username-container .fa-stack > i.fa-user {
   line-height: 1 !important;
   text-shadow: none !important;
 }
+/* Darken the avatar gradient on hover, parallel to the magnifying-glass
+ * search button hover state (var(--cp-teal) → #006f6f) */
+nav.navbar #username-container:hover .fa-stack {
+  background: linear-gradient(135deg, #006f6f 0%, var(--cp-teal) 100%) !important;
+}
 
 /* Dropdown items that fly out from the top nav stay on white surfaces */
 nav.navbar .menuEntries.dropdown-menu,
@@ -220,21 +225,42 @@ nav.navbar .userfunctions.dropdown-menu {
   margin-top: 0 !important;
   padding: 4px 0 !important;
 }
-/* Override the white menuLabel color rule above when the label is inside
- * a dropdown panel — text needs to be near-black on the white surface
- * and heavier so it reads confidently against the panel */
+/* Override the white menuLabel color rule above when text is inside any
+ * dropdown panel. Sweep aggressively — the navbar's white-color rule on
+ * .menuLabel.dropdown-toggle ties on specificity with simpler dropdown
+ * selectors, so target every reasonable child element of .menuEntries
+ * /.userfunctions and every common text-bearing inner element to make
+ * sure dropdown text is pure black at rest. */
+nav.navbar .menuEntries,
 nav.navbar .menuEntries .menuLabel,
-nav.navbar .menuEntries li .menuLabel,
+nav.navbar .menuEntries .menuLabel.dropdown-toggle,
 nav.navbar .menuEntries li,
-nav.navbar .menuEntries li a {
+nav.navbar .menuEntries li > .menuLabel,
+nav.navbar .menuEntries li > a,
+nav.navbar .menuEntries li > span,
+nav.navbar .menuEntries li .menuSection,
+nav.navbar .menuEntries li .menuSection > .menuLabel,
+nav.navbar .menuEntries .dropdown-item,
+nav.navbar .menuEntries .dropdown-item > span,
+nav.navbar .userfunctions,
+nav.navbar .userfunctions li,
+nav.navbar .userfunctions li > a,
+nav.navbar .userfunctions li > .menuLabel,
+nav.navbar .userfunctions .dropdown-item,
+nav.navbar .userfunctions .dropdown-item > span {
   color: #000 !important;
   font-weight: 600 !important;
 }
 nav.navbar .menuEntries .dropdown-item,
 nav.navbar .userfunctions .dropdown-item {
-  color: #000 !important;
-  font-weight: 600 !important;
   padding: 6px 14px !important;
+}
+/* Keep the FA icons next to dropdown items in their original muted gray */
+nav.navbar .menuEntries .text-muted,
+nav.navbar .userfunctions .text-muted,
+nav.navbar .menuEntries i.fa,
+nav.navbar .userfunctions i.fa {
+  color: #6b7280 !important;
 }
 nav.navbar .menuEntries li:hover,
 nav.navbar .menuEntries li:hover .menuLabel,
