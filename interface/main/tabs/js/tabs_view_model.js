@@ -143,6 +143,32 @@ function navigateTab(url,name,afterLoadFunction,loading_label='')
     top.restoreSession();
     if($("iframe[name='"+name+"']").length>0)
     {
+        // If the iframe is already pointed at this URL, don't reassign
+        // contentWindow.location — that triggers a reload of the same
+        // page and causes a visible blink. Compare normalised URLs
+        // (path + query) so we match relative `/interface/...` strings
+        // against the iframe's absolute href.
+        let iframeEl = $("iframe[name='"+name+"']").get(0);
+        let alreadyShowing = false;
+        try {
+            let cur = new URL(iframeEl.contentWindow.location.href);
+            let tgt = new URL(url, window.location.href);
+            alreadyShowing =
+                cur.origin === tgt.origin &&
+                cur.pathname === tgt.pathname &&
+                cur.search === tgt.search;
+        } catch (e) {
+            // Cross-origin or not-yet-loaded — fall through to navigation
+            alreadyShowing = false;
+        }
+        if (alreadyShowing) {
+            openExistingTab(url,name);
+            if (typeof afterLoadFunction === 'function') {
+                afterLoadFunction();
+            }
+            return;
+        }
+
         if(typeof afterLoadFunction !== 'function'){
             $( "body" ).off( "load", "iframe[name='"+name+"']");
         } else {
@@ -151,7 +177,7 @@ function navigateTab(url,name,afterLoadFunction,loading_label='')
             });
         }
         openExistingTab(url,name);
-        $("iframe[name='"+name+"']").get(0).contentWindow.location=url;
+        iframeEl.contentWindow.location=url;
     }
     else
     {
