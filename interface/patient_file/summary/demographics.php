@@ -922,9 +922,9 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
             parent.left_nav.setPatient(<?php echo js_escape($result['fname'] . " " . $result['lname']) .
                     "," . js_escape($pid) . "," . js_escape($result['pubpid']) . ",'',";
             if (empty($date_of_death)) {
-                echo js_escape(" " . xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " " . xl('Age') . ": " . getPatientAgeDisplay($result['DOB_YMD']));
+                echo js_escape(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " (" . getPatientAgeDisplay($result['DOB_YMD']) . " " . xl('yrs') . ")");
             } else {
-                echo js_escape(" " . xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " " . xl('Age at death') . ": " . oeFormatAge($result['DOB_YMD'], $date_of_death));
+                echo js_escape(xl('DOB') . ": " . oeFormatShortDate($result['DOB_YMD']) . " (" . xl('Age at death') . ": " . oeFormatAge($result['DOB_YMD'], $date_of_death) . ")");
             } ?>);
             var EncounterDateArray = [];
             var CalendarCategoryArray = [];
