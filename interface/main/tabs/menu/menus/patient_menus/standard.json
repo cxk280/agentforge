@@ -4,7 +4,7 @@
         "menu_id": "dashboard",
         "target": "main",
         "on_click": "top.restoreSession()",
-        "url": "interface/patient_file/summary/demographics.php",
+        "url": "interface/patient_file/summary/copilot_dashboard.php",
         "pid": "false",
         "children": [],
         "requirement": 0
