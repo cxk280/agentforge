@@ -141,16 +141,37 @@ nav.navbar #username-container .menuLabel {
   font-size: 13px !important;
   font-weight: 500 !important;
 }
+nav.navbar #username-container .username-display {
+  color: #fff !important;
+  font-weight: 500 !important;
+  font-size: 13px !important;
+}
 /* The user icon stack already exists in the markup — give it the gradient
  * avatar look from the mockup */
 nav.navbar #username-container .fa-stack {
-  width: 32px; height: 32px;
-  background: linear-gradient(135deg, var(--cp-teal) 0%, var(--cp-teal-accent) 100%);
-  border-radius: 50%;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px !important;
+  height: 32px !important;
+  line-height: 32px !important;
+  background: linear-gradient(135deg, var(--cp-teal) 0%, var(--cp-teal-accent) 100%) !important;
+  border-radius: 50% !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
-nav.navbar #username-container .fa-stack .fa-circle { display: none !important; }
-nav.navbar #username-container .fa-stack .fa-user { color: #fff !important; }
+nav.navbar #username-container .fa-stack > i.fa-circle,
+nav.navbar #username-container .fa-stack > i.fa-stack-2x {
+  display: none !important;
+}
+nav.navbar #username-container .fa-stack > i.fa-user {
+  color: #fff !important;
+  font-size: 14px !important;
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  line-height: 1 !important;
+  text-shadow: none !important;
+}
 
 /* Dropdown items that fly out from the top nav stay on white surfaces */
 nav.navbar .menuEntries.dropdown-menu,
