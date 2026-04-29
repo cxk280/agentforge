@@ -109,66 +109,11 @@ switch ($search_any_type) {
                     <?php echo ($closeElement !== '') ? "</$closeElement>" : ''; ?>
                 <?php echo "</$wrapperElement>"; ?>
 
-                <div class="mt-2 cp-pt-dob">
+                <span class="cp-pt-dob">
                     <span data-bind="text:patient().str_dob()"></span>
-                </div>
+                </span>
                 <!-- /ko -->
             </div>
-        </div>
-
-        <div class="flex-fill ml-2">
-            <!-- ko if: patient -->
-            <!-- ko with: patient -->
-            <div class="btn-group btn-group-sm">
-                <a class="btn btn-sm btn-secondary" data-bind="click: clickEncounterList" href="#"
-                    title="<?php echo xla("Visit History"); ?>">
-                    <i class="fas fa-history"></i>
-                </a>
-                <div class="btn-group dropdown">
-                <button class="btn btn-secondary btn-sm dropdown-toggle"
-                    type="button" id="pastEncounters"
-                    data-toggle="dropdown"
-                    aria-haspopup="true"
-                    aria-expanded="true">
-                    <?php echo xlt("Select Encounter"); ?>&nbsp;
-                    (<span data-bind="text:encounterArray().length"></span>)<span class="caret"></span></button>
-                <ul class="dropdown-menu" aria-labelledby="pastEncounters">
-                    <!-- ko foreach:encounterArray -->
-                    <li class="d-inline-flex">
-                        <a class="dropdown-item" href="#" data-bind="click:chooseEncounterEvent">
-                            <span data-bind="text:date"></span>
-                            <span data-bind="text:category"></span>
-                        </a>
-                        <a href="#" class="dropdown-item" data-bind="click:reviewEncounterEvent">
-                            <i class="fa fa-rotate-left"></i>&nbsp;<?php echo xlt("Review"); ?>
-                        </a>
-                    </li>
-                    <!-- /ko -->
-                </ul>
-            </div>
-                <a class="btn btn-sm btn-secondary" data-bind="click: clickNewEncounter" href="#"
-                    title="<?php echo xla("New Encounter"); ?>">
-                    <i class="fa fa-plus"></i>
-                </a>
-            </div>
-
-            <!-- ko if: encounterArray().length > 0 -->
-            <div class="patientCurrentEncounter mt-2 d-block">
-                    <span><?php echo xlt("Open Encounter"); ?>:</span>
-                    <!-- ko if:selectedEncounter() -->
-                    <a data-bind="click: refreshEncounter" href="#">
-                        <span data-bind="text:selectedEncounter().date()"></span>
-                        (<span data-bind="text:selectedEncounter().id()"></span>)
-                    </a>
-                    <!-- /ko -->
-                    <!-- ko if:!selectedEncounter() -->
-                    <?php echo xlt("None{{Encounter}}") ?>
-                    <!-- /ko -->
-                </div>
-
-            <!-- /ko --><!-- encounter -->
-            <!-- /ko --><!-- with patient -->
-            <!-- /ko --><!-- patient -->
         </div>
 
         <div class="flex-column mx-2">

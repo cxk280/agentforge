@@ -379,34 +379,52 @@ ul.menu > li > a.activeMenu {
   padding: 0 !important;
   object-fit: cover;
 }
+/* Inline layout: Name | MRN | DOB with vertical separators between each item */
+.cp-demographics-banner .form-group {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+  margin: 0 !important;
+}
 .cp-demographics-banner .ptName {
   color: #fff !important;
   text-decoration: none !important;
   font-size: 16px !important;
   font-weight: 700 !important;
   letter-spacing: -0.1px;
+  display: inline-flex;
+  align-items: center;
 }
 .cp-demographics-banner .cp-pt-name { color: #fff !important; }
 .cp-demographics-banner .cp-pt-mrn {
-  color: rgba(255, 255, 255, 0.55) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
   font-weight: 500 !important;
-  font-size: 12px !important;
-  margin-left: 8px;
+  font-size: 13px !important;
+  margin-left: 16px !important;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
+  line-height: 20px;
 }
 .cp-demographics-banner .cp-pt-mrn::before {
   content: 'MRN ';
-  color: rgba(255, 255, 255, 0.45) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
+  margin-right: 4px;
+  font-weight: 500;
 }
 .cp-demographics-banner .cp-pt-dob {
-  display: inline-block !important;
-  margin-top: 2px !important;
-  margin-left: 0 !important;
+  display: inline-flex !important;
+  align-items: center;
+  margin-left: 16px !important;
+  padding-left: 16px;
+  border-left: 1px solid rgba(255, 255, 255, 0.18);
   color: rgba(255, 255, 255, 0.85) !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  line-height: 20px;
 }
 .cp-demographics-banner .cp-pt-dob::before {
   content: 'DOB ';
-  color: rgba(255, 255, 255, 0.5) !important;
+  color: rgba(255, 255, 255, 0.55) !important;
   margin-right: 4px;
   font-weight: 500;
 }
