@@ -77,21 +77,22 @@ nav.navbar.navbar-expand-xl.navbar-light.bg-light,
 }
 
 /* The KO-rendered top menu uses .menuLabel divs and .menuEntries dropdowns.
- * Scope to body.body_top so this white-on-navy treatment ONLY applies to
- * the outer navbar, not the patient-chart navtab inside the iframe (which
- * is also a <nav class="navbar"> but should keep dark text on white). */
-body.body_top nav.navbar .menuLabel,
-body.body_top nav.navbar .menuLabel a,
-body.body_top nav.navbar .navbar-brand,
-body.body_top nav.navbar .navbar-brand a,
-body.body_top nav.navbar .navbar-toggler,
-body.body_top nav.navbar .nav-link,
-body.body_top nav.navbar .appMenu,
-body.body_top nav.navbar .appMenu a,
-body.body_top nav.navbar .btn-link,
-body.body_top nav.navbar #username,
-body.body_top nav.navbar .menuLabel.dropdown-toggle,
-body.body_top nav.navbar .menuLabel .caret {
+ * Scope to .navbar-expand-xl so this white-on-navy treatment ONLY applies
+ * to the outer navbar (which uses navbar-expand-xl), not the patient
+ * chart navtab inside the iframe (which uses navbar-expand-md and should
+ * keep dark text on white). */
+nav.navbar.navbar-expand-xl .menuLabel,
+nav.navbar.navbar-expand-xl .menuLabel a,
+nav.navbar.navbar-expand-xl .navbar-brand,
+nav.navbar.navbar-expand-xl .navbar-brand a,
+nav.navbar.navbar-expand-xl .navbar-toggler,
+nav.navbar.navbar-expand-xl .nav-link,
+nav.navbar.navbar-expand-xl .appMenu,
+nav.navbar.navbar-expand-xl .appMenu a,
+nav.navbar.navbar-expand-xl .btn-link,
+nav.navbar.navbar-expand-xl #username,
+nav.navbar.navbar-expand-xl .menuLabel.dropdown-toggle,
+nav.navbar.navbar-expand-xl .menuLabel .caret {
   color: rgba(255, 255, 255, 0.92) !important;
 }
 /* Top-level header items: ONLY change text color on hover, never add a
