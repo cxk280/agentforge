@@ -63,8 +63,17 @@ body {
 nav.navbar.navbar-expand-xl.navbar-light.bg-light,
 .body_top .navbar.bg-light {
   background: var(--cp-navy) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: none !important;
+  margin-bottom: 0 !important;
   padding: 6px 16px !important;
+}
+
+/* The wrapper around the banner template — kill any inherited spacing
+ * so the demographics banner sits flush against the navbar */
+#attendantData,
+#attendantData.body_title {
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* The KO-rendered top menu uses .menuLabel divs and .menuEntries dropdowns */
@@ -357,7 +366,7 @@ ul.menu > li > a.activeMenu {
   margin: 0 !important;
   align-items: center !important;
   gap: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border: none !important;
 }
 .cp-demographics-banner .cp-patient-photo {
   margin: 0 12px 0 0 !important;
