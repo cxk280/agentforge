@@ -47,7 +47,7 @@ These cases were authored by Claude (Opus). Lookup cases queried the
 real DB for ground truth and are reliable; summary / multi_step /
 refusal cases are subjective rubrics and benefit from clinician review.
 Treat this as a v0 baseline. Replace cases over time with traces of
-real production failures (see `harvest_failures.py`, post-Gauntlet).
+real production failures (see `harvest_failures.py`).
 
 ## CI integration
 
