@@ -146,7 +146,7 @@ $kpis = [
     <section class="cp-panel flush">
       <div class="cp-panel-head">
         <h3><?php echo xlt("Today's Payments"); ?></h3>
-        <span class="cnt">14</span>
+        <span class="cnt"><?php echo text(count($payments)); ?></span>
       </div>
       <div class="cp-tbl" style="border:none; border-radius:0;">
         <table>
