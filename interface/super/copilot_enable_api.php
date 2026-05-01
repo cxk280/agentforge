@@ -59,6 +59,10 @@ foreach ($flags as $name => $value) {
     }
 }
 
+echo "\nForce-enable all OAuth2 clients (idempotent):\n";
+$enabled = sqlStatement("UPDATE oauth_clients SET is_enabled = 1 WHERE COALESCE(is_enabled, 0) <> 1");
+echo "  oauth_clients UPDATE done\n";
+
 echo "\nOAuth2 client registration check:\n";
 $client = sqlQuery("SELECT client_id, client_name, is_enabled FROM oauth_clients ORDER BY client_id LIMIT 5");
 if ($client) {
