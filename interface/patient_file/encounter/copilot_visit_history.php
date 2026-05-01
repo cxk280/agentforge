@@ -11,18 +11,36 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-$encounters = [
-    ['2026-04-14','Office Visit','Dr. Rivera','Main Street','BP check & medication review',  'Signed','good'],
-    ['2026-03-22','Telehealth',  'Dr. Patel', 'Remote',     'Flu-like symptoms, cough 5 days','Signed','good'],
-    ['2026-02-10','Office Visit','Dr. Rivera','Main Street','Annual physical + labs',         'Signed','good'],
-    ['2025-12-05','Procedure',   'Dr. Lee',   'Surgery Ctr','Mole removal — left forearm',     'Signed','good'],
-    ['2025-11-18','Office Visit','Dr. Rivera','Main Street','Hypertension follow-up',         'Signed','good'],
-    ['2025-10-02','Telehealth',  'Dr. Patel', 'Remote',     'Rx refill — lisinopril',         'Signed','good'],
-    ['2025-08-15','Office Visit','Dr. Rivera','Main Street','Fatigue, shortness of breath',   'Locked','info'],
-    ['2025-07-01','Office Visit','Dr. Rivera','Main Street','New patient intake',             'Locked','info'],
-    ['2025-04-10','Office Visit','Dr. Kim',   'Eastside',   'Knee pain — sports injury',      'Locked','info'],
-    ['2025-01-28','Telehealth',  'Dr. Patel', 'Remote',     'Sinus infection, antibiotics',   'Locked','info'],
-];
+// Live encounters from `form_encounter` joined with users for provider name.
+$encounters = [];
+$totalCount = (int)(sqlQuery("SELECT COUNT(*) AS n FROM form_encounter")['n'] ?? 0);
+$rows = sqlStatement(
+    "SELECT fe.date, fe.reason, fe.facility, fe.last_level_billed, fe.last_level_closed,
+            u.fname AS pfname, u.lname AS plname, u.title AS ptitle
+     FROM form_encounter fe
+     LEFT JOIN users u ON fe.provider_id = u.id
+     ORDER BY fe.date DESC LIMIT 30"
+);
+$idx = 0;
+while ($r = sqlFetchArray($rows)) {
+    $date = substr($r['date'] ?? '', 0, 10) ?: '—';
+    $type = 'Office Visit'; // form_encounter doesn't store visit type natively; default
+    $prov = 'Provider';
+    if ($r['plname']) {
+        $prov = ($r['ptitle'] ? $r['ptitle'] . ' ' : '') . trim($r['pfname'] . ' ' . $r['plname']);
+        if (!$r['ptitle']) { $prov = 'Dr. ' . trim($r['pfname'] . ' ' . $r['plname']); }
+    }
+    $facility = $r['facility'] ?: 'Main Street';
+    $reason = trim((string)$r['reason']);
+    if (!$reason) { $reason = '—'; }
+    if (strlen($reason) > 80) { $reason = substr($reason, 0, 77) . '…'; }
+    // Status: closed → Signed, otherwise In progress
+    if ((int)($r['last_level_closed'] ?? 0) > 0) { $status = 'Signed'; $tone = 'good'; }
+    elseif ((int)($r['last_level_billed'] ?? 0) > 0) { $status = 'Billed'; $tone = 'info'; }
+    else { $status = 'In progress'; $tone = 'warn'; }
+    $encounters[] = [$date, $type, $prov, $facility, $reason, $status, $tone];
+    $idx++;
+}
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -39,7 +57,7 @@ $encounters = [
 <header class="cp-pagehead">
   <div class="info">
     <span class="titleSm"><?php echo xlt('Visit History'); ?></span>
-    <span class="meta">47 <?php echo xlt('encounters'); ?> • <?php echo xlt('All providers, all facilities'); ?></span>
+    <span class="meta"><?php echo text($totalCount); ?> <?php echo xlt('encounters'); ?> • <?php echo xlt('All providers, all facilities'); ?></span>
   </div>
   <button type="button" class="cp-btn primary">+ <?php echo xlt('New encounter'); ?></button>
 </header>

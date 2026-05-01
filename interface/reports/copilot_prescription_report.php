@@ -10,21 +10,33 @@
 
 require_once(__DIR__ . "/../globals.php");
 
-$kpis = [
-    ['Rxs sent (30d)',   '342',   '+12% vs prior 30d',   '#0D1B2A'],
-    ['Refills processed','148',   '94% within 24h',      '#1F8C4D'],
-    ['Controlled (CII)', '24',    'EPCS-signed',         '#8561C7'],
-    ['Rejected at pharm','7',     '2 prior auth required','#D93838'],
-];
+// Live prescriptions
+$totalRx = (int)(sqlQuery("SELECT COUNT(*) AS n FROM prescriptions WHERE active = 1")['n'] ?? 0);
+$rxs = [];
+$rows = sqlStatement(
+    "SELECT p.drug, p.dosage, p.quantity, p.refills, p.start_date, p.date_added,
+            pat.fname AS pfn, pat.lname AS pln,
+            ph.name AS pharmacy
+     FROM prescriptions p
+     LEFT JOIN patient_data pat ON p.patient_id = pat.pid
+     LEFT JOIN pharmacies ph ON p.pharmacy_id = ph.id
+     WHERE p.active = 1
+     ORDER BY p.date_added DESC LIMIT 25"
+);
+while ($r = sqlFetchArray($rows)) {
+    $patName = trim(($r['pfn'] ?? '') . ' ' . ($r['pln'] ?? '')) ?: '—';
+    $drug    = trim(($r['drug'] ?? '') . ' ' . ($r['dosage'] ?? '')) ?: '—';
+    $supply  = trim(($r['quantity'] ?? '0') . ' ct, ' . (int)($r['refills'] ?? 0) . ' refills');
+    $pharm   = $r['pharmacy'] ?: '—';
+    $sent    = $r['date_added'] ? date('m/d H:i', strtotime($r['date_added'])) : '—';
+    $rxs[]   = [$patName, $drug, $supply, $pharm, $sent, 'Sent', 'good'];
+}
 
-$rxs = [
-    ['Margaret Chen',  'Lisinopril 10 mg',         '90 ct, 3 refills', 'CVS Burnet Rd',     '04/29 09:38', 'Sent',  'good'],
-    ['Ted Shaw',       'Atorvastatin 40 mg',       '90 ct, 5 refills', 'Walgreens Lamar',   '04/29 09:14', 'Sent',  'good'],
-    ['Linda Martinez', 'Metformin 1000 mg',        '60 ct, 2 refills', 'CVS Burnet Rd',     '04/28 14:55', 'Sent',  'good'],
-    ['David Kim',      'Levothyroxine 50 mcg',     '90 ct, 5 refills', 'HEB Pharmacy',      '04/28 11:22', 'Sent',  'good'],
-    ['Allison Park',   'Adderall XR 20 mg (CII)',  '30 ct, 0 refills', 'Walgreens Lamar',   '04/27 16:08', 'Sent (EPCS)', 'violet'],
-    ['Robert Hayes',   'Amoxicillin 500 mg',       '21 ct, 0 refills', 'CVS Burnet Rd',     '04/27 13:42', 'Rejected — PA','danger'],
-    ['Carol Bennett',  'Sertraline 50 mg',         '30 ct, 5 refills', 'Walgreens Lamar',   '04/26 10:18', 'Sent',  'good'],
+$kpis = [
+    ['Active Rx',         (string)$totalRx,   'Currently active',     '#0D1B2A'],
+    ['Refills available', (string)max(0, (int)(sqlQuery("SELECT SUM(refills) AS n FROM prescriptions WHERE active=1")['n'] ?? 0)), 'Across active Rx', '#1F8C4D'],
+    ['Patients with Rx',  (string)((int)(sqlQuery("SELECT COUNT(DISTINCT patient_id) AS n FROM prescriptions WHERE active=1")['n'] ?? 0)), 'Distinct patients', '#4785D9'],
+    ['This week',         '0',                'Sent in last 7 days',  '#33A68C'],
 ];
 
 ?><!DOCTYPE html>

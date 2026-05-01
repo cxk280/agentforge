@@ -11,14 +11,45 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-$notes = [
-    ['CK', 'orange', 'Christopher King', '09:42 AM',  'Front desk: BCBS PPO is denying CPT 99396 — verify modifier 25 attached.'],
-    ['ER', 'teal',   'Dr. E. Rivera',    '08:55 AM',  'Pull Margaret Chen prior eye exam before next visit. Endo flagged.'],
-    ['MN', 'mint',   'Maria Nunez',      'Yesterday', 'Voicemail from Linda Martinez requesting MRI auth update — left callback.'],
-    ['BH', 'green',  'Brian Hudson',     'Yesterday', 'Carol Bennett payment plan: $150/mo agreed. First payment posted.'],
-    ['CK', 'orange', 'Christopher King', '2 days ago','Network issue 1pm-1:15pm — confirmed iframe shell auth flow recovered.'],
-    ['ER', 'teal',   'Dr. E. Rivera',    '3 days ago','Refill protocol updated: 90-day supply standard for Lisinopril, A1C-stable patients.'],
-];
+// Handle POST: add a new office note
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !empty(trim($_POST['body'] ?? ''))) {
+    $body = trim($_POST['body']);
+    $author = $_SESSION['authUser'] ?? 'admin';
+    sqlInsert(
+        "INSERT INTO onotes (date, body, user, groupname, activity) VALUES (NOW(), ?, ?, 'Default', 1)",
+        [$body, $author]
+    );
+    header('Location: copilot_office_notes.php');
+    exit;
+}
+
+// Fetch live notes; map user -> friendly name + initials/tone
+$tonePool = ['teal','orange','purple','blue','mint','pink','green','violet'];
+$notes = [];
+$rows = sqlStatement("SELECT date, body, user FROM onotes WHERE activity = 1 ORDER BY date DESC LIMIT 30");
+$nowTs = time();
+$idx = 0;
+while ($r = sqlFetchArray($rows)) {
+    $u = sqlQuery("SELECT fname, lname, title FROM users WHERE username = ?", [$r['user']]);
+    if ($u) {
+        $name = trim(($u['title'] ? $u['title'] . ' ' : '') . $u['fname'] . ' ' . $u['lname']);
+        if (!$name) { $name = $r['user']; }
+        $initials = strtoupper(substr($u['fname'], 0, 1) . substr($u['lname'], 0, 1));
+        if (!$initials) { $initials = strtoupper(substr($r['user'], 0, 2)); }
+    } else {
+        $name = $r['user']; $initials = strtoupper(substr($r['user'], 0, 2));
+    }
+    $diff = $nowTs - strtotime($r['date']);
+    if ($diff < 60) { $when = 'just now'; }
+    elseif ($diff < 3600) { $when = floor($diff / 60) . ' min ago'; }
+    elseif ($diff < 86400) { $when = date('g:i A', strtotime($r['date'])); }
+    elseif ($diff < 86400 * 2) { $when = 'Yesterday'; }
+    elseif ($diff < 86400 * 7) { $when = floor($diff / 86400) . ' days ago'; }
+    else { $when = date('M j', strtotime($r['date'])); }
+    $tone = $tonePool[$idx % count($tonePool)];
+    $notes[] = [$initials, $tone, $name, $when, $r['body']];
+    $idx++;
+}
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -65,15 +96,15 @@ $notes = [
 
 <main class="cp-content tight">
 
-  <div class="cp-on-compose">
-    <textarea placeholder="<?php echo xla('Write a note for the office...'); ?>"></textarea>
+  <form class="cp-on-compose" method="post" action="copilot_office_notes.php">
+    <textarea name="body" placeholder="<?php echo xla('Write a note for the office...'); ?>"></textarea>
     <div class="cp-on-compose-row">
       <span class="cp-status-pill neutral"><?php echo xlt('Visible to: Front Desk, Billing, Admin'); ?></span>
       <span style="flex:1;"></span>
-      <button type="button" class="cp-btn ghost" style="padding:5px 10px;"><?php echo xlt('Cancel'); ?></button>
-      <button type="button" class="cp-btn primary"><?php echo xlt('Post note'); ?></button>
+      <button type="reset" class="cp-btn ghost" style="padding:5px 10px;"><?php echo xlt('Cancel'); ?></button>
+      <button type="submit" class="cp-btn primary"><?php echo xlt('Post note'); ?></button>
     </div>
-  </div>
+  </form>
 
   <?php foreach ($notes as [$ini, $tone, $name, $when, $body]): ?>
     <div class="cp-on-card">

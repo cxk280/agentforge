@@ -10,15 +10,20 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-$documents = [
-    ['HbA1c — Quest Diagnostics',     '2026-04-12', 'PDF', '124 KB', 'Unread', 'warn'],
-    ['BMP Panel — Quest',             '2026-04-12', 'PDF', '218 KB', 'Unread', 'warn'],
-    ['Foot X-ray — Riverside Imaging','2026-04-08', 'PDF', '1.4 MB', 'Read',   'good'],
-    ['Lipid Panel — LabCorp',         '2026-02-18', 'PDF', '156 KB', 'Read',   'good'],
-    ['Mammogram — Solis Imaging',     '2025-11-22', 'PDF', '982 KB', 'Read',   'good'],
-    ['EKG — In-clinic',               '2025-11-18', 'PDF', '88 KB',  'Read',   'good'],
-    ['CMP Panel — Quest',             '2025-08-10', 'PDF', '174 KB', 'Read',   'good'],
-];
+// Live documents — using docdate as the document date.
+$documents = [];
+$rows = sqlStatement("SELECT name, docdate, mimetype, size FROM documents ORDER BY docdate DESC LIMIT 50");
+$idx = 0;
+while ($r = sqlFetchArray($rows)) {
+    $sizeKb = (int)round(($r['size'] ?? 0) / 1024);
+    if ($sizeKb > 1000) { $sizeStr = round($sizeKb / 1024, 1) . ' MB'; } else { $sizeStr = $sizeKb . ' KB'; }
+    $type = (stripos($r['mimetype'] ?? '', 'pdf') !== false) ? 'PDF' : 'FILE';
+    // First two are unread (most recent)
+    $status = $idx < 2 ? 'Unread' : 'Read';
+    $tone = $idx < 2 ? 'warn' : 'good';
+    $documents[] = [$r['name'], $r['docdate'] ?: '—', $type, $sizeStr, $status, $tone];
+    $idx++;
+}
 
 ?><!DOCTYPE html>
 <html lang="en">

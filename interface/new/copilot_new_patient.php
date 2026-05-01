@@ -19,6 +19,26 @@
 
 require_once(__DIR__ . "/../globals.php");
 
+// Handle POST: create a new patient row.
+$createdPid = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !empty($_POST['create_patient'] ?? '')) {
+    $fn  = trim($_POST['fname'] ?? '');
+    $ln  = trim($_POST['lname'] ?? '');
+    $dob = trim($_POST['DOB'] ?? '');
+    $sex = trim($_POST['sex'] ?? 'Female');
+    $phone = trim($_POST['phone_home'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $street = trim($_POST['street'] ?? '');
+    if ($fn !== '' && $ln !== '') {
+        $nextPid = (int)(sqlQuery("SELECT COALESCE(MAX(pid), 0) + 1 AS n FROM patient_data")['n'] ?? 1);
+        sqlStatement(
+            "INSERT INTO patient_data (pid, fname, lname, DOB, sex, phone_home, email, street, country_code, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'US', NOW())",
+            [$nextPid, $fn, $ln, $dob ?: null, $sex, $phone, $email, $street]
+        );
+        $createdPid = $nextPid;
+    }
+}
+
 $status_tabs = [
     ['All',         true],
     ['Active',      false],
@@ -26,14 +46,22 @@ $status_tabs = [
     ['Inactive',    false],
 ];
 
-// Avatar tone tokens — match the Figma palette.
-$recent = [
-    ['name' => 'Margaret Chen',   'mrn' => '#004821', 'dob' => '03/14/1958', 'when' => 'Today',     'tone' => 'teal'],
-    ['name' => 'Ted Shaw',        'mrn' => '#001',    'dob' => '03/12/1965', 'when' => 'Today',     'tone' => 'blue'],
-    ['name' => 'Linda Martinez',  'mrn' => '#003918', 'dob' => '11/02/1947', 'when' => 'Yesterday', 'tone' => 'purple'],
-    ['name' => 'David Kim',       'mrn' => '#006102', 'dob' => '06/18/1981', 'when' => 'Apr 28',    'tone' => 'orange'],
-    ['name' => 'Allison Park',    'mrn' => '#002745', 'dob' => '09/30/1973', 'when' => 'Apr 26',    'tone' => 'green'],
-];
+// Live "recent patients" list — patient_data ordered by date desc.
+$tonePool = ['teal', 'blue', 'purple', 'orange', 'green', 'pink', 'mint', 'violet'];
+$recent = [];
+$rows = sqlStatement("SELECT pid, fname, lname, DOB, date FROM patient_data ORDER BY date DESC, pid DESC LIMIT 5");
+$idx = 0;
+while ($r = sqlFetchArray($rows)) {
+    $name = trim(($r['fname'] ?? '') . ' ' . ($r['lname'] ?? '')) ?: '(unnamed)';
+    $mrn  = '#' . str_pad((string)$r['pid'], 6, '0', STR_PAD_LEFT);
+    $dob  = $r['DOB'] ? date('m/d/Y', strtotime($r['DOB'])) : '—';
+    $when = $r['date'] ? date('M j', strtotime($r['date'])) : 'Today';
+    $diff = $r['date'] ? (time() - strtotime($r['date'])) : 0;
+    if ($diff < 86400) { $when = 'Today'; }
+    elseif ($diff < 86400 * 2) { $when = 'Yesterday'; }
+    $recent[] = ['name' => $name, 'mrn' => $mrn, 'dob' => $dob, 'when' => $when, 'tone' => $tonePool[$idx % count($tonePool)]];
+    $idx++;
+}
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -279,27 +307,31 @@ $recent = [
   </section>
 
   <!-- RIGHT — create new -->
-  <section class="cp-panel cp-panel-create">
-    <div class="cp-panel-lbl"><?php echo xlt('CREATE NEW PATIENT'); ?></div>
+  <form class="cp-panel cp-panel-create" method="post" action="copilot_new_patient.php">
+    <div class="cp-panel-lbl"><?php echo xlt('CREATE NEW PATIENT'); ?>
+      <?php if ($createdPid): ?>
+        <span class="cp-status-pill good" style="margin-left:10px;"><?php echo xlt('Patient created'); ?> #<?php echo text(str_pad((string)$createdPid, 6, '0', STR_PAD_LEFT)); ?></span>
+      <?php endif; ?>
+    </div>
 
     <div class="cp-form-section">
       <h3><?php echo xlt('Identity'); ?></h3>
       <div class="cp-form-grid two">
         <div class="cp-field">
           <label><?php echo xlt('First name'); ?></label>
-          <input class="cp-input" type="text" value="Margaret">
+          <input class="cp-input" type="text" name="fname" value="Margaret" required>
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Last name'); ?></label>
-          <input class="cp-input" type="text" value="Chen">
+          <input class="cp-input" type="text" name="lname" value="Chen" required>
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Date of birth'); ?></label>
-          <input class="cp-input" type="text" value="03/14/1958">
+          <input class="cp-input" type="date" name="DOB" value="1958-03-14">
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Sex'); ?></label>
-          <select class="cp-input cp-select">
+          <select class="cp-input cp-select" name="sex">
             <option>Female</option>
             <option>Male</option>
             <option>Other</option>
@@ -313,17 +345,17 @@ $recent = [
       <div class="cp-form-grid two">
         <div class="cp-field">
           <label><?php echo xlt('Phone'); ?></label>
-          <input class="cp-input" type="text" value="(512) 555-0142">
+          <input class="cp-input" type="text" name="phone_home" value="(512) 555-0142">
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Email'); ?></label>
-          <input class="cp-input" type="email" value="m.chen@example.com">
+          <input class="cp-input" type="email" name="email" value="m.chen@example.com">
         </div>
       </div>
       <div class="cp-form-grid full" style="margin-top: 12px;">
         <div class="cp-field">
           <label><?php echo xlt('Address'); ?></label>
-          <input class="cp-input" type="text" value="847 Main Street, Suite 200, Austin, TX 78701">
+          <input class="cp-input" type="text" name="street" value="847 Main Street, Suite 200, Austin, TX 78701">
         </div>
       </div>
     </div>
@@ -372,10 +404,10 @@ $recent = [
     </div>
 
     <div class="cp-form-foot">
-      <button type="button" class="cp-btn secondary"><?php echo xlt('Save as draft'); ?></button>
-      <button type="button" class="cp-btn primary"><?php echo xlt('Create patient'); ?>  →</button>
+      <button type="reset" class="cp-btn secondary"><?php echo xlt('Save as draft'); ?></button>
+      <button type="submit" name="create_patient" value="1" class="cp-btn primary"><?php echo xlt('Create patient'); ?>  →</button>
     </div>
-  </section>
+  </form>
 
 </main>
 

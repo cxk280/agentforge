@@ -11,18 +11,26 @@
 require_once(__DIR__ . "/../globals.php");
 require_once(__DIR__ . "/copilot_admin_sidebar.php");
 
-$events = [
-    ['09:42:14', 'user.created',     'Site Admin', 'Christopher King', 'Created user "Lin Kim" with role Provider'],
-    ['09:38:02', 'patient.viewed',   'Provider',   'Dr. E. Rivera',    'Viewed Margaret Chen (MRN 4821)'],
-    ['09:31:18', 'rx.signed',        'Provider',   'Dr. E. Rivera',    'Signed Lisinopril 10 mg for Margaret Chen'],
-    ['09:18:04', 'module.enabled',   'Site Admin', 'Christopher King', 'Enabled Carecoordination module'],
-    ['08:51:33', 'acl.updated',      'Site Admin', 'Christopher King', 'Granted Nurse role patients/notes write'],
-    ['08:42:11', 'login.success',    'Provider',   'Dr. A. Park',      'Logged in from 198.51.100.42'],
-    ['08:39:55', 'login.failure',    'unknown',    'unknown',          'Failed login for "admin" from 198.51.100.7'],
-    ['08:14:08', 'document.uploaded','Front Desk', 'Maria Nunez',      'Uploaded "Ins Auth.pdf" to Margaret Chen'],
-    ['07:58:20', 'encounter.signed', 'Provider',   'Dr. E. Rivera',    'Signed encounter 99213 for Ted Shaw'],
-    ['Yesterday','backup.completed', 'System',     '—',                'Daily backup uploaded to S3 (842 MB)'],
-];
+// Live audit log from `log` table — most recent 50 entries.
+$events = [];
+$rows = sqlStatement("SELECT date, event, user, comments FROM log ORDER BY id DESC LIMIT 50");
+while ($r = sqlFetchArray($rows)) {
+    $time = date('H:i:s', strtotime($r['date']));
+    $tag  = strtolower(str_replace(' ', '.', $r['event'] ?: 'event'));
+    $actor = $r['user'] ?: 'system';
+    // Role inference based on username
+    if ($actor === 'admin') { $role = 'Site Admin'; }
+    elseif (in_array($actor, ['erivera','apark','jpatel','llee','kkim'], true)) { $role = 'Provider'; }
+    elseif ($actor === 'mnunez') { $role = 'Front Desk'; }
+    elseif ($actor === 'schoi') { $role = 'Nurse'; }
+    elseif ($actor === 'bhudson') { $role = 'Billing'; }
+    elseif ($actor === 'system') { $role = 'System'; }
+    else { $role = 'User'; }
+    $details = trim((string)($r['comments'] ?: '—'));
+    if (strlen($details) > 96) { $details = substr($details, 0, 93) . '…'; }
+    $events[] = [$time, $tag, $role, $actor, $details];
+}
+$totalEvents = sqlQuery("SELECT COUNT(*) AS n FROM log")['n'] ?? 0;
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -50,7 +58,7 @@ $events = [
 <header class="cp-pagehead">
   <div class="info">
     <span class="title"><?php echo xlt('Audit Log'); ?></span>
-    <span class="meta"><?php echo xlt('All HIPAA-sensitive actions'); ?> • 12,408 <?php echo xlt('events in last 30 days'); ?></span>
+    <span class="meta"><?php echo xlt('All HIPAA-sensitive actions'); ?> • <?php echo text(number_format((int)$totalEvents)); ?> <?php echo xlt('events total'); ?></span>
   </div>
   <button type="button" class="cp-btn ghost">⤓ <?php echo xlt('Export'); ?></button>
   <button type="button" class="cp-btn dark"><?php echo xlt('Subscribe to alerts'); ?></button>

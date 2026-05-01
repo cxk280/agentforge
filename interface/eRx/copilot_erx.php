@@ -18,6 +18,44 @@
 
 require_once(__DIR__ . "/../globals.php");
 
+// CRUD: send prescription. Inserts into prescriptions table.
+$flash = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'send_rx') {
+    $pid = (int)($_SESSION['pid'] ?? 1);
+    $providerId = (int)($_SESSION['authUserID'] ?? 1);
+    // Map drug name to drug_id (best effort)
+    $drugName = $_POST['drug'] ?? '';
+    $drugRow = sqlQuery("SELECT drug_id FROM drugs WHERE name LIKE ? LIMIT 1", ['%' . $drugName . '%']);
+    $drugId = $drugRow ? (int)$drugRow['drug_id'] : 0;
+    // Find pharmacy
+    $pharmacyId = (int)($_POST['pharmacy_id'] ?? 0);
+    if (!$pharmacyId) {
+        $pharmRow = sqlQuery("SELECT id FROM pharmacies LIMIT 1");
+        $pharmacyId = $pharmRow ? (int)$pharmRow['id'] : 0;
+    }
+    sqlInsert(
+        "INSERT INTO prescriptions (patient_id, provider_id, drug, drug_id, dosage, quantity, refills, pharmacy_id, start_date, date_added, active, user, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURDATE(), NOW(), 1, ?, ?)",
+        [
+            $pid, $providerId, $drugName, $drugId,
+            $_POST['dosage'] ?? '', $_POST['quantity'] ?? '0',
+            (int)($_POST['refills'] ?? 0), $pharmacyId,
+            $_SESSION['authUser'] ?? 'admin',
+            $_POST['note'] ?? '',
+        ]
+    );
+    $flash = 'Prescription sent: ' . $drugName;
+    header('Location: copilot_erx.php?msg=' . urlencode($flash));
+    exit;
+}
+$flash = $_GET['msg'] ?? null;
+
+// Pharmacies for the dropdown.
+$pharmacy_options = [];
+$pharmRows = sqlStatement("SELECT id, name FROM pharmacies ORDER BY name ASC");
+while ($pr = sqlFetchArray($pharmRows)) {
+    $pharmacy_options[] = ['id' => $pr['id'], 'name' => $pr['name']];
+}
+
 $drug_search = [
     ['Lisinopril 10 mg tablet',    true],
     ['Lisinopril 20 mg tablet',    false],
@@ -259,8 +297,12 @@ $current_meds = [
   <div class="cp-rx-spacer"></div>
   <span class="cp-rx-epcs"><span class="ic">🛡</span> EPCS active</span>
   <button type="button" class="cp-rx-btn ghost" style="margin-left: 12px;"><?php echo xlt('Save draft'); ?></button>
-  <button type="button" class="cp-rx-btn primary"><?php echo xlt('Send to pharmacy'); ?> →</button>
+  <button type="submit" form="cp-rx-form" class="cp-rx-btn primary"><?php echo xlt('Send to pharmacy'); ?> →</button>
 </header>
+
+<?php if ($flash): ?>
+  <div style="background:#EBF8F0; border:1px solid #B6E0C5; padding:10px 24px; color:#1F8C4D; font-size:13px;"><?php echo text($flash); ?></div>
+<?php endif; ?>
 
 <main class="cp-rx-body">
 
@@ -307,6 +349,9 @@ $current_meds = [
 
   <!-- RIGHT — Rx detail form -->
   <section class="cp-panel">
+    <form id="cp-rx-form" method="post" action="copilot_erx.php">
+    <input type="hidden" name="action" value="send_rx">
+    <input type="hidden" name="drug" value="Lisinopril 10 mg tablet">
     <div class="cp-rx-drug">
       <span class="ic">💊</span>
       <div class="info">
@@ -319,7 +364,7 @@ $current_meds = [
     <div class="cp-rx-form">
       <div class="cp-field">
         <label><?php echo xlt('Strength'); ?></label>
-        <input class="cp-input" type="text" value="10 mg">
+        <input class="cp-input" type="text" name="dosage" value="10 mg">
       </div>
       <div class="cp-field">
         <label><?php echo xlt('Dosage form'); ?></label>
@@ -328,13 +373,13 @@ $current_meds = [
 
       <div class="cp-field full">
         <label><?php echo xlt('Sig (instructions to patient)'); ?></label>
-        <input class="cp-input" type="text" value="Take 1 tablet by mouth once daily for blood pressure">
+        <input class="cp-input" type="text" name="sig" value="Take 1 tablet by mouth once daily for blood pressure">
       </div>
 
       <div class="grid3">
         <div class="cp-field">
           <label><?php echo xlt('Quantity'); ?></label>
-          <input class="cp-input" type="text" value="90">
+          <input class="cp-input" type="text" name="quantity" value="90">
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Days supply'); ?></label>
@@ -342,13 +387,17 @@ $current_meds = [
         </div>
         <div class="cp-field">
           <label><?php echo xlt('Refills'); ?></label>
-          <input class="cp-input" type="text" value="3">
+          <input class="cp-input" type="text" name="refills" value="3">
         </div>
       </div>
 
       <div class="cp-field">
         <label><?php echo xlt('Pharmacy'); ?></label>
-        <input class="cp-input" type="text" value="CVS — 4500 Burnet Rd, Austin TX">
+        <select class="cp-input cp-select" name="pharmacy_id">
+          <?php foreach ($pharmacy_options as $po): ?>
+            <option value="<?php echo attr($po['id']); ?>"><?php echo text($po['name']); ?></option>
+          <?php endforeach; ?>
+        </select>
       </div>
       <div class="cp-field">
         <label><?php echo xlt('Delivery'); ?></label>
@@ -361,12 +410,12 @@ $current_meds = [
       </div>
       <div class="cp-field">
         <label><?php echo xlt('Effective date'); ?></label>
-        <input class="cp-input" type="text" value="04/29/2026">
+        <input class="cp-input" type="text" value="<?php echo text(date('m/d/Y')); ?>">
       </div>
 
       <div class="cp-field full">
         <label><?php echo xlt('Internal note'); ?></label>
-        <textarea class="cp-input ta"></textarea>
+        <textarea class="cp-input ta" name="note"></textarea>
       </div>
     </div>
 
@@ -380,6 +429,7 @@ $current_meds = [
         <div class="body">Lisinopril checked against Penicillin allergy and current medication list. No conflicts.</div>
       </div>
     </div>
+    </form>
   </section>
 
 </main>
