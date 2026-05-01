@@ -130,11 +130,11 @@ class Header
         // patient chart chrome to match the AgentForge Figma mockups. Loaded
         // last so it cascades over the active OpenEMR theme.
         $webRoot = $GLOBALS['web_root'] ?? '';
-        $overlayPath = ($GLOBALS['webserver_root'] ?? '') . '/public/themes/copilot-overlay.css';
+        $overlayPath = ($GLOBALS['webserver_root'] ?? '') . '/public/copilot-overlay.css';
         if (is_file($overlayPath)) {
             $version = filemtime($overlayPath);
             $output .= "<link rel=\"stylesheet\" href=\"" . attr($webRoot)
-                . "/public/themes/copilot-overlay.css?v=" . attr((string)$version) . "\" />\n";
+                . "/public/copilot-overlay.css?v=" . attr((string)$version) . "\" />\n";
         }
 
         if ($echoOutput) {

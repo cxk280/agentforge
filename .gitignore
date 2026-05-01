@@ -15,7 +15,6 @@ node_modules
 /public/assets/*
 /public/themes/*
 !/public/assets/modified
-!/public/themes/copilot-overlay.css
 /.docs/.out/*
 
 # ccda service build
