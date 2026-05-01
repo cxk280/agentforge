@@ -114,9 +114,24 @@ async def chat(req: ChatRequest):
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
 
+    # The agent's tools call OpenEMR FHIR which expects a UUID, not the
+    # internal pid. Most callers (chat UI) resolve before posting; evals
+    # and quick test scripts pass the raw pid. Auto-resolve here so
+    # numeric patient_ids "just work".
+    fhir_patient_id = req.patient_id
+    if req.patient_id.isdigit():
+        try:
+            resolved = await resolve_patient(req.patient_id)
+            if isinstance(resolved, dict) and resolved.get("fhir_id"):
+                fhir_patient_id = resolved["fhir_id"]
+        except HTTPException:
+            # Fall through with the raw value; downstream FHIR call will
+            # report a clear error rather than us swallowing it.
+            pass
+
     try:
         reply, updated_history = await run_agent(
-            req.patient_id,
+            fhir_patient_id,
             history,
             session_id=req.session_id,
         )
