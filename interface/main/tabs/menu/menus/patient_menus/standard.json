@@ -78,7 +78,7 @@
         "menu_id": "issues",
         "target": "main",
         "on_click": "top.restoreSession()",
-        "url": "interface/patient_file/summary/stats_full.php?active=all",
+        "url": "interface/patient_file/issues/copilot_issues.php",
         "pid": "false",
         "children": [],
         "requirement": 0
