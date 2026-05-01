@@ -105,7 +105,7 @@ $loincCodes = [
     '59408-5',  // pulse oximetry / oxygen saturation
 ];
 echo "\nPopulating uuid_mapping (FHIR observation codes)...\n";
-$mapBefore = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE table = 'form_vitals'")['n'];
+$mapBefore = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE `table` = 'form_vitals'")['n'];
 $rows = sqlStatement("SELECT id, uuid FROM form_vitals WHERE uuid IS NOT NULL");
 $inserted = 0;
 while ($v = sqlFetchArray($rows)) {
@@ -114,7 +114,7 @@ while ($v = sqlFetchArray($rows)) {
         // Check existence (uuid_mapping has no natural unique key on
         // resource_path + target_uuid, so guard with a SELECT first).
         $exists = sqlQuery(
-            "SELECT id FROM uuid_mapping WHERE table = 'form_vitals' AND target_uuid = ? AND resource_path = ?",
+            "SELECT id FROM uuid_mapping WHERE `table` = 'form_vitals' AND target_uuid = ? AND resource_path = ?",
             [$v['uuid'], $resourcePath]
         );
         if ($exists) { continue; }
@@ -130,7 +130,7 @@ while ($v = sqlFetchArray($rows)) {
         $inserted++;
     }
 }
-$mapAfter = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE table = 'form_vitals'")['n'];
+$mapAfter = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE `table` = 'form_vitals'")['n'];
 echo "  uuid_mapping (form_vitals) rows: $mapBefore → $mapAfter (inserted $inserted)\n";
 
 // Set marker
