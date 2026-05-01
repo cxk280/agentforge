@@ -80,8 +80,13 @@ async def get_recent_labs(patient_id: str, limit: int = 10) -> dict:
     return {"patient_id": patient_id, "labs": labs}
 
 
-async def get_vitals(patient_id: str, limit: int = 5) -> dict:
-    """Recent vital signs for a patient."""
+async def get_vitals(patient_id: str, limit: int = 20) -> dict:
+    """Recent vital signs for a patient.
+
+    Default limit is 20 because OpenEMR returns one Observation per
+    LOINC code per measurement event (panel + 11 codes per visit), so a
+    single visit produces ~11 entries. limit=5 was hiding BP and BMI.
+    """
     # OpenEMR uses a non-standard category; fetch all observations and rely on
     # LOINC codes to identify vitals (BP, HR, temp, weight, height, O2 sat).
     bundle = await fhir_get(
