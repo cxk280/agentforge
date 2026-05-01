@@ -20,7 +20,32 @@ if (!AclMain::aclCheckCore('admin', 'super')) {
 
 header('Content-Type: text/plain; charset=utf-8');
 
-echo "patient_data — UUID inspection\n";
+echo "FHIR vitals join trace (Ted Shaw, pid=1):\n";
+echo str_repeat('=', 70) . "\n";
+$rows = sqlStatement("
+    SELECT vitals.id AS v_id, vitals.pid AS v_pid, vitals.date AS v_date,
+           vitals.bps, vitals.bpd, vitals.BMI,
+           forms.id AS f_id, forms.encounter AS f_enc, forms.deleted AS f_del,
+           fe.encounter AS fe_enc, fe.id AS fe_id
+      FROM form_vitals vitals
+      LEFT JOIN forms ON forms.form_id = vitals.id AND forms.formdir = 'vitals'
+      LEFT JOIN form_encounter fe ON fe.encounter = forms.encounter AND fe.pid = forms.pid
+     WHERE vitals.pid = 1
+");
+$count = 0;
+while ($r = sqlFetchArray($rows)) {
+    print_r($r);
+    $count++;
+}
+echo "rows: $count\n\n";
+
+echo "All forms entries pid=1:\n";
+$rows = sqlStatement("SELECT id, pid, encounter, formdir, form_id, deleted FROM forms WHERE pid = 1");
+while ($r = sqlFetchArray($rows)) {
+    print_r($r);
+}
+
+echo "\npatient_data — UUID inspection\n";
 echo str_repeat('=', 70) . "\n";
 $rows = sqlStatement("SELECT pid, fname, lname, uuid IS NULL AS is_null, uuid = '' AS is_empty, LENGTH(uuid) AS len, HEX(uuid) AS hex FROM patient_data ORDER BY pid LIMIT 20");
 while ($r = sqlFetchArray($rows)) {
