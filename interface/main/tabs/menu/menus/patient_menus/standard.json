@@ -58,8 +58,8 @@
         "menu_id": "documents",
         "target": "main",
         "on_click": "top.restoreSession()",
-        "url": "controller.php?document&list&patient_id=",
-        "pid": "true",
+        "url": "interface/patient_file/documents/copilot_documents.php",
+        "pid": "false",
         "children": [],
         "requirement": 0
     },
