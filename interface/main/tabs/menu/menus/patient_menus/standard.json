@@ -88,8 +88,8 @@
         "menu_id": "ledger",
         "target": "main",
         "on_click": "top.restoreSession()",
-        "url": "interface/reports/pat_ledger.php?form=1&patient_id=",
-        "pid": "true",
+        "url": "interface/patient_file/ledger/copilot_ledger.php",
+        "pid": "false",
         "children": [],
         "requirement": 0
     },
