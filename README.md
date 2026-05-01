@@ -265,9 +265,13 @@ Bypass with `COPILOT_SKIP_PRE_PUSH=1` or `git push --no-verify`
 
 ### Agent evals
 
-See `copilot/agent/evals/README.md`. 25 cases scored by Claude
-Haiku 4.5, results uploaded to Langfuse Datasets
+See `copilot/agent/evals/README.md`. 25 cases — a mix of `strict`
+(deterministic substring grading) and `labeled` (Claude Haiku 4.5
+rubric-graded). Results uploaded to Langfuse Datasets
 (`copilot-golden-v1`). Runs against the production agent.
+
+**Current baseline: 24/25 passed, avg score 0.92** (run captured in
+`copilot/agent/evals/baseline.txt`).
 
 ```bash
 cd copilot/agent/evals
