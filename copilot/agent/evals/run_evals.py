@@ -87,6 +87,26 @@ def call_agent(endpoint: str, patient_id: str, message: str, timeout: float = 60
     return body.get("reply", ""), latency
 
 
+def grade_strict(case: dict, reply: str) -> tuple[float, str]:
+    """Deterministic grader for strict / golden cases.
+
+    Score is 1.0 only if every `must_contain` substring is present AND no
+    `must_not_contain` substring appears. Otherwise 0.0. Case-insensitive.
+    """
+    expected = case.get("expected", {}) or {}
+    rl = reply.lower()
+    missing = [s for s in expected.get("must_contain", []) if s.lower() not in rl]
+    forbidden = [s for s in expected.get("must_not_contain", []) if s.lower() in rl]
+    if missing or forbidden:
+        bits = []
+        if missing:
+            bits.append("missing required: " + ", ".join(missing))
+        if forbidden:
+            bits.append("contained forbidden: " + ", ".join(forbidden))
+        return 0.0, "; ".join(bits)
+    return 1.0, "all required substrings present, no forbidden substrings"
+
+
 JUDGE_SYSTEM = """You are a strict eval judge for a clinical Co-Pilot agent.
 
 You will be given:
@@ -212,8 +232,13 @@ def run() -> int:
         print(f"[{i}/{len(cases)}] {case['id']:<40s}", end=" ", flush=True)
         try:
             reply, latency = call_agent(args.endpoint, case["patient_id"], case["message"])
-            score, reason = judge_reply(anthropic, case, reply)
-            passed = score >= args.threshold
+            mode = case.get("mode", "labeled")
+            if mode == "strict":
+                score, reason = grade_strict(case, reply)
+                passed = score == 1.0
+            else:
+                score, reason = judge_reply(anthropic, case, reply)
+                passed = score >= args.threshold
             results.append(CaseResult(
                 case_id=case["id"],
                 category=case["category"],
@@ -223,7 +248,8 @@ def run() -> int:
                 reply=reply,
                 judge_reason=reason,
             ))
-            print(f"{'✓' if passed else '✗'} score={score:.2f} ({latency}ms)")
+            mode_tag = "[strict]" if case.get("mode") == "strict" else "[labeled]"
+            print(f"{'✓' if passed else '✗'} {mode_tag} score={score:.2f} ({latency}ms)")
         except Exception as exc:
             results.append(CaseResult(
                 case_id=case["id"],

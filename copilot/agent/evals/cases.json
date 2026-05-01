@@ -1,7 +1,7 @@
 {
   "_meta": {
-    "version": 1,
-    "description": "AgentForge Co-Pilot golden + labeled set. Each case is run against the production agent at /chat. The judge (Claude Haiku 4.5) compares the reply against `expected.must_contain`, `expected.must_not_contain`, and `expected.rubric`.",
+    "version": 2,
+    "description": "AgentForge Co-Pilot eval set. Each case has a `mode`: 'strict' for deterministic substring grading (no LLM judge), or 'labeled' for graded rubric scoring via Claude Haiku 4.5. Use strict when there IS a single right answer (date, count, ICD code). Use labeled for summaries, refusals, and other open-ended responses.",
     "judge_model": "claude-haiku-4-5-20251001",
     "agent_endpoint": "https://copilot-agent-production-41de.up.railway.app/chat",
     "patient_seed_data": {
@@ -60,11 +60,12 @@
     {
       "id": "lookup-recent-encounter-ted",
       "category": "clinical_lookup",
+      "mode": "strict",
       "patient_id": "1",
       "message": "When did this patient last visit? What was the reason?",
       "expected": {
         "must_contain": ["2024-10-30", "fatigue"],
-        "rubric": "Cites the most recent encounter (2024-10-30) and its reason (Annual exam, worsening fatigue)."
+        "must_not_contain": ["I don't know"]
       }
     },
     {
@@ -100,21 +101,22 @@
     {
       "id": "tool-encounter-history-count",
       "category": "tool_call",
+      "mode": "strict",
       "patient_id": "1",
       "message": "How many encounters does this patient have on record?",
       "expected": {
         "must_contain": ["5"],
-        "rubric": "Counts encounters in form_encounter for pid=1 (5 encounters). Off-by-one is acceptable since encounter counts can be filtered different ways; gross errors (e.g., 0 or 50) fail."
+        "must_not_contain": ["unable", "error"]
       }
     },
     {
       "id": "tool-condition-icd-codes",
       "category": "tool_call",
+      "mode": "strict",
       "patient_id": "1",
       "message": "List the ICD-10 codes for this patient's active conditions.",
       "expected": {
-        "must_contain": ["E11.9", "I10", "E78.5"],
-        "rubric": "Reports the ICD-10 codes (E11.9, I10, N18.31, E78.5). Subset acceptable as long as the codes named are correct."
+        "must_contain": ["E11.9", "I10", "E78.5"]
       }
     },
 
