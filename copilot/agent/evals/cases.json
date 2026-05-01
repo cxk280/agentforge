@@ -60,12 +60,12 @@
     {
       "id": "lookup-recent-encounter-ted",
       "category": "clinical_lookup",
-      "mode": "strict",
+      "mode": "labeled",
       "patient_id": "1",
       "message": "When did this patient last visit? What was the reason?",
       "expected": {
-        "must_contain": ["2024-10-30", "fatigue"],
-        "must_not_contain": ["I don't know"]
+        "must_contain": ["fatigue"],
+        "rubric": "Cites the most recent encounter (date 2024-10-30 or any equivalent format like 'October 30, 2024' or 'Oct 30 2024') and the reason 'Annual exam, worsening fatigue' (paraphrasing OK as long as 'fatigue' appears)."
       }
     },
     {

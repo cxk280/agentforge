@@ -153,11 +153,26 @@ def _coding_display(cc: dict) -> str:
 
 def _obs_value(obs: dict) -> str | None:
     if "valueQuantity" in obs:
-        return str(obs["valueQuantity"].get("value"))
+        v = obs["valueQuantity"].get("value")
+        u = obs["valueQuantity"].get("unit") or ""
+        return f"{v} {u}".strip() if v is not None else None
     if "valueString" in obs:
         return obs["valueString"]
     if "valueCodeableConcept" in obs:
         return _coding_display(obs["valueCodeableConcept"])
+    # Panel-style observations (BP) carry their values in component[] —
+    # one entry per sub-code (systolic, diastolic). Render as "S/D unit".
+    components = obs.get("component", []) or []
+    if components:
+        parts = []
+        for c in components:
+            vq = c.get("valueQuantity") or {}
+            val = vq.get("value")
+            if val is not None:
+                parts.append(str(val))
+        if parts:
+            unit = (components[0].get("valueQuantity") or {}).get("unit", "")
+            return f"{'/'.join(parts)} {unit}".strip()
     return None
 
 
