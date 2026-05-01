@@ -20,6 +20,28 @@ if (!AclMain::aclCheckCore('admin', 'super')) {
 
 header('Content-Type: text/plain; charset=utf-8');
 
+echo "Direct VitalsService SQL test (Ted Shaw, pid=1):\n";
+echo str_repeat('=', 70) . "\n";
+try {
+    $svc = new \OpenEMR\Services\VitalsService();
+    $search = [
+        new \OpenEMR\Services\Search\StringSearchField('pid', 1, \OpenEMR\Services\Search\SearchModifier::EXACT),
+        new \OpenEMR\Services\Search\StringSearchField('deleted', 0, \OpenEMR\Services\Search\SearchModifier::EXACT),
+        new \OpenEMR\Services\Search\StringSearchField('formdir', 'vitals', \OpenEMR\Services\Search\SearchModifier::EXACT),
+    ];
+    $result = $svc->search($search);
+    echo "  isValid: " . ($result->isValid() ? "yes" : "no") . "\n";
+    $data = $result->getData() ?? [];
+    echo "  rows returned: " . count($data) . "\n";
+    if (!empty($data)) {
+        $first = $data[0];
+        echo "  first record keys: " . implode(", ", array_keys($first)) . "\n";
+    }
+} catch (\Throwable $e) {
+    echo "  EXCEPTION: " . get_class($e) . ": " . $e->getMessage() . "\n";
+}
+echo "\n";
+
 echo "FHIR vitals join trace (Ted Shaw, pid=1):\n";
 echo str_repeat('=', 70) . "\n";
 $rows = sqlStatement("
