@@ -1,12 +1,180 @@
-# AgentForge: Clinical Co-Pilot
+# AgentForge — Clinical Co-Pilot
 
-An AI agent embedded in OpenEMR that gives physicians fast, patient-specific clinical context in the 90-second window between patient rooms. The agent retrieves real patient data (medications, labs, vitals, visit history) and answers conversational questions with source attribution.
+> An AI agent embedded directly inside an EHR, designed to give clinicians
+> patient-specific clinical context in the **90-second window between
+> exam-room visits**. Built as a one-week sprint deliverable for
+> Gauntlet AI on top of [OpenEMR](https://open-emr.org).
 
-**Live deployment:** https://openemr-production-971e.up.railway.app/ — login `admin` / `admin`
+## Live demo
+
+| Service | URL | Credentials |
+|---|---|---|
+| OpenEMR + Co-Pilot UI | https://openemr-production-971e.up.railway.app | `admin` / `admin` |
+| Co-Pilot agent (FastAPI) | https://copilot-agent-production-41de.up.railway.app | — |
+| Langfuse (observability) | https://langfuse-web-production-368f.up.railway.app | see operator |
+
+Once signed in, the Co-Pilot tab on any patient chart opens the chat
+view backed by the agent. The "Mock Index" page at
+`/interface/main/copilot_mock_index.php` lists every redesigned screen
+and is the fastest way to walk the breadth of the demo.
 
 ---
 
-## Local Development
+## The problem
+
+Primary-care clinicians spend roughly 30% of clinical time on chart
+review and documentation. Between exam rooms they have ~90 seconds to
+re-orient themselves on the next patient: open problems, current meds,
+recent labs, last visit's plan. The standard EHR makes this a
+multi-tab, multi-click affair. The cognitive context-switch tax is
+real and measured.
+
+The Co-Pilot is a chat-style assistant that already knows which
+patient you're looking at and can answer in plain language: *"What's
+been happening with this patient's diabetes?"*, *"Are any of their
+current meds a concern given the CKD?"*, *"Refill Lisinopril 90 days
+to CVS."* It's tool-using — it pulls real records via the EHR's FHIR
+API rather than guessing — and every interaction is traced in
+Langfuse for review.
+
+---
+
+## What's in this repo
+
+This is a **fork of OpenEMR** with three layered pieces of new work:
+
+1. **Clinical Co-Pilot agent** (`copilot/agent/`) — FastAPI service
+   running an Anthropic Claude agent with FHIR-backed retrieval tools.
+2. **Co-Pilot UI redesign** (`interface/.../copilot_*.php`) — a
+   complete reskin of the OpenEMR UI built to a Figma design system.
+   ~50 pages covering every clickable view in the application,
+   each backed by a shared archetype CSS file
+   (`public/copilot-archetype.css`). The redesign is screen-faithful
+   to the Figma reference.
+3. **Eval suite** (`copilot/agent/evals/`) — 25 golden + labeled
+   cases scored by Claude Haiku 4.5 as judge, results uploaded to
+   Langfuse Datasets. Runs against the production agent.
+
+The OpenEMR skeleton underneath provides the database schema
+(MariaDB), the auth/session layer, and the surrounding clinical
+workflow primitives. The fork is intentionally light-touch on the
+core OpenEMR code — almost all new files live in their own
+namespaces (`copilot_*.php`, `copilot/agent/`, `tests/.../Copilot/`)
+so the fork stays mergeable with upstream.
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| EHR shell | OpenEMR 7.x (PHP 8.2+, MariaDB 10.11) |
+| Agent runtime | Python 3.13, FastAPI, Anthropic SDK |
+| Agent model | Claude Sonnet 4.6 (production), Haiku 4.5 (eval judge) |
+| Patient data API | OpenEMR FHIR R4 endpoints |
+| Observability | Self-hosted [Langfuse](https://langfuse.com) (Postgres + ClickHouse + Redis + S3) |
+| Frontend (mocks) | Inline CSS + shared `public/copilot-archetype.css` (no framework) |
+| Hosting | [Railway](https://railway.com) (8 services in one project) |
+| Tests | PHPUnit 11 (isolated suite) + Python eval harness |
+
+---
+
+## Architecture
+
+```
+                        ┌──────────────────────────────────┐
+                        │  Browser (clinician)             │
+                        │  https://openemr-production...   │
+                        └──────────────┬───────────────────┘
+                                       │
+                  ┌────────────────────┴────────────────────┐
+                  │                                         │
+        ┌─────────▼──────────┐                   ┌─────────▼──────────┐
+        │  OpenEMR PHP app   │  iframe + HTTP    │  Co-Pilot FastAPI  │
+        │  (apache, php-fpm) │ ◄────────────────►│   chat endpoint    │
+        └─────────┬──────────┘                   └─────────┬──────────┘
+                  │                                        │
+                  │ JDBC                          FHIR R4  │  Anthropic
+                  ▼                                        ▼  Messages API
+        ┌────────────────────┐                   ┌────────────────────┐
+        │  MariaDB           │                   │ Claude (Sonnet 4.6)│
+        │  (patients, encs,  │                   └────────────────────┘
+        │   Rxs, vitals,     │                              │
+        │   audit log, ...)  │                              │ trace
+        └────────────────────┘                              ▼
+                                                  ┌────────────────────┐
+                                                  │ Langfuse           │
+                                                  │ (Postgres + CH +   │
+                                                  │  Redis + S3 traces)│
+                                                  └────────────────────┘
+```
+
+The Co-Pilot agent is **stateless across sessions** but maintains
+chat-history per `session_id` in process memory. Each tool call
+hits the OpenEMR FHIR API as the patient's authorized provider —
+i.e. the same auth layer that gates the rest of the EHR.
+
+---
+
+## What's real vs what's mocked
+
+This is a one-week demo. Some honesty about scope:
+
+**Real (queries live data, persists user actions):**
+- Patient demographics, encounter history, vitals, prescriptions,
+  conditions, allergies, immunizations — all read from the OpenEMR
+  schema.
+- CRUD flows that write to the DB and persist across reload:
+  - Create patient (Screen 22 → `patient_data` insert)
+  - Post office note (Screen 49 → `onotes`)
+  - Take payment (Screen 58 → `ar_session`)
+  - Send e-Rx (Screen 25 → `prescriptions`)
+  - Sign & lock encounter (Screen 23 → `form_encounter` update)
+  - Invite / deactivate user (Screen 52 → `users`)
+  - Add facility / add drug to inventory (Screens 54 / 60)
+- Audit log (Screen 55) reads ~80k real entries from the OpenEMR
+  `log` table.
+- The Co-Pilot agent answers from real FHIR data for the active
+  patient.
+
+**Mocked (visually faithful but synthetic / static):**
+- Some KPI tiles on the dashboard archetypes (Recalls, Aging,
+  Pending Review) display plausible synthetic data because the
+  underlying schema doesn't exist in the OpenEMR demo dataset.
+- Lab trends / quality measures pages show illustrative numbers.
+- The "Co-Pilot suggestion" card on encounter views is static text
+  in the mock; the agent itself answers in the chat surface.
+
+A complete view-by-view inventory is in
+`/interface/main/copilot_mock_index.php` on the live demo.
+
+---
+
+## Compliance & HIPAA
+
+This is a **demo deployment**. Real-world deployment would require
+several compliance steps that are intentionally simplified here:
+
+- **Langfuse + Anthropic + New Relic (planned)** — each is a third-party
+  data processor. Sending PHI to any of them in production requires
+  a signed Business Associate Agreement (BAA) with that vendor.
+  For the purposes of this demo, we proceed under the **premise
+  that BAAs have been executed**. None have actually been signed
+  for this deployment.
+- **Audit logging** — every tool call from the Co-Pilot agent
+  flows through OpenEMR's existing `log` table, so PHI access is
+  traceable to the authenticated user.
+- **Encryption** — TLS in transit (Railway-managed certs); MariaDB
+  at-rest encryption is **not** enabled in this demo.
+- **Access control** — uses OpenEMR's native ACL. The demo seeds
+  realistic provider / nurse / front-desk / billing roles.
+
+If you are evaluating this for production use, treat the BAA and
+encryption-at-rest items as required pre-launch.
+
+---
+
+## Local development
 
 ### Prerequisites
 
@@ -20,22 +188,20 @@ git clone https://github.com/cxk280/agentforge.git
 cd agentforge
 ```
 
-### 2. Start OpenEMR
+### 2. Start the stack
 
 ```bash
 cd docker/development-easy-light
 docker compose up --detach --wait
 ```
 
-**First boot takes 10–20 minutes.** Docker pulls the `openemr/openemr:flex` image, then runs `composer install` (~200 packages) and `npm install` + Gulp SCSS compilation inside the container. Subsequent starts are fast.
+**First boot takes 10–20 minutes** (image pull + composer install +
+gulp build inside the container). Subsequent starts are fast.
 
-The `--wait` flag blocks until the healthcheck passes. You can watch progress with:
+The `--wait` flag blocks until the healthcheck passes; you can
+watch progress with `docker compose logs -f openemr`.
 
-```bash
-docker compose logs -f openemr
-```
-
-### 3. Access the application
+### 3. Open the app
 
 | Service | URL | Credentials |
 |---|---|---|
@@ -43,136 +209,142 @@ docker compose logs -f openemr
 | OpenEMR (HTTPS) | https://localhost:9300/ | `admin` / `pass` |
 | phpMyAdmin | http://localhost:8310/ | root / `root` |
 
-### 4. Seed demo patient data
+Note the local-dev password is `pass`; on Railway production it's `admin`.
 
-The dev database starts empty. Import the demo patients and clinical data:
+### 4. Seed demo data
 
-```bash
-# From the repo root — run from a second terminal while the container is up
+The seed script is **idempotent** — it sets a marker row in
+`globals.copilot_seed_v1` and skips on subsequent runs so UI
+edits aren't clobbered. Run once per environment:
 
-# Demo patients (Ted Shaw, Farrah Rolle, Nora Cohen)
-docker exec -i development-easy-light-openemr-1 mariadb \
-  -u root -proot openemr \
-  < sql/seed_patients_railway.sql
-
-# Encounters, SOAP notes, vitals (lines 1–186 only)
-head -186 sql/seed_clinical_data.sql | \
-  docker exec -i development-easy-light-openemr-1 mariadb \
-  -u root -proot openemr
-
-# Labs, conditions, allergies, medications
-docker exec -i development-easy-light-openemr-1 mariadb \
-  -u root -proot openemr \
-  < sql/seed_clinical_data_part2.sql
+```
+GET /interface/super/copilot_seed_demo_data.php?confirm=1
 ```
 
-After seeding you should have 3 patients, 15 encounters, 40 lab observations, 10 conditions, 7 allergies, and 16 medications.
+This adds: 8 provider/staff users, 4 facilities, 4 pharmacies,
+10 drugs, 6 office notes, 7 documents, 5 immunizations. The
+underlying OpenEMR demo dataset already has 14 patients, 32
+prescriptions, ~80k audit log entries, etc. — those are
+preserved.
 
-### 5. Stop
+### 5. Run the Co-Pilot agent (optional)
 
 ```bash
-cd docker/development-easy-light
-docker compose down
+cd copilot/agent
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=sk-ant-...
+uvicorn main:app --reload
 ```
 
-Data persists in Docker volumes. To reset to a clean state:
+Agent listens on http://localhost:8000.
+
+---
+
+## Testing
+
+### PHPUnit (isolated, runs in the dev container)
 
 ```bash
-docker compose down --volumes
+docker exec -i development-easy-light-openemr-1 sh -c \
+  "cd /var/www/localhost/htdocs/openemr && \
+   ./vendor/bin/phpunit -c phpunit-isolated.xml --filter Copilot"
+```
+
+97 tests total: 32 helper-function unit tests + 65 syntax-lint
+tests across every `copilot_*.php` view.
+
+### Pre-push hook
+
+```bash
+scripts/install-git-hooks.sh
+```
+
+Installs a hook that runs the Copilot suite before every push.
+Bypass with `COPILOT_SKIP_PRE_PUSH=1` or `git push --no-verify`
+(intentionally awkward — failures should be fixed, not skipped).
+
+### Agent evals
+
+See `copilot/agent/evals/README.md`. 25 cases scored by Claude
+Haiku 4.5, results uploaded to Langfuse Datasets
+(`copilot-golden-v1`). Runs against the production agent.
+
+```bash
+cd copilot/agent/evals
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=...
+export LANGFUSE_PUBLIC_KEY=...
+export LANGFUSE_SECRET_KEY=...
+export LANGFUSE_HOST=...
+python run_evals.py            # full 25-case run
+python run_evals.py --smoke    # 5-case smoke for pre-push
 ```
 
 ---
 
-## Project layout
+## Repository layout
 
 ```
-copilot/agent/   - Python FastAPI agent backend (in progress)
-evals/           - Eval framework and test cases
-sql/             - Seed data for demo patients
-AUDIT.md         - Security, performance, and architecture audit
-USERS.md         - Target user and use case definitions
-ARCHITECTURE.md  - AI integration plan
-COST_ANALYSIS.md - Token cost projections
+copilot/
+├── agent/                    # FastAPI Co-Pilot agent
+│   ├── main.py               # /chat endpoint, session store
+│   ├── agent.py              # Anthropic loop + tool dispatch
+│   ├── tools.py              # FHIR-backed retrieval tools
+│   ├── observability.py      # Langfuse instrumentation
+│   ├── fhir_client.py        # OpenEMR FHIR adapter
+│   └── evals/                # Golden + labeled set + harness
+│       ├── cases.json
+│       ├── run_evals.py
+│       └── requirements.txt
+interface/
+├── ...copilot_*.php          # ~50 redesigned mock views (search the
+│                              tree for `copilot_` to enumerate)
+├── main/copilot_helpers.php  # Shared formatting helpers
+├── main/copilot_mock_index.php   # Walk-every-view nav page
+└── super/copilot_seed_demo_data.php  # Idempotent seeder
+public/
+└── copilot-archetype.css     # Shared design-system CSS
+scripts/
+├── pre-push.sh               # Git hook
+└── install-git-hooks.sh
+tests/Tests/Isolated/Copilot/
+├── CopilotHelpersTest.php    # 32 unit tests
+└── CopilotPagesSyntaxTest.php  # 65 syntax-lint tests
 ```
+
+The rest of the repository is upstream OpenEMR. See
+`CONTRIBUTING.md` for upstream conventions.
 
 ---
 
-[![Syntax Status](https://github.com/openemr/openemr/actions/workflows/syntax.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/syntax.yml)
-[![Styling Status](https://github.com/openemr/openemr/actions/workflows/styling.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/styling.yml)
-[![Testing Status](https://github.com/openemr/openemr/actions/workflows/test.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/test.yml)
-[![JS Unit Testing Status](https://github.com/openemr/openemr/actions/workflows/js-test.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/js-test.yml)
-[![PHPStan](https://github.com/openemr/openemr/actions/workflows/phpstan.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/phpstan.yml)
-[![Rector](https://github.com/openemr/openemr/actions/workflows/rector.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/rector.yml)
-[![ShellCheck](https://github.com/openemr/openemr/actions/workflows/shellcheck.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/shellcheck.yml)
-[![Docker Compose Linting](https://github.com/openemr/openemr/actions/workflows/docker-compose-lint.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/docker-compose-lint.yml)
-[![Dockerfile Linting](https://github.com/openemr/openemr/actions/workflows/hadolint.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/hadolint.yml)
-[![Isolated Tests](https://github.com/openemr/openemr/actions/workflows/isolated-tests.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/isolated-tests.yml)
-[![Inferno Certification Test](https://github.com/openemr/openemr/actions/workflows/inferno-test.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/inferno-test.yml)
-[![Composer Checks](https://github.com/openemr/openemr/actions/workflows/composer.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/composer.yml)
-[![Composer Require Checker](https://github.com/openemr/openemr/actions/workflows/composer-require-checker.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/composer-require-checker.yml)
-[![API Docs Freshness Checks](https://github.com/openemr/openemr/actions/workflows/api-docs.yml/badge.svg)](https://github.com/openemr/openemr/actions/workflows/api-docs.yml)
-[![codecov](https://codecov.io/gh/openemr/openemr/graph/badge.svg?token=7Eu3U1Ozdq)](https://codecov.io/gh/openemr/openemr)
+## Sprint context
 
-[![Backers on Open Collective](https://opencollective.com/openemr/backers/badge.svg)](#backers) [![Sponsors on Open Collective](https://opencollective.com/openemr/sponsors/badge.svg)](#sponsors)
+This was built as a one-week deliverable for the Gauntlet AI program.
+Final review is **Sunday 2026-05-03 at noon CT**. Tradeoffs were made
+to fit that window:
 
-# OpenEMR
+- Fork-and-extend rather than greenfield, so the auth layer, RBAC,
+  audit log, and FHIR API came for free.
+- Mock-faithful screens before deep behavior on each — you can click
+  through every view, but only the high-value flows are wired
+  end-to-end. The shared archetype CSS lets non-priority screens
+  look real without bespoke implementation.
+- LLM-authored draft eval cases (with DB-verified ground truth for
+  the lookup categories) rather than clinician-authored evals. Plan
+  is to evolve toward production-trace-driven evals over time.
 
-[OpenEMR](https://open-emr.org) is a Free and Open Source electronic health records and medical practice management application. It features fully integrated electronic health records, practice management, scheduling, electronic billing, internationalization, free support, a vibrant community, and a whole lot more. It runs on Windows, Linux, Mac OS X, and many other platforms.
+---
 
-### Contributing
+## Upstream OpenEMR
 
-OpenEMR is a leader in healthcare open source software and comprises a large and diverse community of software developers, medical providers and educators with a very healthy mix of both volunteers and professionals. [Join us and learn how to start contributing today!](https://open-emr.org/wiki/index.php/FAQ#How_do_I_begin_to_volunteer_for_the_OpenEMR_project.3F)
+This repository is a fork of [openemr/openemr](https://github.com/openemr/openemr).
+For upstream documentation, contributing guidelines, the OpenEMR
+community, and licensing, see:
 
-> Already comfortable with git? Check out [CONTRIBUTING.md](CONTRIBUTING.md) for quick setup instructions and requirements for contributing to OpenEMR by resolving a bug or adding an awesome feature 😊.
+- [open-emr.org](https://open-emr.org)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- [`API_README.md`](API_README.md), [`FHIR_README.md`](FHIR_README.md), [`DOCKER_README.md`](DOCKER_README.md)
+- [`SECURITY.md`](.github/SECURITY.md) — security disclosure process
 
-### Support
-
-Community and Professional support can be found [here](https://open-emr.org/wiki/index.php/OpenEMR_Support_Guide).
-
-Extensive documentation and forums can be found on the [OpenEMR website](https://open-emr.org) that can help you to become more familiar about the project 📖.
-
-### Reporting Issues and Bugs
-
-Report these on the [Issue Tracker](https://github.com/openemr/openemr/issues). If you are unsure if it is an issue/bug, then always feel free to use the [Forum](https://community.open-emr.org/) and [Chat](https://www.open-emr.org/chat/) to discuss about the issue 🪲.
-
-### Reporting Security Vulnerabilities
-
-Check out [SECURITY.md](.github/SECURITY.md)
-
-### API
-
-Check out [API_README.md](API_README.md)
-
-### Docker
-
-Check out [DOCKER_README.md](DOCKER_README.md)
-
-### FHIR
-
-Check out [FHIR_README.md](FHIR_README.md)
-
-### For Developers
-
-If using OpenEMR directly from the code repository, then the following commands will build OpenEMR (Node.js version 24.* is required) :
-
-```shell
-composer install --no-dev
-npm install
-npm run build
-composer dump-autoload -o
-```
-
-### Contributors
-
-This project exists thanks to all the people who have contributed. [[Contribute]](CONTRIBUTING.md).
-<a href="https://github.com/openemr/openemr/graphs/contributors"><img src="https://opencollective.com/openemr/contributors.svg?width=890" /></a>
-
-
-### Sponsors
-
-Thanks to our [ONC Certification Major Sponsors](https://www.open-emr.org/wiki/index.php/OpenEMR_Certification_Stage_III_Meaningful_Use#Major_sponsors)!
-
-
-### License
-
-[GNU GPL](LICENSE)
+OpenEMR is licensed [GPL-3.0](LICENSE). All AgentForge additions
+inherit that license.
