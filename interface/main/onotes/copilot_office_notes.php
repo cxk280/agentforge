@@ -10,6 +10,7 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../copilot_helpers.php");
 
 // Handle POST: add a new office note
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !empty(trim($_POST['body'] ?? ''))) {
@@ -30,12 +31,10 @@ $rows = sqlStatement("SELECT date, body, user FROM onotes WHERE activity = 1 ORD
 $nowTs = time();
 $idx = 0;
 while ($r = sqlFetchArray($rows)) {
-    $u = sqlQuery("SELECT fname, lname, title FROM users WHERE username = ?", [$r['user']]);
+    $u = sqlQuery("SELECT username, fname, lname, title FROM users WHERE username = ?", [$r['user']]);
     if ($u) {
-        $name = trim(($u['title'] ? $u['title'] . ' ' : '') . $u['fname'] . ' ' . $u['lname']);
-        if (!$name) { $name = $r['user']; }
-        $initials = strtoupper(substr($u['fname'], 0, 1) . substr($u['lname'], 0, 1));
-        if (!$initials) { $initials = strtoupper(substr($r['user'], 0, 2)); }
+        $name = cp_format_provider_name($u);
+        $initials = cp_initials($u);
     } else {
         $name = $r['user']; $initials = strtoupper(substr($r['user'], 0, 2));
     }

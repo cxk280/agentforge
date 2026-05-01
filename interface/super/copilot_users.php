@@ -10,6 +10,7 @@
 
 require_once(__DIR__ . "/../globals.php");
 require_once(__DIR__ . "/copilot_admin_sidebar.php");
+require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 // CRUD: invite new user, edit, deactivate.
 $flash = null;
@@ -49,14 +50,11 @@ $tones = ['teal', 'orange', 'purple', 'blue', 'mint', 'pink', 'green', 'violet']
 $users = [];
 $idx = 0;
 while ($r = sqlFetchArray($rows)) {
-    $fn = $r['fname'] ?: '';
-    $ln = $r['lname'] ?: $r['username'];
-    $name = trim(($r['title'] ? $r['title'] . ' ' : '') . $fn . ' ' . $ln);
-    if ($r['username'] === 'admin') { $name = 'Site Administrator'; }
-    $initials = strtoupper(substr($fn, 0, 1) . substr($ln, 0, 1));
-    if (!$initials) { $initials = strtoupper(substr($r['username'], 0, 2)); }
+    $name = cp_format_provider_name($r);
+    $initials = cp_initials($r);
     // Role inference
     if ($r['username'] === 'admin') { $role = 'Site Admin'; }
+    elseif ($r['username'] === 'davis' || $r['username'] === 'hamming') { $role = 'Admin'; }
     elseif ((int)$r['authorized'] === 1) { $role = 'Provider'; }
     elseif (in_array($r['username'], ['mnunez'], true)) { $role = 'Front Desk'; }
     elseif (in_array($r['username'], ['schoi'], true)) { $role = 'Nurse'; }

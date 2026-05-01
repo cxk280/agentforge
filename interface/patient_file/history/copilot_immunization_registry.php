@@ -10,21 +10,40 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-$immunizations = [
-    ['Influenza (quadrivalent)',     '2025-10-14', 'Riverside Family Medicine', 'Lot FL-7281',  'Up to date', 'good'],
-    ['COVID-19 (Pfizer Bivalent)',   '2025-09-22', 'Riverside Family Medicine', 'Lot CV-9942',  'Up to date', 'good'],
-    ['Tdap (Boostrix)',              '2024-03-08', 'Riverside Family Medicine', 'Lot TD-1144',  '2034 due',   'good'],
-    ['Pneumococcal (Prevnar 20)',    '2023-04-19', 'Riverside Family Medicine', 'Lot PC-8821',  'Complete',   'good'],
-    ['Shingrix dose 2',              '2022-11-04', 'Riverside Family Medicine', 'Lot SH-4488',  'Complete',   'good'],
-    ['Hepatitis B series',           '2018-06-15', 'Pediatric records',         'Imported',     'Complete',   'good'],
-    ['MMR',                          'Childhood',  'Pediatric records',         'Imported',     'Complete',   'good'],
-    ['HPV (Gardasil 9)',             'Refused',    '—',                          '—',            'Refused',    'neutral'],
-];
+$pid = (int)($_SESSION['pid'] ?? 1);
 
-$due = [
-    ['Influenza 2026-2027 season', 'Sep 2026', 'recommended'],
-    ['Shingrix booster',           'Not due',  'complete'],
-];
+$immunizations = [];
+$rows = sqlStatement(
+    "SELECT administered_date, note, administered_by, lot_number
+     FROM immunizations WHERE patient_id = ? ORDER BY administered_date DESC",
+    [$pid]
+);
+$idx = 0;
+while ($r = sqlFetchArray($rows)) {
+    $vaccine = $r['note'] ?: 'Unspecified vaccine';
+    $date = $r['administered_date'] ? substr($r['administered_date'], 0, 10) : '—';
+    $facility = $r['administered_by'] ?: '—';
+    $lot = $r['lot_number'] ? 'Lot ' . $r['lot_number'] : '—';
+    $status = 'Complete';
+    if ($idx < 2) { $status = 'Up to date'; } // Most recent → "Up to date"
+    $immunizations[] = [$vaccine, $date, $facility, $lot, $status, 'good'];
+    $idx++;
+}
+
+// Recommended vaccines based on what's NOT in the history (heuristic).
+$has = function (string $kw) use ($immunizations): bool {
+    foreach ($immunizations as $i) {
+        if (stripos($i[0], $kw) !== false) { return true; }
+    }
+    return false;
+};
+$due = [];
+if (!$has('Influenza') || strtotime((string)($immunizations[0][1] ?? '2020-01-01')) < strtotime('-9 months')) {
+    $due[] = ['Influenza ' . date('Y') . '–' . (date('Y') + 1) . ' season', date('M Y', strtotime('+5 months')), 'recommended'];
+}
+if ($has('Shingrix')) {
+    $due[] = ['Shingrix booster', 'Not due', 'complete'];
+}
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -41,7 +60,7 @@ $due = [
 <header class="cp-pagehead">
   <div class="info">
     <span class="titleSm"><?php echo xlt('Immunizations'); ?></span>
-    <span class="meta">8 <?php echo xlt('on record'); ?> • 1 <?php echo xlt('due in 4 months'); ?></span>
+    <span class="meta"><?php echo text(count($immunizations)); ?> <?php echo xlt('on record'); ?> • <?php echo text(count($due)); ?> <?php echo xlt('to review'); ?></span>
   </div>
   <button type="button" class="cp-btn ghost"><?php echo xlt('Print'); ?></button>
   <button type="button" class="cp-btn primary">+ <?php echo xlt('Record vaccine'); ?></button>

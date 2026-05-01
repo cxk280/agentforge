@@ -13,6 +13,9 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../../main/copilot_helpers.php");
+
+$pid = (int)($_SESSION['pid'] ?? 1);
 
 $filters = [
     ['All',         true],
@@ -22,66 +25,53 @@ $filters = [
     ['Acute',        false],
 ];
 
-// type styles map onto pill colors used in the date rail
-$visits = [
-    [
-        'year'  => '2026',
-        'date'  => 'Apr 12',
-        'day'   => 'Tuesday',
-        'type'  => 'Lab Review',
-        'type_color' => '#4885D9',
-        'provider' => 'Dr. S. Chen',
-        'modality' => 'Tele',
-        'duration' => '15 min',
-        'status'   => 'Signed',
-        'title' => 'A1C trending up — review medication options',
-        'desc'  => 'Discussed recent A1C of 7.9% (up from 7.2%). Reviewed dietary log. Recommended adding GLP-1 agonist if no improvement at next check.',
-        'tags'  => [
-            ['A1C ↑', 'neutral'],
-            ['GLP-1 considered', 'neutral'],
-            ['+ Co-Pilot insight', 'copilot'],
-        ],
-    ],
-    [
-        'year'  => '2026',
-        'date'  => 'Feb 18',
-        'day'   => 'Wednesday',
-        'type'  => 'Annual Physical',
-        'type_color' => '#008C8C',
-        'provider' => 'Dr. E. Rivera',
+$totalCount = (int)(sqlQuery("SELECT COUNT(*) AS n FROM form_encounter WHERE pid = ?", [$pid])['n'] ?? 0);
+
+$visits = [];
+$rows = sqlStatement(
+    "SELECT fe.id, fe.date, fe.reason, fe.last_level_closed,
+            u.username, u.fname, u.lname, u.title
+     FROM form_encounter fe LEFT JOIN users u ON fe.provider_id = u.id
+     WHERE fe.pid = ? ORDER BY fe.date DESC LIMIT 30",
+    [$pid]
+);
+while ($r = sqlFetchArray($rows)) {
+    $ts = $r['date'] ? strtotime($r['date']) : time();
+    $year = date('Y', $ts);
+    $dateLbl = date('M j', $ts);
+    $dayLbl = date('l', $ts);
+    $reason = $r['reason'] ?: 'Office visit';
+    // Heuristic type from reason text
+    $reasonL = strtolower($reason);
+    if (str_contains($reasonL, 'annual')) { $type = 'Annual Physical'; $color = '#008C8C'; }
+    elseif (str_contains($reasonL, 'lab') || str_contains($reasonL, 'a1c') || str_contains($reasonL, 'cholesterol')) { $type = 'Lab Review'; $color = '#4885D9'; }
+    elseif (str_contains($reasonL, 'follow')) { $type = 'Follow-up'; $color = '#4885D9'; }
+    elseif (str_contains($reasonL, 'tele')) { $type = 'Telehealth'; $color = '#8561C7'; }
+    else { $type = 'Office Visit'; $color = '#33A68C'; }
+    $prov = cp_format_provider_name([
+        'username' => $r['username'] ?? '', 'fname' => $r['fname'] ?? '',
+        'lname' => $r['lname'] ?? '', 'title' => $r['title'] ?? '',
+    ]);
+    $closed = (int)($r['last_level_closed'] ?? 0) > 0;
+    $visits[] = [
+        'year' => $year,
+        'date' => $dateLbl,
+        'day'  => $dayLbl,
+        'type' => $type,
+        'type_color' => $color,
+        'provider' => $prov,
         'modality' => null,
-        'duration' => '30 min',
-        'status'   => 'Signed',
-        'title' => 'Annual exam — diabetes well-controlled, BP improved',
-        'desc'  => 'BP 130/82 (down from 145/90). All age-appropriate screenings ordered. No new concerns. Continue current regimen.',
-        'tags'  => [
-            ['BP improved', 'success'],
-            ['Routine', 'neutral'],
-        ],
-    ],
-    [
-        'year'  => '2026',
-        'date'  => 'Nov 15',
-        'day'   => 'Friday',
-        'type'  => 'Follow-up',
-        'type_color' => '#4885D9',
-        'provider' => 'Dr. E. Rivera',
-        'modality' => null,
-        'duration' => '20 min',
-        'status'   => 'Signed',
-        'title' => 'Diabetes follow-up — Lisinopril increased',
-        'desc'  => 'BP elevated at 145/90. Increased Lisinopril from 5 mg to 10 mg daily. Recheck in 6 weeks.',
-        'tags'  => [
-            ['Rx adjusted', 'neutral'],
-        ],
-    ],
-];
+        'duration' => '—',
+        'status'   => $closed ? 'Signed' : 'Open',
+        'title'    => $reason,
+        'desc'     => '',
+        'tags'     => [],
+    ];
+}
 
 // group by year preserving order
 $by_year = [];
-foreach ($visits as $v) {
-    $by_year[$v['year']][] = $v;
-}
+foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -264,7 +254,7 @@ foreach ($visits as $v) {
 
 <header class="cp-hist-head">
   <div class="cp-hist-title"><?php echo xlt('Visit History'); ?></div>
-  <div class="cp-hist-meta">32 encounters since 2018</div>
+  <div class="cp-hist-meta"><?php echo text($totalCount); ?> <?php echo xlt('encounters'); ?></div>
   <div class="cp-hist-spacer"></div>
   <div class="cp-filters">
     <?php foreach ($filters as [$label, $active]): ?>

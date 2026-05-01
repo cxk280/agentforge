@@ -17,19 +17,32 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../../main/copilot_helpers.php");
+
+// Patient context comes from session; default to Ted Shaw (pid=1) if missing.
+$pid = (int)($_SESSION['pid'] ?? 1);
+
+// Most recent encounter for this patient (preferred: still open).
+$enc = sqlQuery(
+    "SELECT id, date, reason, last_level_closed, last_level_billed, provider_id, facility
+     FROM form_encounter WHERE pid = ?
+     ORDER BY (CASE WHEN COALESCE(last_level_closed, 0) = 0 THEN 0 ELSE 1 END), date DESC LIMIT 1",
+    [$pid]
+);
+$encId    = $enc ? (int)$enc['id'] : 0;
+$encReason = $enc['reason'] ?? '—';
+$encDate  = $enc ? date('M j, Y', strtotime($enc['date'])) : date('M j, Y');
+$encOpen  = $enc ? (int)($enc['last_level_closed'] ?? 0) === 0 : true;
+$encStatus = $encOpen ? 'OPEN' : 'SIGNED';
+$provider = sqlQuery("SELECT username, fname, lname, title FROM users WHERE id = ?", [(int)($enc['provider_id'] ?? 1)]) ?: ['username' => 'admin'];
+$providerName = cp_format_provider_name($provider);
 
 // CRUD: Sign & lock the encounter (UPDATE form_encounter.last_level_closed)
 $flash = null;
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'sign_encounter') {
-    $encId = (int)($_POST['encounter_id'] ?? 0);
-    if (!$encId) {
-        // Fall back to latest open encounter for the patient in session.
-        $pid = (int)($_SESSION['pid'] ?? 1);
-        $latest = sqlQuery("SELECT id FROM form_encounter WHERE pid = ? AND COALESCE(last_level_closed, 0) = 0 ORDER BY date DESC LIMIT 1", [$pid]);
-        if ($latest) { $encId = (int)$latest['id']; }
-    }
-    if ($encId) {
-        sqlStatement("UPDATE form_encounter SET last_level_closed = 1 WHERE id = ?", [$encId]);
+    $targetEnc = (int)($_POST['encounter_id'] ?? $encId);
+    if ($targetEnc) {
+        sqlStatement("UPDATE form_encounter SET last_level_closed = 1 WHERE id = ?", [$targetEnc]);
         $flash = 'Encounter signed & locked.';
     }
     header('Location: copilot_encounter.php?msg=' . urlencode($flash ?? 'Done'));
@@ -37,13 +50,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') ==
 }
 $flash = $_GET['msg'] ?? null;
 
+// Most recent vitals for this patient.
+$v = sqlQuery(
+    "SELECT bps, bpd, pulse, temperature, oxygen_saturation, weight, BMI
+     FROM form_vitals WHERE pid = ? ORDER BY date DESC LIMIT 1",
+    [$pid]
+);
+$bp   = ($v && $v['bps'] && $v['bpd']) ? (int)$v['bps'] . '/' . (int)$v['bpd'] : '—';
+$hr   = ($v && $v['pulse']) ? (int)$v['pulse'] : '—';
+$temp = ($v && $v['temperature']) ? number_format((float)$v['temperature'], 1) : '—';
+$spo2 = ($v && $v['oxygen_saturation']) ? (int)$v['oxygen_saturation'] : '—';
+$wt   = ($v && $v['weight']) ? (int)$v['weight'] : '—';
+$bmi  = ($v && $v['BMI']) ? number_format((float)$v['BMI'], 1) : '—';
+$bmiTone = ($v && $v['BMI'] && (float)$v['BMI'] >= 30) ? '#FA8C33' : '#0D1B2A';
+
 $vitals = [
-    ['BP',   '128/82', 'mmHg', '#0D1B2A'],
-    ['HR',   '74',     'bpm',  '#0D1B2A'],
-    ['TEMP', '98.4',   '°F',   '#0D1B2A'],
-    ['SPO₂', '98',     '%',    '#0D1B2A'],
-    ['WT',   '156',    'lbs',  '#0D1B2A'],
-    ['BMI',  '24.6',   'kg/m²', '#33A666'],
+    ['BP',   $bp,   'mmHg',  '#0D1B2A'],
+    ['HR',   $hr,   'bpm',   '#0D1B2A'],
+    ['TEMP', $temp, '°F',    '#0D1B2A'],
+    ['SPO₂', $spo2, '%',     '#0D1B2A'],
+    ['WT',   $wt,   'lbs',   '#0D1B2A'],
+    ['BMI',  $bmi,  'kg/m²', $bmiTone],
 ];
 
 $soap_tabs = [
@@ -324,10 +351,10 @@ $dxs = [
 <body>
 
 <header class="cp-en-head">
-  <div class="cp-en-title"><?php echo xlt("Today's Visit"); ?></div>
+  <div class="cp-en-title"><?php echo $encOpen ? xlt("Today's Visit") : xlt('Encounter'); ?></div>
   <div class="cp-en-bullet">•</div>
-  <div class="cp-en-meta">Office Visit, Level 3 (99213) — Dr. E. Rivera</div>
-  <span class="cp-en-status"><span class="dot"></span> OPEN</span>
+  <div class="cp-en-meta"><?php echo text($encReason); ?> — <?php echo text($providerName); ?></div>
+  <span class="cp-en-status" style="<?php echo $encOpen ? '' : 'background: rgba(51,166,102,0.14); color: #1F8C4D;'; ?>"><span class="dot" style="<?php echo $encOpen ? '' : 'background:#1F8C4D;'; ?>"></span> <?php echo text($encStatus); ?></span>
   <div class="cp-en-spacer"></div>
   <button type="button" class="cp-en-btn ghost">⎙ <?php echo xlt('Print'); ?></button>
   <button type="button" class="cp-en-btn ghost"><?php echo xlt('Save draft'); ?></button>
@@ -366,7 +393,7 @@ $dxs = [
 
     <div class="cp-soap-section">
       <h4><?php echo xlt('Chief Complaint'); ?></h4>
-      <div class="cp-soap-text">Patient here for routine 3-month diabetes follow-up. Reports recent fasting BG averaging 138 mg/dL, occasional readings &gt;200 after large meals.</div>
+      <div class="cp-soap-text"><?php echo text($encReason); ?></div>
     </div>
 
     <div class="cp-soap-section">

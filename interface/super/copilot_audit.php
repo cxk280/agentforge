@@ -10,6 +10,7 @@
 
 require_once(__DIR__ . "/../globals.php");
 require_once(__DIR__ . "/copilot_admin_sidebar.php");
+require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 // Live audit log from `log` table — most recent 50 entries.
 $events = [];
@@ -26,8 +27,7 @@ while ($r = sqlFetchArray($rows)) {
     elseif ($actor === 'bhudson') { $role = 'Billing'; }
     elseif ($actor === 'system') { $role = 'System'; }
     else { $role = 'User'; }
-    $details = trim((string)($r['comments'] ?: '—'));
-    if (strlen($details) > 96) { $details = substr($details, 0, 93) . '…'; }
+    $details = cp_decode_log_comment((string)($r['comments'] ?: ''), 100);
     $events[] = [$time, $tag, $role, $actor, $details];
 }
 $totalEvents = sqlQuery("SELECT COUNT(*) AS n FROM log")['n'] ?? 0;

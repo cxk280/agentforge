@@ -10,13 +10,14 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../../main/copilot_helpers.php");
 
 // Live encounters from `form_encounter` joined with users for provider name.
 $encounters = [];
 $totalCount = (int)(sqlQuery("SELECT COUNT(*) AS n FROM form_encounter")['n'] ?? 0);
 $rows = sqlStatement(
     "SELECT fe.date, fe.reason, fe.facility, fe.last_level_billed, fe.last_level_closed,
-            u.fname AS pfname, u.lname AS plname, u.title AS ptitle
+            u.username, u.fname AS pfname, u.lname AS plname, u.title AS ptitle
      FROM form_encounter fe
      LEFT JOIN users u ON fe.provider_id = u.id
      ORDER BY fe.date DESC LIMIT 30"
@@ -25,10 +26,14 @@ $idx = 0;
 while ($r = sqlFetchArray($rows)) {
     $date = substr($r['date'] ?? '', 0, 10) ?: '—';
     $type = 'Office Visit'; // form_encounter doesn't store visit type natively; default
-    $prov = 'Provider';
+    $prov = '—';
     if ($r['plname']) {
-        $prov = ($r['ptitle'] ? $r['ptitle'] . ' ' : '') . trim($r['pfname'] . ' ' . $r['plname']);
-        if (!$r['ptitle']) { $prov = 'Dr. ' . trim($r['pfname'] . ' ' . $r['plname']); }
+        $prov = cp_format_provider_name([
+            'username' => $r['username'] ?? '',
+            'fname'    => $r['pfname'] ?? '',
+            'lname'    => $r['plname'] ?? '',
+            'title'    => $r['ptitle'] ?? '',
+        ]);
     }
     $facility = $r['facility'] ?: 'Main Street';
     $reason = trim((string)$r['reason']);

@@ -19,50 +19,125 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../../main/copilot_helpers.php");
 
-$vitals = [
-    ['label' => 'BP',  'value' => '130/82', 'unit' => 'mmHg',   'trend' => '↓ from 145/90', 'trend_color' => '#26A65B'],
-    ['label' => 'A1C', 'value' => '7.9%',   'unit' => 'current', 'trend' => '↑ from 7.2%',   'trend_color' => '#FA8C33'],
-    ['label' => 'LDL', 'value' => '98',     'unit' => 'mg/dL',  'trend' => '↓ from 112',    'trend_color' => '#26A65B'],
-    ['label' => 'BMI', 'value' => '29.4',   'unit' => 'kg/m²',  'trend' => '↑ from 28.8',   'trend_color' => '#FA8C33'],
-];
+$pid = (int)($_SESSION['pid'] ?? 1);
 
-$allergies = [
-    ['icon' => '⚠', 'kind' => 'alert', 'name' => 'Penicillin',  'sub' => 'Mild — itching, rash'],
-    ['icon' => '⚠', 'kind' => 'alert', 'name' => 'Sulfa drugs', 'sub' => 'Mild — skin reaction'],
-    ['icon' => '+', 'kind' => 'note',  'name' => 'No food allergies recorded', 'sub' => 'Reviewed 02/18/2026'],
-];
+// ── Vitals from form_vitals (most recent + previous for trend) ─────────
+$vRecent = sqlQuery(
+    "SELECT bps, bpd, BMI, weight FROM form_vitals WHERE pid = ? ORDER BY date DESC LIMIT 1",
+    [$pid]
+);
+$vPrev = sqlQuery(
+    "SELECT bps, bpd, BMI, weight FROM form_vitals WHERE pid = ? ORDER BY date DESC LIMIT 1 OFFSET 1",
+    [$pid]
+);
+$vitals = [];
+if ($vRecent && $vRecent['bps']) {
+    $bp = (int)$vRecent['bps'] . '/' . (int)$vRecent['bpd'];
+    if ($vPrev && $vPrev['bps']) {
+        $prevBp = (int)$vPrev['bps'] . '/' . (int)$vPrev['bpd'];
+        $arrow = ((int)$vRecent['bps'] < (int)$vPrev['bps']) ? '↓' : '↑';
+        $color = ((int)$vRecent['bps'] < (int)$vPrev['bps']) ? '#26A65B' : '#FA8C33';
+        $trend = "$arrow from $prevBp";
+    } else { $trend = '—'; $color = '#26A65B'; }
+    $vitals[] = ['label' => 'BP', 'value' => $bp, 'unit' => 'mmHg', 'trend' => $trend, 'trend_color' => $color];
+}
+if ($vRecent && $vRecent['BMI']) {
+    $bmi = number_format((float)$vRecent['BMI'], 1);
+    if ($vPrev && $vPrev['BMI']) {
+        $prevBmi = number_format((float)$vPrev['BMI'], 1);
+        $arrow = ((float)$vRecent['BMI'] < (float)$vPrev['BMI']) ? '↓' : '↑';
+        $color = ((float)$vRecent['BMI'] < (float)$vPrev['BMI']) ? '#26A65B' : '#FA8C33';
+        $trend = "$arrow from $prevBmi";
+    } else { $trend = '—'; $color = '#26A65B'; }
+    $vitals[] = ['label' => 'BMI', 'value' => $bmi, 'unit' => 'kg/m²', 'trend' => $trend, 'trend_color' => $color];
+}
+if ($vRecent && $vRecent['weight']) {
+    $wt = (int)$vRecent['weight'];
+    $vitals[] = ['label' => 'WT', 'value' => (string)$wt, 'unit' => 'lbs', 'trend' => 'last visit', 'trend_color' => '#26A65B'];
+}
+// Pad to 4 with placeholders if needed.
+while (count($vitals) < 4) {
+    $vitals[] = ['label' => '—', 'value' => '—', 'unit' => '—', 'trend' => '—', 'trend_color' => '#8A91A1'];
+}
 
-$problems = [
-    ['name' => 'Type 2 Diabetes Mellitus', 'sub' => 'Since 2019 • Active'],
-    ['name' => 'Hypertension',             'sub' => 'Since 2017 • Active'],
-    ['name' => 'Hypothyroidism',           'sub' => 'Since 2021 • Active'],
-    ['name' => 'Osteoarthritis (knees)',   'sub' => 'Since 2022 • Active'],
-];
+// ── Allergies ──────────────────────────────────────────────────────────
+$allergies = [];
+$rows = sqlStatement("SELECT DISTINCT title, severity_al, comments FROM lists WHERE pid = ? AND type = 'allergy' AND COALESCE(enddate, '0000-00-00') = '0000-00-00' ORDER BY date ASC", [$pid]);
+while ($r = sqlFetchArray($rows)) {
+    $sub = trim((string)($r['severity_al'] ?? ''));
+    if (!$sub && $r['comments']) { $sub = $r['comments']; }
+    if (!$sub) { $sub = 'Active allergy'; }
+    $allergies[] = ['icon' => '⚠', 'kind' => 'alert', 'name' => $r['title'], 'sub' => $sub];
+}
+if (!$allergies) {
+    $allergies[] = ['icon' => '+', 'kind' => 'note', 'name' => 'No allergies recorded', 'sub' => 'Reviewed today'];
+}
 
-$medications = [
-    ['name' => 'Metformin 1000 mg',     'sub' => 'BID with meals'],
-    ['name' => 'Lisinopril 10 mg',      'sub' => 'Daily — increased 04/01'],
-    ['name' => 'Levothyroxine 50 mcg',  'sub' => 'Daily, AM'],
-    ['name' => 'Atorvastatin 40 mg',    'sub' => 'Nightly'],
-];
+// ── Problems ───────────────────────────────────────────────────────────
+$problems = [];
+$rows = sqlStatement("SELECT DISTINCT title, diagnosis, date FROM lists WHERE pid = ? AND type = 'medical_problem' AND COALESCE(enddate, '0000-00-00') = '0000-00-00' ORDER BY date ASC", [$pid]);
+while ($r = sqlFetchArray($rows)) {
+    $year = $r['date'] ? substr($r['date'], 0, 4) : '';
+    $sub = ($year ? 'Since ' . $year . ' • ' : '') . 'Active';
+    $problems[] = ['name' => $r['title'], 'sub' => $sub];
+}
 
-// status: 'normal' (green dot), 'high' (amber dot), 'low' (amber dot)
-$labs = [
-    ['test' => 'HbA1c',        'value' => '7.9 %',     'status' => 'high',   'range' => '<7.0',    'date' => '04/12/2026'],
-    ['test' => 'LDL',          'value' => '98 mg/dL',  'status' => 'normal', 'range' => '<100',    'date' => '04/12/2026'],
-    ['test' => 'Creatinine',   'value' => '1.04 mg/dL','status' => 'normal', 'range' => '0.6–1.2', 'date' => '04/12/2026'],
-    ['test' => 'TSH',          'value' => '2.4 mIU/L', 'status' => 'normal', 'range' => '0.4–4.0', 'date' => '04/12/2026'],
-    ['test' => 'Microalbumin', 'value' => '32 mg/g',   'status' => 'high',   'range' => '<30',     'date' => '04/12/2026'],
-];
+// ── Medications (active prescriptions) ─────────────────────────────────
+$medications = [];
+$rows = sqlStatement(
+    "SELECT drug, dosage, MAX(date_added) AS dt
+     FROM prescriptions WHERE patient_id = ? AND active = 1
+     GROUP BY drug, dosage ORDER BY dt DESC LIMIT 6",
+    [$pid]
+);
+while ($r = sqlFetchArray($rows)) {
+    $name = trim($r['drug'] . ' ' . $r['dosage']);
+    $medications[] = ['name' => $name, 'sub' => 'Active'];
+}
 
-$visits = [
-    ['title' => 'Annual physical — Dr. Rivera',     'sub' => '02/18/2026 • 30 min • Signed'],
-    ['title' => 'Diabetes follow-up — Dr. Rivera',  'sub' => '11/15/2025 • 20 min • Signed'],
-    ['title' => 'Lab review — Dr. Chen',            'sub' => '08/22/2025 • Telehealth • Signed'],
-    ['title' => 'Annual physical — Dr. Rivera',     'sub' => '02/12/2025 • 30 min • Signed'],
-    ['title' => 'Acute visit (URI) — Dr. Patel',    'sub' => '10/04/2024 • 15 min • Signed'],
-];
+// ── Labs (placeholder — no procedure_result data in demo) ──────────────
+// Show vitals trends as faux labs so this card isn't empty.
+$labs = [];
+if ($vRecent) {
+    if ($vRecent['bps']) {
+        $bps = (int)$vRecent['bps'];
+        $tone = $bps >= 140 ? 'high' : ($bps < 90 ? 'low' : 'normal');
+        $labs[] = ['test' => 'BP (sys)', 'value' => $bps . ' mmHg', 'status' => $tone, 'range' => '<140', 'date' => 'recent'];
+    }
+    if ($vRecent['BMI']) {
+        $bm = (float)$vRecent['BMI'];
+        $tone = $bm >= 30 ? 'high' : 'normal';
+        $labs[] = ['test' => 'BMI', 'value' => number_format($bm, 1), 'status' => $tone, 'range' => '18.5–25', 'date' => 'recent'];
+    }
+}
+if (!$labs) {
+    $labs = [['test' => '(no labs on file)', 'value' => '—', 'status' => 'normal', 'range' => '—', 'date' => '—']];
+}
+
+// ── Recent visits ──────────────────────────────────────────────────────
+$visits = [];
+$rows = sqlStatement(
+    "SELECT fe.date, fe.reason, u.username, u.fname, u.lname, u.title
+     FROM form_encounter fe LEFT JOIN users u ON fe.provider_id = u.id
+     WHERE fe.pid = ? ORDER BY fe.date DESC LIMIT 5",
+    [$pid]
+);
+while ($r = sqlFetchArray($rows)) {
+    $prov = cp_format_provider_name([
+        'username' => $r['username'] ?? '',
+        'fname'    => $r['fname'] ?? '',
+        'lname'    => $r['lname'] ?? '',
+        'title'    => $r['title'] ?? '',
+    ]);
+    $title = ($r['reason'] ?: 'Office visit') . ' — ' . $prov;
+    $sub = ($r['date'] ? date('m/d/Y', strtotime($r['date'])) : '—') . ' • Signed';
+    $visits[] = ['title' => $title, 'sub' => $sub];
+}
+if (!$visits) {
+    $visits[] = ['title' => '(no encounters on file)', 'sub' => '—'];
+}
 ?><!DOCTYPE html>
 <html lang="en">
 <head>

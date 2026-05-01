@@ -14,6 +14,8 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
+$pid = (int)($_SESSION['pid'] ?? 1);
+
 $status_tabs = [
     ['Active',   true],
     ['Inactive', false],
@@ -21,30 +23,52 @@ $status_tabs = [
     ['All',      false],
 ];
 
-// severity tones: warn (orange) | good (green)
-$groups = [
-    [
-        'title'    => 'Active — Medical Problems',
-        'count'    => 4,
-        'dot_tone' => 'warn',
-        'rows'     => [
-            ['icd' => 'E11.9', 'title' => 'Type 2 Diabetes Mellitus',          'sub' => 'Onset 2019 • Active',                        'sev' => 'MODERATE', 'sev_tone' => 'warn'],
-            ['icd' => 'I10',   'title' => 'Essential Hypertension',            'sub' => 'Onset 2017 • Controlled w/ Lisinopril',      'sev' => 'MODERATE', 'sev_tone' => 'warn'],
-            ['icd' => 'E03.9', 'title' => 'Hypothyroidism, unspecified',       'sub' => 'Onset 2021 • Levothyroxine 50mcg daily',     'sev' => 'STABLE',   'sev_tone' => 'good'],
-            ['icd' => 'M17.0', 'title' => 'Bilateral knee osteoarthritis',     'sub' => 'Onset 2022 • Conservative management',       'sev' => 'MILD',     'sev_tone' => 'good'],
-        ],
-    ],
-    [
-        'title'    => 'Active — Allergies & Risk Factors',
-        'count'    => 3,
-        'dot_tone' => 'danger',
-        'rows'     => [
-            ['icd' => 'Z88.0', 'title' => 'Allergy to Penicillin',                  'sub' => 'Documented 2017 • Itching, rash',  'sev' => 'MILD',     'sev_tone' => 'good'],
-            ['icd' => 'Z88.2', 'title' => 'Allergy to Sulfa drugs',                 'sub' => 'Documented 2017 • Skin reaction',  'sev' => 'MILD',     'sev_tone' => 'good'],
-            ['icd' => 'Z83.3', 'title' => 'Family hx of diabetes (mother, brother)','sub' => 'Documented 2019 • Risk factor',    'sev' => 'ADVISORY', 'sev_tone' => 'good'],
-        ],
-    ],
-];
+function cp_extract_icd(string $diagnosis): string
+{
+    if (preg_match('#ICD10:([A-Z][0-9.]+)#i', $diagnosis, $m)) { return strtoupper($m[1]); }
+    if (preg_match('#ICD9:([0-9.]+)#i', $diagnosis, $m)) { return $m[1]; }
+    return '—';
+}
+
+$problems = [];
+$rows = sqlStatement("SELECT DISTINCT title, diagnosis, date FROM lists WHERE pid = ? AND type = 'medical_problem' AND COALESCE(enddate, '0000-00-00') = '0000-00-00' ORDER BY date ASC", [$pid]);
+while ($r = sqlFetchArray($rows)) {
+    $year = $r['date'] ? substr($r['date'], 0, 4) : '';
+    $problems[] = [
+        'icd' => cp_extract_icd((string)$r['diagnosis']),
+        'title' => $r['title'],
+        'sub' => ($year ? "Onset $year" : 'Onset unknown') . ' • Active',
+        'sev' => 'ACTIVE',
+        'sev_tone' => 'warn',
+    ];
+}
+
+$allergies = [];
+$rows = sqlStatement("SELECT DISTINCT title, severity_al, comments, date FROM lists WHERE pid = ? AND type = 'allergy' AND COALESCE(enddate, '0000-00-00') = '0000-00-00' ORDER BY date ASC", [$pid]);
+while ($r = sqlFetchArray($rows)) {
+    $year = $r['date'] ? substr($r['date'], 0, 4) : '';
+    $sub = ($year ? "Documented $year" : 'Documented') . ($r['comments'] ? ' • ' . $r['comments'] : '');
+    $sev = strtoupper((string)($r['severity_al'] ?? 'MILD'));
+    $allergies[] = [
+        'icd'   => 'Z88',
+        'title' => 'Allergy to ' . $r['title'],
+        'sub'   => $sub,
+        'sev'   => $sev ?: 'MILD',
+        'sev_tone' => 'good',
+    ];
+}
+
+$groups = [];
+if ($problems) {
+    $groups[] = ['title' => 'Active — Medical Problems', 'count' => count($problems), 'dot_tone' => 'warn', 'rows' => $problems];
+}
+if ($allergies) {
+    $groups[] = ['title' => 'Active — Allergies & Risk Factors', 'count' => count($allergies), 'dot_tone' => 'danger', 'rows' => $allergies];
+}
+if (!$groups) {
+    $groups[] = ['title' => 'No active issues', 'count' => 0, 'dot_tone' => 'good', 'rows' => []];
+}
+$activeCount = array_sum(array_map(fn($g) => $g['count'], $groups));
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -190,7 +214,7 @@ $groups = [
 <header class="cp-iss-head">
   <div class="cp-iss-title"><?php echo xlt('Issues'); ?></div>
   <div class="cp-iss-bullet">•</div>
-  <div class="cp-iss-meta">Active 9 • Inactive 4 • Resolved 12</div>
+  <div class="cp-iss-meta">Active <?php echo text($activeCount); ?></div>
   <div class="cp-iss-spacer"></div>
   <div class="cp-seg">
     <?php foreach ($status_tabs as [$label, $active]): ?>
