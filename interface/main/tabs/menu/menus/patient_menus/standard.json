@@ -98,7 +98,7 @@
         "menu_id": "external_data",
         "target": "main",
         "on_click": "top.restoreSession()",
-        "url": "interface/reports/external_data.php",
+        "url": "interface/patient_file/external_data/copilot_external_data.php",
         "pid": "false",
         "children": [],
         "requirement": 0
