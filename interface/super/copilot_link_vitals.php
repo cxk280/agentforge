@@ -67,6 +67,25 @@ $after = sqlQuery("SELECT COUNT(*) AS n FROM forms WHERE formdir = 'vitals'")['n
 $inserted = $after - $before;
 echo "After: $after  (inserted $inserted)\n";
 
+// FhirObservationVitalsService inner-joins form_vital_details. Without
+// detail rows, FHIR Observation surface stays empty even when forms+
+// form_vitals are populated. Insert one details row per vitals column
+// (bps, bpd, weight, BMI, etc.) so each becomes a discrete Observation.
+echo "\nPopulating form_vital_details...\n";
+$detailsBefore = (int)sqlQuery("SELECT COUNT(*) AS n FROM form_vital_details")['n'];
+$columns = ['bps', 'bpd', 'weight', 'height', 'temperature', 'pulse', 'respiration', 'BMI', 'oxygen_saturation'];
+$rows = sqlStatement("SELECT id FROM form_vitals");
+while ($v = sqlFetchArray($rows)) {
+    foreach ($columns as $col) {
+        sqlStatement(
+            "INSERT IGNORE INTO form_vital_details (form_id, vitals_column) VALUES (?, ?)",
+            [(int)$v['id'], $col]
+        );
+    }
+}
+$detailsAfter = (int)sqlQuery("SELECT COUNT(*) AS n FROM form_vital_details")['n'];
+echo "  form_vital_details rows: $detailsBefore → $detailsAfter (inserted " . ($detailsAfter - $detailsBefore) . ")\n";
+
 // Set marker
 $exists = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_link_vitals_v1'");
 if (!$exists) {
