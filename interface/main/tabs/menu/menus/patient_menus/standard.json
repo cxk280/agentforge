@@ -115,6 +115,11 @@
     },
     {
         "label": "Modules",
+        "menu_id": "modules",
+        "target": "main",
+        "on_click": "top.restoreSession()",
+        "url": "interface/patient_file/modules/copilot_modules.php",
+        "pid": "false",
         "children": [],
         "requirement": 0
     }
