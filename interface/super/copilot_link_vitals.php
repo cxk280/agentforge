@@ -86,6 +86,53 @@ while ($v = sqlFetchArray($rows)) {
 $detailsAfter = (int)sqlQuery("SELECT COUNT(*) AS n FROM form_vital_details")['n'];
 echo "  form_vital_details rows: $detailsBefore → $detailsAfter (inserted " . ($detailsAfter - $detailsBefore) . ")\n";
 
+// FhirObservationVitalsService::getVitalSignsUuidMappings() pulls
+// uuid_mapping rows keyed by form_vitals.uuid + LOINC code. Without
+// these, parseVitalsIntoObservationRecords() emits zero Observations
+// even when the underlying SQL returns rows. Insert one mapping per
+// (vitals row, LOINC code) pair we want surfaced.
+$loincCodes = [
+    '85353-1',  // vital signs panel
+    '85354-9',  // blood pressure
+    '8480-6',   // systolic BP
+    '8462-4',   // diastolic BP
+    '39156-5',  // BMI
+    '29463-7',  // weight
+    '8302-2',   // height
+    '8867-4',   // pulse
+    '9279-1',   // respiration
+    '8310-5',   // temperature
+    '59408-5',  // pulse oximetry / oxygen saturation
+];
+echo "\nPopulating uuid_mapping (FHIR observation codes)...\n";
+$mapBefore = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE table = 'form_vitals'")['n'];
+$rows = sqlStatement("SELECT id, uuid FROM form_vitals WHERE uuid IS NOT NULL");
+$inserted = 0;
+while ($v = sqlFetchArray($rows)) {
+    foreach ($loincCodes as $code) {
+        $resourcePath = 'category=vital-signs&code=' . $code;
+        // Check existence (uuid_mapping has no natural unique key on
+        // resource_path + target_uuid, so guard with a SELECT first).
+        $exists = sqlQuery(
+            "SELECT id FROM uuid_mapping WHERE table = 'form_vitals' AND target_uuid = ? AND resource_path = ?",
+            [$v['uuid'], $resourcePath]
+        );
+        if ($exists) { continue; }
+        // Generate a new v4 UUID for the observation row.
+        $bytes = random_bytes(16);
+        $bytes[6] = chr(ord($bytes[6]) & 0x0F | 0x40);
+        $bytes[8] = chr(ord($bytes[8]) & 0x3F | 0x80);
+        sqlStatement(
+            "INSERT INTO uuid_mapping (uuid, resource, resource_path, `table`, target_uuid, created)
+             VALUES (?, 'Observation', ?, 'form_vitals', ?, NOW())",
+            [$bytes, $resourcePath, $v['uuid']]
+        );
+        $inserted++;
+    }
+}
+$mapAfter = (int)sqlQuery("SELECT COUNT(*) AS n FROM uuid_mapping WHERE table = 'form_vitals'")['n'];
+echo "  uuid_mapping (form_vitals) rows: $mapBefore → $mapAfter (inserted $inserted)\n";
+
 // Set marker
 $exists = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_link_vitals_v1'");
 if (!$exists) {
