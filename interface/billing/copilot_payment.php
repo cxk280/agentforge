@@ -11,23 +11,57 @@
 
 require_once(__DIR__ . "/../globals.php");
 
+// CRUD: take payment. Inserts into ar_session.
+$flash = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'take_payment') {
+    $amount  = (float)preg_replace('/[^0-9.]/', '', $_POST['amount'] ?? '0');
+    $method  = $_POST['method'] ?? 'card';
+    $patient = (int)($_POST['patient_id'] ?? 1);
+    $userId  = (int)($_SESSION['authUserID'] ?? 1);
+    $ref     = trim($_POST['reference'] ?? '');
+    if ($amount > 0) {
+        sqlInsert(
+            "INSERT INTO ar_session (payer_id, user_id, closed, reference, check_date, deposit_date, pay_total, modified_time, global_amount, payment_type, description, adjustment_code, post_to_date, patient_id, payment_method) VALUES (0, ?, 0, ?, CURDATE(), CURDATE(), ?, NOW(), ?, 'patient', ?, '', CURDATE(), ?, ?)",
+            [$userId, $ref, $amount, $amount, ($_POST['note'] ?? 'Co-Pay'), $patient, $method]
+        );
+        $flash = 'Payment posted: $' . number_format($amount, 2);
+        header('Location: copilot_payment.php?msg=' . urlencode($flash));
+        exit;
+    }
+}
+$flash = $_GET['msg'] ?? null;
+
+// Live KPIs from ar_session
+$todayTotal = (float)(sqlQuery("SELECT COALESCE(SUM(pay_total), 0) AS s FROM ar_session WHERE deposit_date = CURDATE()")['s'] ?? 0);
+$cashTotal  = (float)(sqlQuery("SELECT COALESCE(SUM(pay_total), 0) AS s FROM ar_session WHERE deposit_date = CURDATE() AND payment_method = 'cash'")['s'] ?? 0);
+$cardTotal  = (float)(sqlQuery("SELECT COALESCE(SUM(pay_total), 0) AS s FROM ar_session WHERE deposit_date = CURDATE() AND payment_method = 'card'")['s'] ?? 0);
+$todayCount = (int)(sqlQuery("SELECT COUNT(*) AS n FROM ar_session WHERE deposit_date = CURDATE()")['n'] ?? 0);
+$cashCount  = (int)(sqlQuery("SELECT COUNT(*) AS n FROM ar_session WHERE deposit_date = CURDATE() AND payment_method = 'cash'")['n'] ?? 0);
+$cardCount  = (int)(sqlQuery("SELECT COUNT(*) AS n FROM ar_session WHERE deposit_date = CURDATE() AND payment_method = 'card'")['n'] ?? 0);
+
+// Recent payments
+$payments = [];
+$rows = sqlStatement(
+    "SELECT s.created_time, s.pay_total, s.payment_method, s.reference, s.description,
+            pat.fname, pat.lname
+     FROM ar_session s
+     LEFT JOIN patient_data pat ON s.patient_id = pat.pid
+     ORDER BY s.created_time DESC LIMIT 15"
+);
+while ($r = sqlFetchArray($rows)) {
+    $patName = trim(($r['fname'] ?? '') . ' ' . ($r['lname'] ?? '')) ?: '—';
+    $time = $r['created_time'] ? date('g:i A', strtotime($r['created_time'])) : '—';
+    $payments[] = [$time, $patName, '$' . number_format((float)$r['pay_total'], 2),
+                   ucfirst($r['payment_method']), $r['description'] ?: '—', 'Posted', '#1F8C4D'];
+}
+
 $kpis = [
-    ['Today',             '$3,420',  '14 payments',                '#0D1B2A'],
-    ['Cash on hand',      '$1,150',  '5 cash transactions',        '#1F8C4D'],
-    ['Card payments',     '$2,070',  '8 transactions',             '#4785D9'],
-    ['Outstanding posts', '$840',    '2 awaiting batch',           '#FA8C33'],
+    ['Today',         '$' . number_format($todayTotal, 0), $todayCount . ' payments',          '#0D1B2A'],
+    ['Cash on hand',  '$' . number_format($cashTotal, 0),  $cashCount . ' cash transactions',  '#1F8C4D'],
+    ['Card payments', '$' . number_format($cardTotal, 0),  $cardCount . ' transactions',       '#4785D9'],
+    ['Active sessions', (string)((int)(sqlQuery("SELECT COUNT(*) AS n FROM ar_session WHERE closed = 0")['n'] ?? 0)), 'Open A/R sessions', '#FA8C33'],
 ];
 
-$payments = [
-    ['10:42 AM', 'Margaret Chen',   '$25.00',  'Card',   '99213 Office Visit',  'Posted',     '#1F8C4D'],
-    ['10:18 AM', 'Ted Shaw',        '$215.00', 'Card',   '99214',               'Posted',     '#1F8C4D'],
-    ['09:55 AM', 'Linda Martinez',  '$60.00',  'Cash',   'Co-pay',              'Posted',     '#1F8C4D'],
-    ['09:31 AM', 'David Kim',       '$152.00', 'Check',  '#1820 — 99213',       'Pending',    '#FA8C33'],
-    ['09:12 AM', 'Allison Park',    '$280.00', 'Card',   '99396 Wellness',      'Posted',     '#1F8C4D'],
-    ['08:48 AM', 'Robert Hayes',    '$184.00', 'Card',   '80050 CMP',           'Posted',     '#1F8C4D'],
-    ['08:22 AM', 'Carol Bennett',   '$152.00', 'Cash',   '99213',               'Posted',     '#1F8C4D'],
-    ['08:01 AM', 'James Wong',      '$80.00',  'Cash',   'Co-pay',              'Posted',     '#1F8C4D'],
-];
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -67,32 +101,47 @@ $payments = [
 
   <div class="cp-pay-body">
 
-    <section class="cp-panel">
+    <form class="cp-panel" method="post">
+      <input type="hidden" name="action" value="take_payment">
       <div class="cp-panel-lbl"><?php echo xlt('TAKE PAYMENT'); ?></div>
+
+      <?php if ($flash): ?>
+        <div style="background:#EBF8F0; border:1px solid #B6E0C5; padding:8px 10px; color:#1F8C4D; font-size:12px; border-radius:6px; margin-bottom:10px;"><?php echo text($flash); ?></div>
+      <?php endif; ?>
 
       <div class="cp-row" style="grid-template-columns: 100px 1fr;">
         <label><?php echo xlt('Patient'); ?></label>
-        <input class="cp-input" type="text" value="Margaret Chen — MRN 4821">
+        <select class="cp-input cp-select" name="patient_id">
+          <?php
+          $pp = sqlStatement("SELECT pid, fname, lname FROM patient_data ORDER BY date DESC LIMIT 50");
+          while ($p = sqlFetchArray($pp)):
+              $label = trim(($p['fname'] ?? '') . ' ' . ($p['lname'] ?? '')) . ' — MRN ' . str_pad((string)$p['pid'], 6, '0', STR_PAD_LEFT);
+          ?><option value="<?php echo attr($p['pid']); ?>"><?php echo text($label); ?></option><?php endwhile; ?>
+        </select>
       </div>
       <div class="cp-row" style="grid-template-columns: 100px 1fr;">
         <label><?php echo xlt('Amount'); ?></label>
-        <input class="cp-input" type="text" value="$25.00">
+        <input class="cp-input" type="text" name="amount" value="$25.00" required>
       </div>
       <div class="cp-row" style="grid-template-columns: 100px 1fr;">
         <label><?php echo xlt('Method'); ?></label>
-        <select class="cp-input cp-select"><option>Card</option><option>Cash</option><option>Check</option></select>
+        <select class="cp-input cp-select" name="method">
+          <option value="card">Card</option>
+          <option value="cash">Cash</option>
+          <option value="check">Check</option>
+        </select>
       </div>
       <div class="cp-row" style="grid-template-columns: 100px 1fr;">
-        <label><?php echo xlt('Apply to'); ?></label>
-        <select class="cp-input cp-select"><option>99213 Office Visit — $152.00</option></select>
+        <label><?php echo xlt('Note'); ?></label>
+        <input class="cp-input" type="text" name="note" value="Co-Pay">
       </div>
       <div class="cp-row" style="grid-template-columns: 100px 1fr;">
         <label><?php echo xlt('Reference #'); ?></label>
-        <input class="cp-input" type="text" placeholder="<?php echo xla('Auth code or check number'); ?>">
+        <input class="cp-input" type="text" name="reference" placeholder="<?php echo xla('Auth code or check number'); ?>">
       </div>
 
-      <button type="button" class="cp-btn primary" style="width:100%; justify-content:center; padding:10px;"><?php echo xlt('Charge'); ?> →</button>
-    </section>
+      <button type="submit" class="cp-btn primary" style="width:100%; justify-content:center; padding:10px;"><?php echo xlt('Charge'); ?> →</button>
+    </form>
 
     <section class="cp-panel flush">
       <div class="cp-panel-head">

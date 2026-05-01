@@ -10,6 +10,21 @@
 
 require_once(__DIR__ . "/../globals.php");
 
+// CRUD: add drug.
+$flash = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'add_drug' && !empty($_POST['name'])) {
+    sqlInsert(
+        "INSERT INTO drugs (name, ndc_number, reorder_point, max_level, form, size, route, active, dispensable) VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)",
+        [$_POST['name'], $_POST['ndc'] ?? '', (float)($_POST['reorder'] ?? 10),
+         (float)($_POST['max'] ?? 100), $_POST['form'] ?? 'tablet',
+         $_POST['size'] ?? '', $_POST['route'] ?? 'oral']
+    );
+    $flash = 'Drug added: ' . $_POST['name'];
+    header('Location: copilot_inventory.php?msg=' . urlencode($flash));
+    exit;
+}
+$flash = $_GET['msg'] ?? null;
+
 // Live inventory from `drugs` table.
 $items = [];
 $onHandValue = 0.0;
@@ -71,8 +86,26 @@ $kpis = [
     <span class="meta"><?php echo xlt('Drug stock + destruction log (DEA-222)'); ?></span>
   </div>
   <button type="button" class="cp-btn ghost"><?php echo xlt('Destroy / log'); ?></button>
-  <button type="button" class="cp-btn primary">+ <?php echo xlt('Receive shipment'); ?></button>
+  <button type="button" class="cp-btn primary" onclick="document.getElementById('cp-drug-form').style.display='block';">+ <?php echo xlt('Add drug'); ?></button>
 </header>
+
+<?php if ($flash): ?>
+  <div style="background:#EBF8F0; border:1px solid #B6E0C5; padding:10px 24px; color:#1F8C4D; font-size:13px;"><?php echo text($flash); ?></div>
+<?php endif; ?>
+
+<div id="cp-drug-form" style="display:none; background:#FFFFFF; border-bottom:1px solid #E4E5E8; padding:14px 24px;">
+  <form method="post" style="display:flex; gap:8px; align-items:end; flex-wrap:wrap;">
+    <input type="hidden" name="action" value="add_drug">
+    <div><label style="font-size:11px;color:#4F5763;">Name</label><br><input class="cp-input" name="name" required style="width:240px;"></div>
+    <div><label style="font-size:11px;color:#4F5763;">NDC</label><br><input class="cp-input" name="ndc" style="width:140px;"></div>
+    <div><label style="font-size:11px;color:#4F5763;">Form</label><br><input class="cp-input" name="form" value="tablet" style="width:100px;"></div>
+    <div><label style="font-size:11px;color:#4F5763;">Size</label><br><input class="cp-input" name="size" placeholder="90 ct" style="width:90px;"></div>
+    <div><label style="font-size:11px;color:#4F5763;">Reorder</label><br><input class="cp-input" name="reorder" type="number" value="10" style="width:80px;"></div>
+    <div><label style="font-size:11px;color:#4F5763;">Max</label><br><input class="cp-input" name="max" type="number" value="100" style="width:80px;"></div>
+    <button type="submit" class="cp-btn primary"><?php echo xlt('Add'); ?></button>
+    <button type="button" class="cp-btn ghost" onclick="document.getElementById('cp-drug-form').style.display='none';">Cancel</button>
+  </form>
+</div>
 
 <main class="cp-content tight">
 

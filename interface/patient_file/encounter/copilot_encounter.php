@@ -18,6 +18,25 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
+// CRUD: Sign & lock the encounter (UPDATE form_encounter.last_level_closed)
+$flash = null;
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'sign_encounter') {
+    $encId = (int)($_POST['encounter_id'] ?? 0);
+    if (!$encId) {
+        // Fall back to latest open encounter for the patient in session.
+        $pid = (int)($_SESSION['pid'] ?? 1);
+        $latest = sqlQuery("SELECT id FROM form_encounter WHERE pid = ? AND COALESCE(last_level_closed, 0) = 0 ORDER BY date DESC LIMIT 1", [$pid]);
+        if ($latest) { $encId = (int)$latest['id']; }
+    }
+    if ($encId) {
+        sqlStatement("UPDATE form_encounter SET last_level_closed = 1 WHERE id = ?", [$encId]);
+        $flash = 'Encounter signed & locked.';
+    }
+    header('Location: copilot_encounter.php?msg=' . urlencode($flash ?? 'Done'));
+    exit;
+}
+$flash = $_GET['msg'] ?? null;
+
 $vitals = [
     ['BP',   '128/82', 'mmHg', '#0D1B2A'],
     ['HR',   '74',     'bpm',  '#0D1B2A'],
@@ -312,8 +331,15 @@ $dxs = [
   <div class="cp-en-spacer"></div>
   <button type="button" class="cp-en-btn ghost">⎙ <?php echo xlt('Print'); ?></button>
   <button type="button" class="cp-en-btn ghost"><?php echo xlt('Save draft'); ?></button>
-  <button type="button" class="cp-en-btn primary"><?php echo xlt('Sign & lock'); ?> →</button>
+  <form method="post" style="display:inline;" onsubmit="return confirm('Sign & lock this encounter?');">
+    <input type="hidden" name="action" value="sign_encounter">
+    <button type="submit" class="cp-en-btn primary"><?php echo xlt('Sign & lock'); ?> →</button>
+  </form>
 </header>
+
+<?php if ($flash): ?>
+  <div style="background:#EBF8F0; border:1px solid #B6E0C5; padding:8px 24px; color:#1F8C4D; font-size:12px;"><?php echo text($flash); ?></div>
+<?php endif; ?>
 
 <section class="cp-vitals">
   <span class="cp-vitals-lbl"><?php echo xlt('VITALS'); ?></span>
