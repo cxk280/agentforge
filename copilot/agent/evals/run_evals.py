@@ -239,14 +239,22 @@ def run() -> int:
 
         if lf:
             try:
-                with lf.start_as_current_span(name="eval-case", input={
-                    "case_id": case["id"],
-                    "patient_id": case["patient_id"],
-                    "message": case["message"],
-                }) as span:
+                with lf.start_as_current_observation(
+                    name="eval-case",
+                    as_type="span",
+                    input={
+                        "case_id": case["id"],
+                        "patient_id": case["patient_id"],
+                        "message": case["message"],
+                    },
+                ) as span:
                     span.update(output={"reply": results[-1].reply})
-                    span.score(name="judge-score", value=results[-1].score, comment=results[-1].judge_reason)
-                    span.score(
+                    lf.score_current_span(
+                        name="judge-score",
+                        value=results[-1].score,
+                        comment=results[-1].judge_reason,
+                    )
+                    lf.score_current_span(
                         name="passed",
                         value=1.0 if results[-1].passed else 0.0,
                         comment="passed" if results[-1].passed else "failed",
