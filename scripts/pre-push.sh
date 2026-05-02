@@ -10,7 +10,10 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Use git's idea of the repo root, not BASH_SOURCE-relative — when git
+# invokes this script via .git/hooks/pre-push (an installed copy),
+# BASH_SOURCE/.. resolves to the .git directory, not the repo root.
+REPO_ROOT="$(git rev-parse --show-toplevel)"
 CONTAINER="${COPILOT_TEST_CONTAINER:-development-easy-light-openemr-1}"
 
 if ! command -v docker >/dev/null 2>&1; then
