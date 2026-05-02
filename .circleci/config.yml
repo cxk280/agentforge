@@ -152,9 +152,14 @@ jobs:
       - checkout
       - run:
           name: Install PHP deps
+          # The isolated suite needs no PHP extensions at runtime — it
+          # exercises plain classes with no DB, no curl, no redis. Bypass
+          # composer's platform-req check so we don't have to install a
+          # full LAMP-style PHP image just to run unit tests.
           command: |
-            composer install --no-interaction --prefer-dist --no-scripts --no-dev || true
-            composer install --no-interaction --prefer-dist --no-scripts
+            composer install \
+              --no-interaction --prefer-dist --no-scripts \
+              --ignore-platform-reqs
       - run:
           name: Run isolated PHPUnit Copilot suite
           command: ./vendor/bin/phpunit -c phpunit-isolated.xml --filter Copilot
