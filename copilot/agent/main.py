@@ -63,6 +63,8 @@ class ChatResponse(BaseModel):
 
 # ── Routes ────────────────────────────────────────────────────────────────
 
+import os
+
 _BUILD_MARKER = "loinc+limit50+stream-2026-05-02"
 
 
@@ -74,7 +76,10 @@ async def health():
 @app.get("/version")
 async def version():
     """Returns a build marker so we can verify which code is actually running."""
-    return {"build_marker": _BUILD_MARKER}
+    return {
+        "build_marker": _BUILD_MARKER,
+        "build_rev": os.environ.get("BUILD_REV", "unknown"),
+    }
 
 
 @app.get("/")
