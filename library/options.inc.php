@@ -228,26 +228,44 @@ function generate_select_list(
 
         // sort by title
         $order_by_sql = (OEGlobalsBag::getInstance()->get('gb_how_sort_list') == '0') ? "seq, title" : "title, seq";
-        if (!OEGlobalsBag::getInstance()->getBoolean('translate_lists')) {
-            // do not translate
-            $lres = sqlStatement("SELECT * FROM list_options WHERE list_id = ? AND activity = ? ORDER BY $order_by_sql", [$list_id, $active]);
+        // Per-request memoization. Profiling demographics.php showed
+        // 76 calls EACH for list_id IN ('drug_form','drug_route',
+        // 'drug_units','drug_interval') — one per prescription per
+        // dropdown — to fetch identical row sets. The list_options
+        // table cannot change within a single request, so cache the
+        // materialized rows by (list_id, active, translate_lists,
+        // lang_id, order) and replay.
+        static $listOptionsCache = [];
+        $translate = OEGlobalsBag::getInstance()->getBoolean('translate_lists');
+        $cacheKey = $list_id . '|' . $active . '|' . ($translate ? "T:$lang_id" : 'N') . '|' . $order_by_sql;
+        if (isset($listOptionsCache[$cacheKey])) {
+            $cachedRows = $listOptionsCache[$cacheKey];
         } else {
-            // do translate
-            $order_by_sql = str_replace("seq", "lo.seq", $order_by_sql);
-            $sql = "SELECT lo.option_id, lo.is_default,
-                        COALESCE((SELECT ld.definition FROM lang_constants AS lc, lang_definitions AS ld
-                            WHERE lc.constant_name = lo.title AND ld.cons_id = lc.cons_id AND ld.lang_id = ? AND ld.definition IS NOT NULL
-                                AND ld.definition != ''
-                            LIMIT 1), lo.title) AS title
-                    FROM list_options AS lo
-                    WHERE lo.list_id = ? AND lo.activity = ?
-                    ORDER BY {$order_by_sql}";
-            $lres = sqlStatement($sql, [$lang_id, $list_id, $active]);
+            if (!$translate) {
+                // do not translate
+                $lres = sqlStatement("SELECT * FROM list_options WHERE list_id = ? AND activity = ? ORDER BY $order_by_sql", [$list_id, $active]);
+            } else {
+                // do translate
+                $order_by_sql = str_replace("seq", "lo.seq", $order_by_sql);
+                $sql = "SELECT lo.option_id, lo.is_default,
+                            COALESCE((SELECT ld.definition FROM lang_constants AS lc, lang_definitions AS ld
+                                WHERE lc.constant_name = lo.title AND ld.cons_id = lc.cons_id AND ld.lang_id = ? AND ld.definition IS NOT NULL
+                                    AND ld.definition != ''
+                                LIMIT 1), lo.title) AS title
+                        FROM list_options AS lo
+                        WHERE lo.list_id = ? AND lo.activity = ?
+                        ORDER BY {$order_by_sql}";
+                $lres = sqlStatement($sql, [$lang_id, $list_id, $active]);
+            }
+            $cachedRows = [];
+            while ($r = sqlFetchArray($lres)) {
+                $cachedRows[] = $r;
+            }
+            $listOptionsCache[$cacheKey] = $cachedRows;
         }
 
         // Populate the options array with pertinent values
-
-        while ($lrow = sqlFetchArray($lres)) {
+        foreach ($cachedRows as $lrow) {
             $selectedValues = explode("|", $currvalue ?? '');
             $isSelected = false;
 

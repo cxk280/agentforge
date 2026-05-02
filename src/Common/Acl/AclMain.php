@@ -170,9 +170,31 @@ class AclMain
             $user = $session->get('authUser') ?? '';
         }
 
-        // Superuser always gets access to everything.
+        // Per-request memoization. Profiling demographics.php showed
+        // 224 + 224 redundant gacl SQL pairs per render — same
+        // (section, value, user, return_value) tuples evaluated over
+        // and over by the dashboard cards' permission checks. ACLs
+        // cannot change within a single request, so we cache the
+        // boolean result. Cache key includes return_value canonicalized
+        // (string or array) so distinct check semantics get distinct
+        // cache slots.
+        static $aclCheckCache = [];
+        $rvKey = is_array($return_value)
+            ? '[' . implode(',', $return_value) . ']'
+            : (string) $return_value;
+        $cacheKey = "$user|$section|$value|$rvKey";
+        if (array_key_exists($cacheKey, $aclCheckCache)) {
+            return $aclCheckCache[$cacheKey];
+        }
+
+        // Superuser always gets access to everything. The recursive
+        // call here ALSO benefits from the cache above — without it,
+        // every aclCheckCore call paid for a full superuser SQL pair
+        // before doing its own check (so the page's first-time access
+        // pattern is admin/super -> miss, then everything else gets
+        // an instant cache hit on the recursive admin/super check).
         if (($section != 'admin' || $value != 'super') && self::aclCheckCore('admin', 'super', $user)) {
-            return true;
+            return $aclCheckCache[$cacheKey] = true;
         }
 
         // This will return all pertinent ACL's (including return_values and whether allow/deny)
@@ -231,10 +253,8 @@ class AclMain
 
         // Now decide whether user has access
         // (Note a denial takes precedence)
-        if (!$deny && $access) {
-            return true;
-        }
-        return false;
+        $aclCheckCache[$cacheKey] = (!$deny && $access);
+        return $aclCheckCache[$cacheKey];
     }
 
     /**

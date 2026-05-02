@@ -268,9 +268,18 @@ class Pharmacy extends ORDataObject
 
     function getState()
     {
-        $sql = "SELECT state FROM facility";
-        $res = sqlQuery($sql);
-        return $res['state'];
+        // Per-request memoization. Each pharmacy display in the
+        // prescriptions panel calls this — profiling demographics.php
+        // showed 88 firings of the SAME `SELECT state FROM facility`
+        // per page render. Facility state cannot change within a
+        // single request.
+        static $cachedState = null;
+        if ($cachedState === null) {
+            $sql = "SELECT state FROM facility";
+            $res = sqlQuery($sql);
+            $cachedState = $res['state'] ?? '';
+        }
+        return $cachedState;
     }
 
     function toString($html = false)
