@@ -138,13 +138,18 @@ async def get_recent_labs(patient_id: str, limit: int = 10) -> dict:
     return {"patient_id": patient_id, "labs": labs}
 
 
-async def get_vitals(patient_id: str, limit: int = 20) -> dict:
+async def get_vitals(patient_id: str, limit: int = 50) -> dict:
     """Recent vital signs for a patient.
 
     Pulls a wide batch of Observations and filters IN only vital-sign
     LOINC codes, so trend questions ("has BP improved?") see the full
     history of BP readings instead of being capped by interleaved lab
     results. Caller-visible results are capped at ``limit``.
+
+    Each visit produces ~11 vital-sign observations (BP panel + 10
+    sub-codes), so ``limit=50`` covers roughly 4-5 visits — enough
+    for most trend questions. Bump higher when the user asks about
+    long-term trends or when the first call returns < 4 distinct dates.
     """
     bundle = await fhir_get(
         "Observation",
@@ -346,12 +351,23 @@ TOOL_SCHEMAS = [
     },
     {
         "name": "get_vitals",
-        "description": "Retrieve recent vital signs for a patient.",
+        "description": (
+            "Retrieve recent vital signs for a patient (BP, HR, temp, weight, "
+            "height, BMI, O2 sat). Each visit produces ~11 observations "
+            "(BP panel + sub-codes), so the default limit of 50 covers about "
+            "4-5 visits. For trend questions ('has BP improved over time?', "
+            "'show weight history'), pass limit=100 or higher to ensure the "
+            "full longitudinal view across all relevant encounters."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "patient_id": {"type": "string", "description": "OpenEMR patient ID (pid)"},
-                "limit": {"type": "integer", "description": "Max results to return (default 5)", "default": 5},
+                "limit": {
+                    "type": "integer",
+                    "description": "Max vital observations to return (default 50; use 100+ for trend questions)",
+                    "default": 50,
+                },
             },
             "required": ["patient_id"],
         },
