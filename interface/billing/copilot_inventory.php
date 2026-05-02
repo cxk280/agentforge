@@ -43,12 +43,24 @@ $groupName = (string)($_SESSION['authProvider'] ?? 'Default');
 // --------------------------------------------------------------------
 // Whitelists for filter inputs.
 // --------------------------------------------------------------------
-$validTabs = ['all', 'active', 'low_stock', 'expiring', 'destroyed'];
-$tab = $_GET['tab'] ?? 'all';
+// Tabs match the Figma frame exactly: Active inventory / Expiring soon /
+// Below reorder / Destruction log / Receiving log.
+$validTabs = ['active', 'expiring', 'below_reorder', 'destruction_log', 'receiving_log'];
+$tab = $_GET['tab'] ?? 'active';
 if (!in_array($tab, $validTabs, true)) {
-    $tab = 'all';
+    $tab = 'active';
 }
 $q = trim((string)($_GET['q'] ?? ''));
+
+// Filter dropdowns from the Figma frame: schedule / form / facility / status.
+// Each is a whitelist; values are validated below.
+$validSched   = ['', 'all', 'rx', 'controlled'];
+$validForm    = ['', 'all', 'tablet', 'injection', 'spray', 'vial'];
+$validStock   = ['', 'all', 'in_stock', 'out_of_stock', 'low'];
+$fSched   = $_GET['sched']   ?? 'all'; if (!in_array($fSched, $validSched, true))   { $fSched = 'all'; }
+$fForm    = $_GET['form']    ?? 'all'; if (!in_array($fForm, $validForm, true))     { $fForm = 'all'; }
+$fStock   = $_GET['stock']   ?? 'in_stock'; if (!in_array($fStock, $validStock, true)) { $fStock = 'in_stock'; }
+$fFacility = trim((string)($_GET['facility'] ?? ''));
 
 // --------------------------------------------------------------------
 // POST handlers (CSRF skipped — internal mock page).
@@ -232,11 +244,13 @@ $kpiDestroyed = (int)(sqlQuery(
 
 // Tab counts (also used for badge labels).
 $tabCounts = [
-    'all'       => (int)(sqlQuery("SELECT COUNT(*) AS c FROM drug_inventory")['c'] ?? 0),
-    'active'    => (int)(sqlQuery("SELECT COUNT(*) AS c FROM drug_inventory WHERE destroy_date IS NULL AND on_hand > 0")['c'] ?? 0),
-    'low_stock' => $kpiLowStock,
-    'expiring'  => $kpiExpiring,
-    'destroyed' => $kpiDestroyed,
+    'active'          => (int)(sqlQuery("SELECT COUNT(*) AS c FROM drug_inventory WHERE destroy_date IS NULL AND on_hand > 0")['c'] ?? 0),
+    'expiring'        => $kpiExpiring,
+    'below_reorder'   => $kpiLowStock,
+    'destruction_log' => $kpiDestroyed,
+    // Receiving log: every lot that's been added (i.e. exists in
+    // drug_inventory). Same row count as the all-time inventory.
+    'receiving_log'   => (int)(sqlQuery("SELECT COUNT(*) AS c FROM drug_inventory")['c'] ?? 0),
 ];
 
 // --------------------------------------------------------------------
@@ -253,19 +267,65 @@ switch ($tab) {
                 . ' AND di.expiration IS NOT NULL'
                 . ' AND di.expiration BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 30 DAY)';
         break;
-    case 'destroyed':
+    case 'destruction_log':
         $where .= ' AND di.destroy_date IS NOT NULL';
         break;
-    case 'low_stock':
+    case 'receiving_log':
+        // Receiving log = every lot, ordered by inventory_id desc (most
+        // recently added first). Use a sentinel so the main query path
+        // applies the right ORDER BY further down.
+        // (No additional WHERE clause needed.)
+        break;
+    case 'below_reorder':
         // Show drugs (one row each) whose total on-hand is below reorder.
         // We'll handle this with a separate query below; sentinel here.
         $where .= ' AND 1=0';
         break;
-    case 'all':
     default:
-        // Show all rows, even destroyed (so the destruction log is visible).
+        // Defensive: should already be normalized by validTabs check.
+        $where .= ' AND di.destroy_date IS NULL AND di.on_hand > 0';
         break;
 }
+// Filter dropdowns. Each value is allow-listed above; only literal SQL
+// fragments enter $where, never user input.
+if ($fSched === 'controlled') {
+    // Controlled-substance match by drug name (drugs table has no
+    // dea_schedule column in the seed). Pattern list mirrors the
+    // controlled-detection helper used by the prescription-report.
+    $where .= " AND (d.name LIKE 'Tramadol%' OR d.name LIKE 'Lorazepam%'"
+            . " OR d.name LIKE 'Phenobarbital%' OR d.name LIKE 'Oxycodone%'"
+            . " OR d.name LIKE 'Hydrocodone%' OR d.name LIKE 'Adderall%'"
+            . " OR d.name LIKE 'Vyvanse%' OR d.name LIKE 'Xanax%'"
+            . " OR d.name LIKE 'Ambien%' OR d.name LIKE 'Methylphenidate%'"
+            . " OR d.name LIKE 'Diazepam%' OR d.name LIKE 'Clonazepam%'"
+            . " OR d.name LIKE 'Codeine%' OR d.name LIKE 'Fentanyl%'"
+            . " OR d.name LIKE 'Morphine%')";
+} elseif ($fSched === 'rx') {
+    // Rx-only (non-controlled) — exclude OTC + the controlled patterns.
+    $where .= " AND d.name NOT LIKE 'Tramadol%'"
+            . " AND d.name NOT LIKE 'Lorazepam%'"
+            . " AND d.name NOT LIKE 'Phenobarbital%'"
+            . " AND d.name NOT LIKE 'Oxycodone%'"
+            . " AND d.name NOT LIKE 'Adderall%'";
+}
+if ($fForm === 'tablet')    { $where .= " AND (d.form LIKE '%tab%' OR d.form LIKE '%capsule%')"; }
+elseif ($fForm === 'injection') { $where .= " AND (d.form LIKE '%inject%' OR d.form LIKE '%IM%' OR d.form LIKE '%IV%' OR d.form LIKE '%vial%')"; }
+elseif ($fForm === 'spray') { $where .= " AND d.form LIKE '%spray%'"; }
+elseif ($fForm === 'vial')  { $where .= " AND d.form LIKE '%vial%'"; }
+
+// Stock filter only applies to the inventory tabs (not destruction/receiving log).
+if (in_array($tab, ['active', 'expiring'], true)) {
+    if ($fStock === 'in_stock')      { $where .= ' AND di.on_hand > 0'; }
+    elseif ($fStock === 'out_of_stock') { $where .= ' AND di.on_hand = 0'; }
+    elseif ($fStock === 'low')        { $where .= ' AND d.reorder_point > 0 AND di.on_hand < d.reorder_point'; }
+}
+
+// Facility filter: maps to drug_inventory.warehouse_id (a list_options key).
+if ($fFacility !== '' && $fFacility !== 'all') {
+    $where .= ' AND di.warehouse_id = ?';
+    $params[] = $fFacility;
+}
+
 if ($q !== '') {
     $where .= ' AND (d.name LIKE ? OR d.ndc_number LIKE ? OR di.lot_number LIKE ?)';
     $like = '%' . $q . '%';
@@ -274,10 +334,50 @@ if ($q !== '') {
 
 $rows = [];
 
-if ($tab === 'low_stock') {
+// Per-drug "last dispensed" date — pulled from drug_sales. Cached in a
+// PHP map so the inventory query stays a simple JOIN.
+$lastDispensed = [];
+$ldRows = sqlStatement(
+    "SELECT drug_id, MAX(sale_date) AS last_sale FROM drug_sales GROUP BY drug_id"
+);
+while ($r = sqlFetchArray($ldRows)) {
+    $lastDispensed[(int)$r['drug_id']] = $r['last_sale'];
+}
+
+// Controlled-substance detection — by name pattern, since drugs has no
+// dea_schedule column in seed. Returns the schedule label (e.g. "C-IV")
+// or '' for non-controlled.
+$schedFor = static function (string $name): string {
+    $n = strtolower(trim($name));
+    if ($n === '') return '';
+    // Schedule II
+    if (preg_match('/^(oxycodone|fentanyl|methylphenidate|adderall|vyvanse|hydrocodone|morphine)/', $n)) return 'C-II';
+    // Schedule III
+    if (preg_match('/^(codeine|ketamine)/', $n)) return 'C-III';
+    // Schedule IV (the most common pattern in the demo seed)
+    if (preg_match('/^(tramadol|lorazepam|phenobarbital|diazepam|clonazepam|alprazolam|xanax|ambien|zolpidem)/', $n)) return 'C-IV';
+    // Schedule V
+    if (preg_match('/^(pregabalin|lacosamide)/', $n)) return 'C-V';
+    return '';
+};
+
+if ($tab === 'below_reorder') {
     // One row per drug (no lot dimension) — show the deficit.
     $sql = "SELECT d.drug_id, d.name, d.ndc_number, d.form, d.reorder_point,
-                   COALESCE(SUM(CASE WHEN di.destroy_date IS NULL THEN di.on_hand ELSE 0 END), 0) AS on_hand_total
+                   COALESCE(SUM(CASE WHEN di.destroy_date IS NULL THEN di.on_hand ELSE 0 END), 0) AS on_hand_total,
+                   (SELECT MAX(di2.warehouse_id)
+                      FROM drug_inventory di2
+                     WHERE di2.drug_id = d.drug_id
+                       AND di2.destroy_date IS NULL) AS warehouse_id,
+                   (SELECT MIN(di3.expiration)
+                      FROM drug_inventory di3
+                     WHERE di3.drug_id = d.drug_id
+                       AND di3.destroy_date IS NULL
+                       AND di3.expiration IS NOT NULL) AS expiration,
+                   (SELECT MAX(di4.lot_number)
+                      FROM drug_inventory di4
+                     WHERE di4.drug_id = d.drug_id
+                       AND di4.destroy_date IS NULL) AS lot_number
               FROM drugs d
               LEFT JOIN drug_inventory di ON di.drug_id = d.drug_id
              WHERE d.active = 1 AND d.reorder_point > 0";
@@ -294,21 +394,27 @@ if ($tab === 'low_stock') {
     $res = sqlStatement($sql, $lowParams);
     while ($r = sqlFetchArray($res)) {
         $rows[] = [
-            'inventory_id'  => null,
-            'drug_id'       => (int)$r['drug_id'],
-            'name'          => (string)$r['name'],
-            'ndc_number'    => (string)$r['ndc_number'],
-            'form'          => (string)$r['form'],
-            'lot_number'    => '—',
-            'expiration'    => null,
-            'on_hand'       => (int)$r['on_hand_total'],
-            'reorder_point' => (float)$r['reorder_point'],
-            'warehouse_id'  => '',
-            'destroy_date'  => null,
-            'low'           => true,
+            'inventory_id'   => null,
+            'drug_id'        => (int)$r['drug_id'],
+            'name'           => (string)$r['name'],
+            'ndc_number'     => (string)$r['ndc_number'],
+            'form'           => (string)$r['form'],
+            'lot_number'     => (string)($r['lot_number'] ?? ''),
+            'expiration'     => $r['expiration'],
+            'on_hand'        => (int)$r['on_hand_total'],
+            'reorder_point'  => (float)$r['reorder_point'],
+            'warehouse_id'   => (string)($r['warehouse_id'] ?? ''),
+            'destroy_date'   => null,
+            'low'            => true,
+            'last_dispensed' => $lastDispensed[(int)$r['drug_id']] ?? null,
+            'schedule'       => $schedFor((string)$r['name']),
         ];
     }
 } else {
+    // Receiving log uses inventory_id DESC; everything else sorts by exp date.
+    $orderBy = ($tab === 'receiving_log')
+        ? 'di.inventory_id DESC'
+        : '(di.destroy_date IS NOT NULL), di.expiration ASC, d.name ASC';
     $sql = "SELECT di.inventory_id, di.drug_id, di.lot_number, di.expiration,
                    di.on_hand, di.warehouse_id, di.destroy_date,
                    di.destroy_notes, di.manufacturer,
@@ -316,27 +422,27 @@ if ($tab === 'low_stock') {
               FROM drug_inventory di
               JOIN drugs d ON d.drug_id = di.drug_id
              WHERE $where
-             ORDER BY (di.destroy_date IS NOT NULL),
-                      di.expiration ASC,
-                      d.name ASC
+             ORDER BY $orderBy
              LIMIT 200";
     $res = sqlStatement($sql, $params);
     while ($r = sqlFetchArray($res)) {
         $rows[] = [
-            'inventory_id'  => (int)$r['inventory_id'],
-            'drug_id'       => (int)$r['drug_id'],
-            'name'          => (string)$r['name'],
-            'ndc_number'    => (string)$r['ndc_number'],
-            'form'          => (string)$r['form'],
-            'lot_number'    => (string)($r['lot_number'] ?? ''),
-            'expiration'    => $r['expiration'],
-            'on_hand'       => (int)$r['on_hand'],
-            'reorder_point' => (float)$r['reorder_point'],
-            'warehouse_id'  => (string)($r['warehouse_id'] ?? ''),
-            'destroy_date'  => $r['destroy_date'],
-            'destroy_notes' => (string)($r['destroy_notes'] ?? ''),
-            'manufacturer'  => (string)($r['manufacturer'] ?? ''),
-            'low'           => false,
+            'inventory_id'   => (int)$r['inventory_id'],
+            'drug_id'        => (int)$r['drug_id'],
+            'name'           => (string)$r['name'],
+            'ndc_number'     => (string)$r['ndc_number'],
+            'form'           => (string)$r['form'],
+            'lot_number'     => (string)($r['lot_number'] ?? ''),
+            'expiration'     => $r['expiration'],
+            'on_hand'        => (int)$r['on_hand'],
+            'reorder_point'  => (float)$r['reorder_point'],
+            'warehouse_id'   => (string)($r['warehouse_id'] ?? ''),
+            'destroy_date'   => $r['destroy_date'],
+            'destroy_notes'  => (string)($r['destroy_notes'] ?? ''),
+            'manufacturer'   => (string)($r['manufacturer'] ?? ''),
+            'low'            => false,
+            'last_dispensed' => $lastDispensed[(int)$r['drug_id']] ?? null,
+            'schedule'       => $schedFor((string)$r['name']),
         ];
     }
 }
@@ -453,6 +559,45 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
     position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
     color: #8A91A1; font-size: 9px;
   }
+  /* Native <select> styled to match the figma dropdown chrome */
+  .cp-dd-native {
+    background: #FFFFFF;
+    border: 1px solid #E4E5E8;
+    border-radius: 8px;
+    height: 32px;
+    padding: 0 28px 0 12px;
+    font-size: 12px; color: #0D1B2A;
+    appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, #8A91A1 50%),
+                      linear-gradient(135deg, #8A91A1 50%, transparent 50%);
+    background-position: calc(100% - 14px) 14px, calc(100% - 9px) 14px;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+    flex: 0 0 auto;
+    min-width: 110px;
+  }
+  .cp-dd-native:focus { outline: none; border-color: #008C8C; }
+
+  /* SCHEDULE pill (e.g. C-IV) — orange tone for controlled substances */
+  .cp-sched-pill {
+    display: inline-block;
+    background: #FFF1E0;
+    color: #FA8C33;
+    border-radius: 999px;
+    padding: 2px 9px;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.5px;
+    line-height: 1.4;
+  }
+
+  /* Kebab action — replaces the inline Destroy form per the figma */
+  .cp-kebab {
+    display: inline-block;
+    color: #8A91A1; cursor: pointer;
+    padding: 4px 6px; border-radius: 6px; font-size: 14px;
+    line-height: 1; text-decoration: none;
+  }
+  .cp-kebab:hover { background: #F5F6F7; color: #0D1B2A; }
 
   /* KPI strip */
   .cp-kpis {
@@ -592,8 +737,8 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
     <input type="hidden" name="action" value="export_csv">
     <button type="submit" class="cp-btn ghost">⤓ <?php echo xlt('Export'); ?></button>
   </form>
-  <a href="#add-inv" class="cp-btn ghost" style="text-decoration:none;">+ <?php echo xlt('Add inventory'); ?></a>
-  <a href="?tab=destroyed" class="cp-btn danger" style="text-decoration:none;">✕ <?php echo xlt('Destruction log'); ?></a>
+  <a href="#add-inv" class="cp-btn ghost" style="text-decoration:none;">+ <?php echo xlt('Receive shipment'); ?></a>
+  <a href="?tab=destruction_log" class="cp-btn danger" style="text-decoration:none;">✕ <?php echo xlt('Record destruction (DEA)'); ?></a>
   <button type="button" class="cp-btn ghost" disabled title="<?php echo xla('Help is out of scope'); ?>">? <?php echo xlt('Help'); ?></button>
 </header>
 
@@ -650,49 +795,30 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
         <?php endforeach; ?>
       </select>
     </div>
-    <button type="submit" class="cp-btn primary"><?php echo xlt('Save'); ?></button>
+    <button type="submit" class="cp-btn primary"><?php echo xlt('Receive lot'); ?></button>
     <a href="<?php echo attr($selfUrl); ?>" class="cp-btn ghost" style="text-decoration:none;"><?php echo xlt('Cancel'); ?></a>
   </form>
-</section>
-
-<section class="cp-kpis">
-  <div class="cp-kpi">
-    <div class="lbl"><?php echo xlt('Total drugs'); ?></div>
-    <div class="val"><?php echo text((string)$kpiTotalDrugs); ?></div>
-    <div class="sub"><?php echo xlt('Active SKUs'); ?></div>
-  </div>
-  <div class="cp-kpi">
-    <div class="lbl"><?php echo xlt('Low stock'); ?></div>
-    <div class="val<?php echo $kpiLowStock > 0 ? ' warn' : ''; ?>"><?php echo text((string)$kpiLowStock); ?></div>
-    <div class="sub"><?php echo xlt('Below reorder point'); ?></div>
-  </div>
-  <div class="cp-kpi">
-    <div class="lbl"><?php echo xlt('Expiring 30d'); ?></div>
-    <div class="val<?php echo $kpiExpiring > 0 ? ' bad' : ''; ?>"><?php echo text((string)$kpiExpiring); ?></div>
-    <div class="sub"><?php echo xlt('Lots expiring this month'); ?></div>
-  </div>
-  <div class="cp-kpi">
-    <div class="lbl"><?php echo xlt('On-hand units'); ?></div>
-    <div class="val"><?php echo text(number_format($kpiOnHandUnits)); ?></div>
-    <div class="sub"><?php echo xlt('Active inventory total'); ?></div>
-  </div>
 </section>
 
 <nav class="cp-tabs">
   <?php
     $tabDefs = [
-        'all'       => xl('All'),
-        'active'    => xl('Active'),
-        'low_stock' => xl('Low stock'),
-        'expiring'  => xl('Expiring'),
-        'destroyed' => xl('Destroyed'),
+        'active'          => xl('Active inventory'),
+        'expiring'        => xl('Expiring soon'),
+        'below_reorder'   => xl('Below reorder'),
+        'destruction_log' => xl('Destruction log'),
+        'receiving_log'   => xl('Receiving log'),
     ];
     foreach ($tabDefs as $key => $lbl):
       $cls = ($tab === $key) ? 'active' : '';
       $href = '?tab=' . urlencode($key) . ($q !== '' ? '&q=' . urlencode($q) : '');
+      $cnt = (int)($tabCounts[$key] ?? 0);
   ?>
     <a class="<?php echo attr($cls); ?>" href="<?php echo attr($href); ?>">
-      <?php echo text($lbl); ?> (<?php echo text((string)($tabCounts[$key] ?? 0)); ?>)
+      <?php echo text($lbl); ?>
+      <?php if ($key !== 'receiving_log' || $cnt > 0): ?>
+        (<?php echo text((string)$cnt); ?>)
+      <?php endif; ?>
     </a>
   <?php endforeach; ?>
 </nav>
@@ -703,10 +829,37 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
     <span class="ic">🔍</span>
     <input type="text" name="q"
            value="<?php echo attr($q); ?>"
-           placeholder="<?php echo xla('Search by drug, NDC, or lot #'); ?>">
+           placeholder="<?php echo xla('Search by drug, NDC, or lot #'); ?>"
+           onchange="this.form.submit()">
   </div>
-  <button type="submit" class="cp-btn ghost"><?php echo xlt('Filter'); ?></button>
-  <?php if ($q !== ''): ?>
+  <select class="cp-dd-native" name="sched" onchange="this.form.submit()">
+    <option value="all"        <?php echo $fSched === 'all' ? 'selected' : ''; ?>><?php echo xlt('All'); ?></option>
+    <option value="rx"         <?php echo $fSched === 'rx' ? 'selected' : ''; ?>><?php echo xlt('Rx (non-controlled)'); ?></option>
+    <option value="controlled" <?php echo $fSched === 'controlled' ? 'selected' : ''; ?>><?php echo xlt('Controlled (C-II–V)'); ?></option>
+  </select>
+  <select class="cp-dd-native" name="form" onchange="this.form.submit()">
+    <option value="all"       <?php echo $fForm === 'all' ? 'selected' : ''; ?>><?php echo xlt('All'); ?></option>
+    <option value="tablet"    <?php echo $fForm === 'tablet' ? 'selected' : ''; ?>><?php echo xlt('Tablet / Capsule'); ?></option>
+    <option value="injection" <?php echo $fForm === 'injection' ? 'selected' : ''; ?>><?php echo xlt('Injection / IV'); ?></option>
+    <option value="spray"     <?php echo $fForm === 'spray' ? 'selected' : ''; ?>><?php echo xlt('Spray'); ?></option>
+    <option value="vial"      <?php echo $fForm === 'vial' ? 'selected' : ''; ?>><?php echo xlt('Vial'); ?></option>
+  </select>
+  <select class="cp-dd-native" name="facility" onchange="this.form.submit()">
+    <option value=""  <?php echo $fFacility === '' || $fFacility === 'all' ? 'selected' : ''; ?>><?php echo xlt('All facilities'); ?></option>
+    <?php foreach ($whLabels as $id => $title): ?>
+      <option value="<?php echo attr($id); ?>"
+              <?php echo $fFacility === $id ? 'selected' : ''; ?>>
+        <?php echo text($title); ?>
+      </option>
+    <?php endforeach; ?>
+  </select>
+  <select class="cp-dd-native" name="stock" onchange="this.form.submit()">
+    <option value="in_stock"     <?php echo $fStock === 'in_stock' ? 'selected' : ''; ?>><?php echo xlt('In stock'); ?></option>
+    <option value="all"          <?php echo $fStock === 'all' ? 'selected' : ''; ?>><?php echo xlt('All stock'); ?></option>
+    <option value="out_of_stock" <?php echo $fStock === 'out_of_stock' ? 'selected' : ''; ?>><?php echo xlt('Out of stock'); ?></option>
+    <option value="low"          <?php echo $fStock === 'low' ? 'selected' : ''; ?>><?php echo xlt('Low'); ?></option>
+  </select>
+  <?php if ($q !== '' || $fSched !== 'all' || $fForm !== 'all' || $fFacility !== '' || $fStock !== 'in_stock'): ?>
     <a href="?tab=<?php echo attr(urlencode($tab)); ?>" class="cp-btn ghost" style="text-decoration:none;">
       <?php echo xlt('Clear'); ?>
     </a>
@@ -721,20 +874,21 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
         <tr>
           <th class="drug"><?php echo xlt('DRUG / FORM'); ?></th>
           <th><?php echo xlt('NDC'); ?></th>
+          <th><?php echo xlt('SCHEDULE'); ?></th>
           <th><?php echo xlt('LOT #'); ?></th>
           <th><?php echo xlt('EXP DATE'); ?></th>
           <th><?php echo xlt('ON HAND'); ?></th>
           <th><?php echo xlt('REORDER'); ?></th>
           <th><?php echo xlt('LOCATION'); ?></th>
-          <th><?php echo xlt('STATUS'); ?></th>
+          <th><?php echo xlt('LAST DISPENSED'); ?></th>
           <th class="act"></th>
         </tr>
       </thead>
       <tbody>
         <?php if (empty($rows)): ?>
-          <tr><td class="cp-empty" colspan="9">
-            <?php if ($tab === 'all' && $q === ''): ?>
-              <?php echo xlt('No drug inventory yet. Click "Add inventory" to receive your first lot.'); ?>
+          <tr><td class="cp-empty" colspan="10">
+            <?php if ($tab === 'active' && $q === ''): ?>
+              <?php echo xlt('No drug inventory yet. Click "Receive shipment" to log your first lot.'); ?>
             <?php else: ?>
               <?php echo xlt('No matches for the current tab and filter.'); ?>
             <?php endif; ?>
@@ -750,14 +904,10 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
           $reorderDisplay = ((float)$r['reorder_point']) > 0
               ? rtrim(rtrim(number_format((float)$r['reorder_point'], 2), '0'), '.')
               : '—';
-          $statusLbl = $isDestroyed ? 'Destroyed'
-                      : ($low ? 'Low stock'
-                      : ($tone === 'past' ? 'Expired'
-                      : ($tone === 'warn' ? 'Expiring soon' : 'OK')));
-          $statusCls = $isDestroyed ? 'past'
-                      : ($low ? 'warn'
-                      : ($tone === 'past' ? 'past'
-                      : ($tone === 'warn' ? 'warn' : 'plain')));
+          $lastDisp = $r['last_dispensed'] ?? null;
+          $lastDispDisplay = ($lastDisp && $lastDisp !== '0000-00-00')
+              ? date('m/d/Y', (int)strtotime((string)$lastDisp))
+              : '—';
         ?>
           <tr<?php echo $isDestroyed ? ' class="destroyed"' : ''; ?>>
             <td class="drug">
@@ -765,12 +915,17 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
               <div class="form"><?php echo text($r['form']); ?></div>
             </td>
             <td class="muted"><?php echo text($r['ndc_number']); ?></td>
+            <td>
+              <?php if ($r['schedule'] !== ''): ?>
+                <span class="cp-sched-pill"><?php echo text($r['schedule']); ?></span>
+              <?php endif; ?>
+            </td>
             <td class="muted"><?php echo text($r['lot_number'] !== '' ? $r['lot_number'] : '—'); ?></td>
             <td><span class="v-<?php echo attr($tone); ?>"><?php echo text($expDisplay); ?></span></td>
             <td><span class="v-<?php echo attr($ohTone); ?>"><?php echo text((string)$r['on_hand']); ?></span></td>
             <td class="muted"><?php echo text($reorderDisplay); ?></td>
             <td class="muted"><?php echo text($resolveWarehouse($r['warehouse_id'] ?? '')); ?></td>
-            <td><span class="v-<?php echo attr($statusCls); ?>"><?php echo text($statusLbl); ?></span></td>
+            <td class="muted"><?php echo text($lastDispDisplay); ?></td>
             <td class="act">
               <?php if (!$isDestroyed && !empty($r['inventory_id'])): ?>
                 <form method="post" action="<?php echo attr($selfUrl); ?>"
@@ -779,14 +934,10 @@ $subMeta = $kpiTotalDrugs . ' SKUs · '
                   <input type="hidden" name="action" value="destroy">
                   <input type="hidden" name="inv_id" value="<?php echo attr((string)$r['inventory_id']); ?>">
                   <input type="hidden" name="reason" value="<?php echo attr($tone === 'past' ? 'expired' : 'standard_destruction'); ?>">
-                  <button type="submit" class="cp-mini-btn danger"><?php echo xlt('Destroy'); ?></button>
+                  <button type="submit" class="cp-kebab" title="<?php echo xla('Destroy lot (DEA-222)'); ?>">⋯</button>
                 </form>
-              <?php elseif ($isDestroyed): ?>
-                <span class="muted" style="font-size:11px;">
-                  <?php echo text(date('m/d/Y', (int)strtotime((string)$r['destroy_date']))); ?>
-                </span>
               <?php else: ?>
-                <span class="muted">—</span>
+                <span class="muted">⋯</span>
               <?php endif; ?>
             </td>
           </tr>
