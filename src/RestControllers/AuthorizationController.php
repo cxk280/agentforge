@@ -724,7 +724,16 @@ class AuthorizationController
             );
         }
         // TODO: break this up - throw exception for not turned on.
-        if (!empty($this->globalsBag->get('oauth_password_grant')) && ($this->grantType === self::GRANT_TYPE_PASSWORD)) {
+        // AgentForge demo override: env var OPENEMR_FORCE_REST_API=1
+        // also enables the password grant when the DB global hasn't
+        // been written yet on a fresh container. Keep narrow — only
+        // affects whether the grant is *registered*; per-user auth
+        // and scope checks downstream still apply normally.
+        $forcePwGrant = !empty(getenv('OPENEMR_FORCE_REST_API'));
+        if (
+            ($forcePwGrant || !empty($this->globalsBag->get('oauth_password_grant')))
+            && ($this->grantType === self::GRANT_TYPE_PASSWORD)
+        ) {
             $grant = new CustomPasswordGrant(
                 $this->session,
                 $this->getUserRepository(),

@@ -88,7 +88,14 @@ class UserRepository implements UserRepositoryInterface, IdentityProviderInterfa
      */
     protected function getAccountByPassword(UserEntity $user, $userrole, $username, $password, $email = ''): bool
     {
-        if (($userrole == UuidUserAccount::USER_ROLE_USERS) && ((OEGlobalsBag::getInstance()->get('oauth_password_grant') == 1) || (OEGlobalsBag::getInstance()->get('oauth_password_grant') == 3))) {
+        // AgentForge demo: the env-var override (OPENEMR_FORCE_REST_API=1)
+        // also enables user-grant authentication so the Co-Pilot agent
+        // can resolve clinician credentials without a written
+        // oauth_password_grant DB global. See AuthorizationController
+        // for the matching gate.
+        $cpForceUserGrant = !empty(getenv('OPENEMR_FORCE_REST_API'));
+        $cpPwGrantGlobal = OEGlobalsBag::getInstance()->get('oauth_password_grant');
+        if (($userrole == UuidUserAccount::USER_ROLE_USERS) && ($cpForceUserGrant || ($cpPwGrantGlobal == 1) || ($cpPwGrantGlobal == 3))) {
             $auth = new AuthUtils('api');
             if ($auth->confirmPassword($username, $password)) {
                 $id = $auth->getUserId();
