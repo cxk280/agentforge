@@ -512,6 +512,61 @@ function appendAssistant(text) {
   return div;
 }
 
+// Streaming helpers — used by the NDJSON consumer in send().
+function appendAssistantStreaming() {
+  const msgs = document.getElementById('messages');
+  const div  = document.createElement('div');
+  div.className = 'msg assistant';
+  div.innerHTML = `
+    <div class="ai-label">Clinical Co-Pilot</div>
+    <div class="bubble"><div class="content"></div></div>`;
+  msgs.appendChild(div);
+  scrollToBottom();
+  return div;
+}
+
+function updateAssistantStreaming(div, fullText) {
+  const { body } = splitSources(fullText);
+  const content = div.querySelector('.content');
+  content.innerHTML = renderMarkdown(body);
+  scrollToBottom();
+}
+
+function finalizeAssistantStreaming(div, fullText) {
+  const { body, sources } = splitSources(fullText);
+  const bubble = div.querySelector('.bubble');
+  const sourcesHtml = sources.length
+    ? `<div class="sources">
+        <span class="sources-label">Sources:</span>
+        ${sources.map(s => `<span class="source-chip">${escapeHtml(s)}</span>`).join('')}
+       </div>`
+    : '';
+  bubble.innerHTML = renderMarkdown(body) + sourcesHtml;
+  scrollToBottom();
+}
+
+function setTypingStatus(text) {
+  const typing = document.getElementById('typing');
+  if (!typing) return;
+  let status = typing.querySelector('.typing-status');
+  if (!status) {
+    status = document.createElement('div');
+    status.className = 'typing-status';
+    typing.appendChild(status);
+  }
+  status.textContent = text;
+}
+
+const TOOL_LABELS = {
+  get_patient_summary: 'patient summary',
+  get_medications:     'medications',
+  get_recent_labs:     'recent labs',
+  get_vitals:          'vitals',
+  get_visit_history:   'visit history',
+  get_conditions:      'conditions',
+};
+function toolLabel(name) { return TOOL_LABELS[name] || name; }
+
 function appendError(text, retryHandler) {
   const msgs = document.getElementById('messages');
   const div  = document.createElement('div');
@@ -628,8 +683,18 @@ async function send(text) {
   lastQuestion = message;
   appendTyping();
 
+  let assistantDiv = null;
+  let assistantText = '';
+  let activeTools = 0;
+
+  function ensureAssistantBubble() {
+    if (assistantDiv) return;
+    removeTyping();
+    assistantDiv = appendAssistantStreaming();
+  }
+
   try {
-    const res = await fetch(`${BACKEND}/chat`, {
+    const res = await fetch(`${BACKEND}/chat/stream`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -644,11 +709,48 @@ async function send(text) {
       throw new Error(err.detail || 'Server error');
     }
 
-    const data = await res.json();
-    removeTyping();
-    appendAssistant(data.reply);
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let streamError = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop();
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        let evt;
+        try { evt = JSON.parse(trimmed); } catch { continue; }
+        if (evt.type === 'tool_start') {
+          activeTools++;
+          setTypingStatus(`Looking up ${toolLabel(evt.name)}…`);
+        } else if (evt.type === 'tool_end') {
+          activeTools = Math.max(0, activeTools - 1);
+          if (activeTools === 0) setTypingStatus('Reading results…');
+        } else if (evt.type === 'delta') {
+          ensureAssistantBubble();
+          assistantText += evt.text;
+          updateAssistantStreaming(assistantDiv, assistantText);
+        } else if (evt.type === 'done') {
+          ensureAssistantBubble();
+          finalizeAssistantStreaming(assistantDiv, assistantText);
+        } else if (evt.type === 'error') {
+          streamError = evt.detail || 'Server error';
+        }
+      }
+    }
+    if (streamError) throw new Error(streamError);
+    if (!assistantDiv) {
+      removeTyping();
+      throw new Error('Empty response');
+    }
   } catch (e) {
     removeTyping();
+    if (assistantDiv) assistantDiv.remove();
     appendError(e.message, () => send(lastQuestion));
   } finally {
     busy = false;

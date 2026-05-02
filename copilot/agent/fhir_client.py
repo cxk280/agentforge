@@ -28,6 +28,38 @@ _cache = _TokenCache()
 # DB pool for fail-counter reset — created lazily
 _db_pool: aiomysql.Pool | None = None
 
+# Shared httpx client. Reusing a single client across FHIR + token calls
+# keeps TCP + TLS connections warm — a fresh AsyncClient per call adds a
+# full handshake (~100-300ms) on every tool invocation, which the agent
+# can't afford in the 90-second-between-rooms target.
+_http_client: httpx.AsyncClient | None = None
+_http_lock = asyncio.Lock()
+
+
+async def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        async with _http_lock:
+            if _http_client is None:
+                _http_client = httpx.AsyncClient(
+                    verify=False,
+                    timeout=httpx.Timeout(15.0, connect=5.0),
+                    limits=httpx.Limits(
+                        max_connections=20,
+                        max_keepalive_connections=10,
+                        keepalive_expiry=60.0,
+                    ),
+                )
+    return _http_client
+
+
+async def aclose_http_client() -> None:
+    """Close the shared HTTP client. Call from FastAPI lifespan shutdown."""
+    global _http_client
+    if _http_client is not None:
+        await _http_client.aclose()
+        _http_client = None
+
 
 async def _get_db_pool() -> aiomysql.Pool:
     global _db_pool
@@ -98,35 +130,25 @@ async def _get_token(client: httpx.AsyncClient) -> str:
 
 async def fhir_get(path: str, params: dict | None = None) -> dict:
     """GET a FHIR resource or search bundle. Retries once on 401."""
-    async with httpx.AsyncClient(verify=False) as client:
-        token = await _get_token(client)
-        resp = await client.get(
-            f"{settings.openemr_base_url}/apis/default/fhir/{path.lstrip('/')}",
-            params=params,
-            headers={
-                "Authorization": f"Bearer {token}",
-                "Accept": "application/fhir+json",
-            },
-            timeout=15,
-        )
+    client = await _get_http_client()
+    token = await _get_token(client)
+    url = f"{settings.openemr_base_url}/apis/default/fhir/{path.lstrip('/')}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/fhir+json",
+    }
+    resp = await client.get(url, params=params, headers=headers)
 
-        if resp.status_code == 401:
-            # Token may have been revoked or expired early — clear cache and retry once
-            _cache.access_token = ""
-            _cache.expires_at = 0.0
-            token = await _fetch_token(client)
-            resp = await client.get(
-                f"{settings.openemr_base_url}/apis/default/fhir/{path.lstrip('/')}",
-                params=params,
-                headers={
-                    "Authorization": f"Bearer {token}",
-                    "Accept": "application/fhir+json",
-                },
-                timeout=15,
-            )
+    if resp.status_code == 401:
+        # Token may have been revoked or expired early — clear cache and retry once
+        _cache.access_token = ""
+        _cache.expires_at = 0.0
+        token = await _fetch_token(client)
+        headers["Authorization"] = f"Bearer {token}"
+        resp = await client.get(url, params=params, headers=headers)
 
-        resp.raise_for_status()
-        return resp.json()
+    resp.raise_for_status()
+    return resp.json()
 
 
 def bundle_entries(bundle: dict) -> list[dict]:

@@ -291,7 +291,7 @@ python run_evals.py --smoke    # 5-case smoke for pre-push
 ```
 copilot/
 ├── agent/                    # FastAPI Co-Pilot agent
-│   ├── main.py               # /chat endpoint, session store
+│   ├── main.py               # /chat + /chat/stream endpoints, session store
 │   ├── agent.py              # Anthropic loop + tool dispatch
 │   ├── tools.py              # FHIR-backed retrieval tools
 │   ├── observability.py      # Langfuse instrumentation

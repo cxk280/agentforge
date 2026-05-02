@@ -1,16 +1,17 @@
 """FastAPI entry point for the Clinical Co-Pilot agent."""
 
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from agent import run_agent
-from fhir_client import fhir_get, bundle_entries
+from agent import run_agent, run_agent_stream
+from fhir_client import fhir_get, bundle_entries, aclose_http_client
 from observability import flush as langfuse_flush
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -21,6 +22,9 @@ async def lifespan(app: FastAPI):
     yield
     # Drain queued Langfuse events on shutdown so traces aren't lost
     langfuse_flush()
+    # Close the shared httpx client cleanly so keep-alive connections
+    # are torn down rather than orphaned at SIGTERM.
+    await aclose_http_client()
 
 
 app = FastAPI(title="Clinical Co-Pilot", lifespan=lifespan)
@@ -35,6 +39,11 @@ app.add_middleware(
 # In-memory session store: session_id → message history
 # Replace with Redis for multi-worker deployments
 _sessions: dict[str, list[dict]] = {}
+
+# pid → FHIR UUID cache. The mapping is global (a given pid resolves to
+# the same UUID for the life of the patient_data row), so caching across
+# sessions is safe and saves a DB + FHIR lookup on every chat turn.
+_pid_to_fhir_id: dict[str, str] = {}
 
 
 # ── Models ────────────────────────────────────────────────────────────────
@@ -113,21 +122,7 @@ async def chat(req: ChatRequest):
 
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
-
-    # The agent's tools call OpenEMR FHIR which expects a UUID, not the
-    # internal pid. Most callers (chat UI) resolve before posting; evals
-    # and quick test scripts pass the raw pid. Auto-resolve here so
-    # numeric patient_ids "just work".
-    fhir_patient_id = req.patient_id
-    if req.patient_id.isdigit():
-        try:
-            resolved = await resolve_patient(req.patient_id)
-            if isinstance(resolved, dict) and resolved.get("fhir_id"):
-                fhir_patient_id = resolved["fhir_id"]
-        except HTTPException:
-            # Fall through with the raw value; downstream FHIR call will
-            # report a clear error rather than us swallowing it.
-            pass
+    fhir_patient_id = await _resolve_fhir_id(req.patient_id)
 
     try:
         reply, updated_history = await run_agent(
@@ -145,6 +140,65 @@ async def chat(req: ChatRequest):
         patient_id=req.patient_id,
         reply=reply,
         history_length=len(updated_history),
+    )
+
+
+async def _resolve_fhir_id(patient_id: str) -> str:
+    """Convert numeric pid → FHIR UUID, hitting a process-level cache first."""
+    if not patient_id.isdigit():
+        return patient_id
+    cached = _pid_to_fhir_id.get(patient_id)
+    if cached is not None:
+        return cached
+    try:
+        resolved = await resolve_patient(patient_id)
+        if isinstance(resolved, dict) and resolved.get("fhir_id"):
+            _pid_to_fhir_id[patient_id] = resolved["fhir_id"]
+            return resolved["fhir_id"]
+    except HTTPException:
+        # Fall through; downstream FHIR call will surface a clear error.
+        pass
+    return patient_id
+
+
+@app.post("/chat/stream")
+async def chat_stream(req: ChatRequest):
+    """Stream the agent response as NDJSON events.
+
+    Each line is one JSON object. Event types:
+      tool_start, tool_end, delta, done, error.
+    """
+    if not req.patient_id:
+        raise HTTPException(status_code=400, detail="patient_id is required")
+
+    history = _sessions.get(req.session_id, [])
+    history.append({"role": "user", "content": req.message})
+    fhir_patient_id = await _resolve_fhir_id(req.patient_id)
+
+    async def event_stream():
+        try:
+            async for event in run_agent_stream(
+                fhir_patient_id,
+                history,
+                session_id=req.session_id,
+            ):
+                if event.get("type") == "done":
+                    final_history = event.pop("history", history)
+                    _sessions[req.session_id] = final_history
+                    event["history_length"] = len(final_history)
+                yield json.dumps(event) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            # Defeat any intermediary that buffers — Cloudflare/nginx in
+            # particular won't flush small chunks without this hint.
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
     )
 
 
