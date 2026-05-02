@@ -60,8 +60,14 @@ services:
       # of a static integer). Without this, every browser pins to
       # tabs_view_model.js?v=82 forever and never picks up local edits.
       OPENEMR__ENVIRONMENT: dev
+      # XDebug *debugger* is fine to leave on — it only activates per
+      # request when the browser sends an XDEBUG_SESSION cookie/header.
+      # The *profiler*, however, was writing a full call-graph trace
+      # file on every page load, which made demographics.php take
+      # 24-42 seconds (per measured TTFB). Off by default; flip to
+      # 1 only when you need a profile.
       XDEBUG_ON: 1
-      XDEBUG_PROFILER_ON: 1
+      XDEBUG_PROFILER_ON: 0
       # setting xdebug client host for cases where xdebug.discover_client_host fails
       XDEBUG_CLIENT_HOST: host.docker.internal
       GITHUB_COMPOSER_TOKEN: c313de1ed5a00eb6ff9309559ec9ad01fcc553f0

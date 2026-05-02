@@ -81,7 +81,7 @@ so the fork stays mergeable with upstream.
 | Agent runtime | Python 3.13, FastAPI, Anthropic SDK |
 | Agent model | Claude Sonnet 4.6 (production), Haiku 4.5 (eval judge) |
 | Patient data API | OpenEMR FHIR R4 endpoints |
-| Observability | Self-hosted [Langfuse](https://langfuse.com) (Postgres + ClickHouse + Redis + S3) |
+| Observability | Self-hosted [Langfuse](https://langfuse.com) (Postgres + ClickHouse + Redis + S3) for agent traces; [New Relic](https://newrelic.com) APM + log forwarding for both services |
 | Frontend (mocks) | Inline CSS + shared `public/copilot-archetype.css` (no framework) |
 | Hosting | [Railway](https://railway.com) (8 services in one project) |
 | Tests | PHPUnit 11 (isolated suite) + Python eval harness |
@@ -164,12 +164,41 @@ A complete view-by-view inventory is in
 This is a **demo deployment**. Real-world deployment would require
 several compliance steps that are intentionally simplified here:
 
-- **Langfuse + Anthropic + New Relic (planned)** — each is a third-party
+- **Langfuse + Anthropic + New Relic** — each is a third-party
   data processor. Sending PHI to any of them in production requires
   a signed Business Associate Agreement (BAA) with that vendor.
   For the purposes of this demo, we proceed under the **premise
   that BAAs have been executed**. None have actually been signed
-  for this deployment.
+  for this deployment. Specifically:
+    - **Anthropic**'s commercial Claude API is HIPAA-eligible under
+      a signed BAA via the Enterprise plan.
+    - **Langfuse** is self-hosted in this deployment, so traces stay
+      inside the Railway project (no external processor) — but the
+      managed Langfuse Cloud tier would require a BAA.
+    - **New Relic** offers a HIPAA-compliant tier that requires a
+      signed BAA before any PHI may be transmitted. The PHP and
+      Python agents in this deployment scrub PHI via
+      `attributes.exclude` patterns (request headers, parameters,
+      response cookies), `transaction_tracer.record_sql=obfuscated`
+      (SQL literals are replaced with `?`), and
+      `strip_exception_messages.enabled=true` (exception bodies
+      stripped before send). NR's account-level **High Security
+      Mode** is *not* enabled (it would require a separate
+      irreversible NR account toggle and supersedes per-agent
+      config). URL paths and error messages can still leak PHI
+      fragments, so the BAA is load-bearing in any real
+      deployment. We assume one is in place for the demo.
+
+      **Operational note for future operators:** Setting
+      `NEW_RELIC_HIGH_SECURITY=true` on the agent without first
+      enabling HSM at the NR account level causes the agent to
+      silently fail registration in a retry loop ("agent run was
+      None"). If you see APM apps not appearing in NR despite the
+      Infrastructure entities reporting correctly, check this env
+      var first. To turn HSM on properly: enable it in NR UI →
+      Settings → Account → High Security (irreversible), then set
+      the agent env var. We chose not to do this so the toggle
+      stays reversible during the demo period.
 - **Audit logging** — every tool call from the Co-Pilot agent
   flows through OpenEMR's existing `log` table, so PHI access is
   traceable to the authenticated user.

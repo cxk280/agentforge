@@ -5,19 +5,15 @@
 services:
   mysql:
     restart: always
-    image: mariadb:11.8.6@sha256:78a5047d3ba33975f183f183c2464cc7f1eab13ec8667e57cc9a5821d6da7577
-    command: ['mariadbd', '--character-set-server=utf8mb4']
+    # AgentForge standardizes on MySQL 9.4 across local dev + Railway envs.
+    image: mysql:9.4
+    command: ['mysqld', '--character-set-server=utf8mb4']
     volumes:
     - databasevolume:/var/lib/mysql
     environment:
       MYSQL_ROOT_PASSWORD: root
     healthcheck:
-      test:
-      - CMD
-      - /usr/local/bin/healthcheck.sh
-      - --su-mysql
-      - --connect
-      - --innodb_initialized
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       start_period: 1m
       start_interval: 10s
       interval: 1m
