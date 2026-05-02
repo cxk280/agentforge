@@ -3440,9 +3440,26 @@ function getLayoutProperties($formtype, &$grparr, $sel = "grp_title", $limit = n
     if ($sel != '*' && !str_contains((string) $sel, 'grp_group_id')) {
         $sel = "grp_group_id, $sel";
     }
+
+    // Per-request memoization. Profiling demographics.php showed this
+    // exact query (e.g. grp_form_id='DEM') firing 312 times in a single
+    // render — every dashboard card calls back into the layout system.
+    // Layout properties cannot change within a single request, so we
+    // cache the materialized $grparr keyed by (formtype, sel, limit)
+    // and copy out on subsequent calls.
+    static $cache = [];
+    $key = $formtype . '|' . $sel . '|' . ($limit ?? '');
+    if (isset($cache[$key])) {
+        foreach ($cache[$key] as $k => $v) {
+            $grparr[$k] = $v;
+        }
+        return;
+    }
+
     $gres = sqlStatement("SELECT $sel FROM layout_group_properties WHERE grp_form_id = ? " .
         " ORDER BY grp_group_id " .
         ($limit ? "LIMIT " . escape_limit($limit) : ""), [$formtype]);
+    $rows = [];
     while ($grow = sqlFetchArray($gres)) {
         // TBD: Remove this after grp_init_open column is implemented.
         if ($sel == '*' && !isset($grow['grp_init_open'])) {
@@ -3454,8 +3471,10 @@ function getLayoutProperties($formtype, &$grparr, $sel = "grp_title", $limit = n
             );
             $grow['grp_init_open'] = !empty($tmprow['form_id']);
         }
+        $rows[$grow['grp_group_id']] = $grow;
         $grparr[$grow['grp_group_id']] = $grow;
     }
+    $cache[$key] = $rows;
 }
 
 function display_layout_rows($formtype, $result1, $result2 = ''): void

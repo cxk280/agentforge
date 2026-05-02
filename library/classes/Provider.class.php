@@ -44,6 +44,26 @@ class Provider extends ORDataObject
 
     function populate()
     {
+        // Per-request memoization. Each prescription on a patient chart
+        // constructs a Provider, and each construction otherwise fires
+        // 1 SELECT on `users` + 1 SELECT on `insurance_numbers` + N
+        // SELECTs on individual InsuranceNumbers rows. With ~30
+        // prescriptions on a typical chart that was 60-90 redundant
+        // queries per render. The provider record cannot change within
+        // a single request, so cache by id.
+        static $cache = [];
+        $key = (string) $this->id;
+        if (isset($cache[$key])) {
+            $this->lname               = $cache[$key]['lname'];
+            $this->fname               = $cache[$key]['fname'];
+            $this->federal_drug_id     = $cache[$key]['federal_drug_id'];
+            $this->specialty           = $cache[$key]['specialty'];
+            $this->npi                 = $cache[$key]['npi'];
+            $this->state_license_number = $cache[$key]['state_license_number'];
+            $this->insurance_numbers    = $cache[$key]['insurance_numbers'];
+            return;
+        }
+
         $res = sqlQuery("SELECT fname,lname,federaldrugid, specialty, npi, state_license_number FROM users where id ='" . add_escape_custom($this->id) . "'");
 
         if (is_array($res)) {
@@ -57,6 +77,16 @@ class Provider extends ORDataObject
 
         $ins = new InsuranceNumbers();
         $this->insurance_numbers = $ins->insurance_numbers_factory($this->id);
+
+        $cache[$key] = [
+            'lname'               => $this->lname,
+            'fname'               => $this->fname,
+            'federal_drug_id'     => $this->federal_drug_id,
+            'specialty'           => $this->specialty,
+            'npi'                 => $this->npi,
+            'state_license_number' => $this->state_license_number,
+            'insurance_numbers'   => $this->insurance_numbers,
+        ];
     }
 
     function utility_provider_array()

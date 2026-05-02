@@ -40,6 +40,17 @@ class QueryUtils
         return $field_list;
     }
 
+    /**
+     * Per-request cache of the list of tables in the current schema.
+     * `SHOW TABLES` is otherwise fired on every escapeTableName() call —
+     * profiling demographics.php showed 319 calls per page render. The
+     * table list cannot change within a single request, so we memoize.
+     * Cleared at process start (PHP's natural lifecycle).
+     *
+     * @var ?string[]
+     */
+    private static ?array $tablesCache = null;
+
     public static function escapeTableName(string $table): string
     {
         // Reject table names containing backticks to prevent identifier-context injection
@@ -47,15 +58,17 @@ class QueryUtils
             throw new SqlQueryException("", "ERROR: OpenEMR SQL Escaping ERROR of the following string: " . \errorLogEscape($table));
         }
 
-        $res = self::sqlStatementThrowException("SHOW TABLES", [], noLog: true);
-        $tables_array = [];
-        while ($row = self::fetchArrayFromResultSet($res)) {
-            $keys_return = array_keys($row);
-            $tables_array[] = $row[$keys_return[0]];
+        if (self::$tablesCache === null) {
+            $res = self::sqlStatementThrowException("SHOW TABLES", [], noLog: true);
+            self::$tablesCache = [];
+            while ($row = self::fetchArrayFromResultSet($res)) {
+                $keys_return = array_keys($row);
+                self::$tablesCache[] = $row[$keys_return[0]];
+            }
         }
 
         // Whitelist against actual tables, then backtick-quote to keep in identifier context
-        $tableName = \escape_identifier($table, $tables_array, true, false);
+        $tableName = \escape_identifier($table, self::$tablesCache, true, false);
         return sprintf('`%s`', $tableName);
     }
 
