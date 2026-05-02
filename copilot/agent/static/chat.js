@@ -31,7 +31,12 @@ async function init() {
       const data = await res.json();
       if (!data.fhir_id) throw new Error(data.detail || 'Patient not found');
       FHIR_ID = data.fhir_id;
-      setPatient(data.name || 'Patient', `PID ${PID}`);
+      // Build the meta line "PID 1 · DOB 1965-03-12 · M" to match the
+      // Figma mock — needs DOB and sex from the resolver response.
+      const metaParts = [`PID ${PID}`];
+      if (data.dob) metaParts.push(`DOB ${data.dob}`);
+      if (data.sex) metaParts.push(data.sex);
+      setPatient(data.name || 'Patient', metaParts.join(' · '));
     } else if (FHIR_ID) {
       setPatient('Patient', FHIR_ID.slice(0, 8) + '…');
     }

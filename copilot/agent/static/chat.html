@@ -100,22 +100,34 @@
 
   /* AI label above each assistant bubble */
   .ai-label {
-    display: flex; align-items: center; gap: 8px;
     font-size: 11px; font-weight: 600;
     color: var(--text-3);
     letter-spacing: 0.6px;
     text-transform: uppercase;
     margin-bottom: 6px;
-    padding-left: 4px;
-  }
-  .ai-label::before {
-    content: ''; width: 6px; height: 6px; border-radius: 50%;
-    background: var(--teal);
   }
 
   .msg { display: flex; flex-direction: column; max-width: 100%; }
   .msg.user { align-items: flex-end; }
-  .msg.assistant { align-items: flex-start; }
+  /* Assistant messages get a 40px "AI" avatar to the left of the
+     label/bubble column, matching the Figma "Patient Ready" mock. */
+  .msg.assistant {
+    align-items: flex-start;
+    position: relative;
+    padding-left: 52px;
+  }
+  .msg.assistant::before {
+    content: 'AI';
+    position: absolute;
+    left: 0; top: 0;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: #E5EAF0;
+    color: #4F5763;
+    font-size: 12px; font-weight: 700;
+    letter-spacing: 0.5px;
+    display: flex; align-items: center; justify-content: center;
+  }
 
   .bubble {
     padding: 14px 18px;
@@ -319,21 +331,28 @@
     padding: 6px 0;
   }
   #input::placeholder { color: var(--text-3); }
+  /* Send button: rectangular pill with "Send →" text per Figma. */
   #send {
     flex-shrink: 0;
-    width: 40px; height: 40px;
+    height: 40px;
+    padding: 0 18px;
     background: var(--teal);
     color: #fff;
     border: none;
-    border-radius: 50%;
+    border-radius: 999px;
     cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; gap: 6px;
+    font: inherit;
+    font-size: 14px; font-weight: 600;
     transition: background 0.15s, transform 0.05s;
+  }
+  #send::after {
+    content: 'Send →';
   }
   #send:disabled { background: var(--text-3); cursor: not-allowed; opacity: 0.55; }
   #send:hover:not(:disabled) { background: #006f6f; }
   #send:active:not(:disabled) { transform: translateY(1px); }
-  #send svg { width: 18px; height: 18px; }
+  #send svg { display: none; }
 </style>
 </head>
 <body>

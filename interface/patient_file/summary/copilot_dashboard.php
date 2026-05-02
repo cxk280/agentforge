@@ -32,6 +32,29 @@ $vPrev = sqlQuery(
     "SELECT bps, bpd, BMI, weight FROM form_vitals WHERE pid = ? ORDER BY date DESC LIMIT 1 OFFSET 1",
     [$pid]
 );
+// Lookup latest + previous A1C / LDL from form_observation (seed uses
+// this table for LOINC-coded labs; see copilot_lab_overview.php for the
+// same pattern). Codes: HbA1c = 4548-4 / 17856-6, LDL = 13457-7 /
+// 2089-1 / 18262-6.
+$labLookup = static function (int $pid, array $codes): array {
+    $placeholders = implode(',', array_fill(0, count($codes), '?'));
+    $rows = sqlStatement(
+        "SELECT ob_value, date FROM form_observation
+         WHERE pid = ? AND ob_code IN ($placeholders)
+         ORDER BY date DESC LIMIT 2",
+        array_merge([$pid], $codes)
+    );
+    $out = [];
+    while ($r = sqlFetchArray($rows)) { $out[] = $r; }
+    return $out;
+};
+$a1cRows = $labLookup($pid, ['4548-4', '17856-6']);
+$ldlRows = $labLookup($pid, ['13457-7', '2089-1', '18262-6']);
+
+// Build the 4-tile KPI strip — BP / A1C / LDL / BMI per the Figma mock.
+// Tone: green when value moved toward target (lower is better for all
+// four metrics here), orange otherwise. Reference ranges are clinical
+// constants — comment them as such.
 $vitals = [];
 if ($vRecent && $vRecent['bps']) {
     $bp = (int)$vRecent['bps'] . '/' . (int)$vRecent['bpd'];
@@ -42,6 +65,32 @@ if ($vRecent && $vRecent['bps']) {
         $trend = "$arrow from $prevBp";
     } else { $trend = '—'; $color = '#26A65B'; }
     $vitals[] = ['label' => 'BP', 'value' => $bp, 'unit' => 'mmHg', 'trend' => $trend, 'trend_color' => $color];
+} else {
+    $vitals[] = ['label' => 'BP', 'value' => '—', 'unit' => 'mmHg', 'trend' => 'No reading', 'trend_color' => '#8A91A1'];
+}
+if ($a1cRows) {
+    $a1c = number_format((float)$a1cRows[0]['ob_value'], 1);
+    if (isset($a1cRows[1])) {
+        $prev = number_format((float)$a1cRows[1]['ob_value'], 1);
+        $arrow = ((float)$a1cRows[0]['ob_value'] < (float)$a1cRows[1]['ob_value']) ? '↓' : '↑';
+        $color = ((float)$a1cRows[0]['ob_value'] < (float)$a1cRows[1]['ob_value']) ? '#26A65B' : '#FA8C33';
+        $trend = "$arrow from $prev";
+    } else { $trend = '—'; $color = '#FA8C33'; }
+    $vitals[] = ['label' => 'A1C', 'value' => $a1c, 'unit' => '%', 'trend' => $trend, 'trend_color' => $color];
+} else {
+    $vitals[] = ['label' => 'A1C', 'value' => '—', 'unit' => '%', 'trend' => 'No labs', 'trend_color' => '#8A91A1'];
+}
+if ($ldlRows) {
+    $ldl = (int)$ldlRows[0]['ob_value'];
+    if (isset($ldlRows[1])) {
+        $prev = (int)$ldlRows[1]['ob_value'];
+        $arrow = ($ldl < $prev) ? '↓' : '↑';
+        $color = ($ldl < $prev) ? '#26A65B' : '#FA8C33';
+        $trend = "$arrow from $prev";
+    } else { $trend = '—'; $color = '#26A65B'; }
+    $vitals[] = ['label' => 'LDL', 'value' => (string)$ldl, 'unit' => 'mg/dL', 'trend' => $trend, 'trend_color' => $color];
+} else {
+    $vitals[] = ['label' => 'LDL', 'value' => '—', 'unit' => 'mg/dL', 'trend' => 'No labs', 'trend_color' => '#8A91A1'];
 }
 if ($vRecent && $vRecent['BMI']) {
     $bmi = number_format((float)$vRecent['BMI'], 1);
@@ -52,14 +101,8 @@ if ($vRecent && $vRecent['BMI']) {
         $trend = "$arrow from $prevBmi";
     } else { $trend = '—'; $color = '#26A65B'; }
     $vitals[] = ['label' => 'BMI', 'value' => $bmi, 'unit' => 'kg/m²', 'trend' => $trend, 'trend_color' => $color];
-}
-if ($vRecent && $vRecent['weight']) {
-    $wt = (int)$vRecent['weight'];
-    $vitals[] = ['label' => 'WT', 'value' => (string)$wt, 'unit' => 'lbs', 'trend' => 'last visit', 'trend_color' => '#26A65B'];
-}
-// Pad to 4 with placeholders if needed.
-while (count($vitals) < 4) {
-    $vitals[] = ['label' => '—', 'value' => '—', 'unit' => '—', 'trend' => '—', 'trend_color' => '#8A91A1'];
+} else {
+    $vitals[] = ['label' => 'BMI', 'value' => '—', 'unit' => 'kg/m²', 'trend' => 'No reading', 'trend_color' => '#8A91A1'];
 }
 
 // ── Allergies ──────────────────────────────────────────────────────────

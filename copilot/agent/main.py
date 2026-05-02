@@ -1,5 +1,14 @@
 """FastAPI entry point for the Clinical Co-Pilot agent."""
 
+# Install the PHI-scrubbing LogRecord factory before any other import that
+# may emit a log line at import time (uvicorn, fastapi, anthropic SDK, the
+# NR Python agent — all of these touch the logging module on import). This
+# guarantees the scrub applies to every log record from the very first byte
+# the process emits.
+import phi_redaction  # noqa: E402  (must precede other imports)
+
+phi_redaction.install()
+
 import json
 import os
 from contextlib import asynccontextmanager
@@ -72,14 +81,17 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
 
 # Origins allowed to iframe the Co-Pilot chat surface. The agent is
 # embedded inside OpenEMR's `interface/copilot/index.php`, which lives
-# on a different port (or in prod a different host) than the agent —
-# so 'self' is not enough. Configurable via env so prod can list its
-# own OpenEMR origins. Defaults cover local dev (localhost:8300/9300)
-# plus the demo's Railway and custom-domain prod URLs.
+# on a different port (or in any deployed env, a different host) than
+# the agent — so 'self' is not enough.
+#
+# Defaults cover **local dev only** (localhost:8300/9300). Each
+# Railway env (dev/qa/prod) MUST set ALLOWED_IFRAME_ORIGINS to its own
+# OpenEMR origin via env var. We deliberately keep prod URLs out of
+# the defaults so a misconfigured qa/dev container can't accept iframe
+# embeds from prod openemr — that would violate environment
+# isolation. See `feedback_environment_isolation.md`.
 _DEFAULT_IFRAME_ORIGINS = (
-    "http://localhost:8300 https://localhost:9300 "
-    "https://openemr-production-971e.up.railway.app "
-    "https://app.agentforgedemo.com"
+    "http://localhost:8300 https://localhost:9300"
 )
 _FRAME_ANCESTORS = "'self' " + os.environ.get(
     "ALLOWED_IFRAME_ORIGINS", _DEFAULT_IFRAME_ORIGINS
@@ -237,7 +249,7 @@ async def resolve_patient(pid: str):
         async with pool.acquire() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(
-                    "SELECT HEX(uuid), fname, lname FROM patient_data WHERE pid = %s",
+                    "SELECT HEX(uuid), fname, lname, DOB, sex FROM patient_data WHERE pid = %s",
                     (int(pid),),
                 )
                 row = await cur.fetchone()
@@ -253,8 +265,13 @@ async def resolve_patient(pid: str):
     # Format hex as standard UUID: 8-4-4-4-12
     fhir_id = f"{hex_uuid[0:8]}-{hex_uuid[8:12]}-{hex_uuid[12:16]}-{hex_uuid[16:20]}-{hex_uuid[20:32]}".lower()
     full_name = f"{row[1]} {row[2]}".strip()
+    dob_raw = row[3]
+    # DOB comes back as date/datetime/str depending on driver; emit ISO YYYY-MM-DD
+    dob_str = dob_raw.strftime("%Y-%m-%d") if hasattr(dob_raw, "strftime") else (str(dob_raw)[:10] if dob_raw else "")
+    sex_raw = (row[4] or "").strip()
+    sex = sex_raw[:1].upper() if sex_raw else ""
 
-    return {"pid": pid, "fhir_id": fhir_id, "name": full_name}
+    return {"pid": pid, "fhir_id": fhir_id, "name": full_name, "dob": dob_str, "sex": sex}
 
 
 @app.post("/chat", response_model=ChatResponse)
