@@ -79,6 +79,7 @@
                 "label": "Patient Finder",
                 "menu_id": "fin0",
                 "target": "fin",
+                "on_click": "top.clearPatient(false)",
                 "url": "/interface/main/finder/dynamic_finder.php",
                 "children": [],
                 "requirement": 0,

@@ -225,19 +225,54 @@ while ($p = sqlFetchArray($result)) {
     $provider  = trim((string)($p['provider_name'] ?? ''));
     $insurance = trim((string)($p['insurance']     ?? ''));
 
+    // Pre-compute every field `left_nav.setPatient` needs so the click
+    // handler can update header2 without waiting for demographics.php to
+    // finish rendering. setPatient signature:
+    //   setPatient(pname, pid, pubpid, frname, str_dob, provider, insurance, allergies)
+    // pname uses the same "First Last" form OpenEMR's other call sites
+    // produce; str_dob mirrors the format demographics.php builds.
+    $allergy_titles = [];
+    $allergy_res = sqlStatement(
+        "SELECT title FROM lists WHERE pid = ? AND type = 'allergy' AND activity = 1 "
+      . "AND (enddate IS NULL OR enddate = '0000-00-00' OR enddate > CURDATE()) ORDER BY id",
+        [(int)$p['pid']]
+    );
+    while ($a = sqlFetchArray($allergy_res)) {
+        if (!empty($a['title'])) {
+            $allergy_titles[] = $a['title'];
+        }
+    }
+
+    $age_yrs   = cp_age($p['DOB'] ?? null);
+    $dob_full  = cp_dob_display($p['DOB'] ?? null);
+    $str_dob   = $dob_full === '—'
+        ? 'DOB: —'
+        : 'DOB: ' . $dob_full;
+
+    $set_patient_payload = [
+        'pname'     => trim("$first $last"),
+        'pid'       => (int)$p['pid'],
+        'pubpid'    => (string)$p['pubpid'],
+        'str_dob'   => $str_dob,
+        'provider'  => $provider,
+        'insurance' => $insurance,
+        'allergies' => $allergy_titles,
+    ];
+
     $rows[] = [
         'pid'          => (int)$p['pid'],
         'initials'     => cp_initials($first, $last),
         'avatar_color' => $avatar_palette[((int)$p['pid']) % count($avatar_palette)],
         'name'         => $last !== '' ? "$last, $first" : $first,
         'mrn'          => $p['pubpid'] !== '' ? '#' . $p['pubpid'] : '—',
-        'dob'          => cp_dob_display($p['DOB'] ?? null),
+        'dob'          => $dob_full,
         'provider'     => $provider  !== '' ? $provider  : '—',
         'insurance'    => $insurance !== '' ? $insurance : '—',
         'last_visit'   => $visit_label,
         'today'        => $is_today,
         'selected'     => $selected_pid > 0 && (int)$p['pid'] === $selected_pid,
         'flags'        => $flags,
+        'set_patient_payload' => $set_patient_payload,
     ];
 }
 
@@ -571,12 +606,20 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
       </div>
     <?php else: ?>
       <?php foreach ($rows as $r): ?>
+        <?php
+          // Each row carries the data left_nav.setPatient needs so the
+          // click handler can paint header2 immediately, in parallel with
+          // demographics.php loading. Stored as a JSON-encoded data
+          // attribute and decoded in cpSelectPatient.
+          $pdata_json = json_encode($r['set_patient_payload'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        ?>
         <div class="cp-pf-row<?php echo $r['selected'] ? ' selected' : ''; ?>"
              data-pid="<?php echo attr($r['pid']); ?>"
-             onclick="cpSelectPatient(<?php echo attr_js($r['pid']); ?>)"
+             data-pdata="<?php echo attr($pdata_json); ?>"
+             onclick="cpSelectPatient(this)"
              role="button"
              tabindex="0"
-             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpSelectPatient(<?php echo attr_js($r['pid']); ?>);}"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();cpSelectPatient(this);}"
              title="Open <?php echo attr($r['name']); ?>">
           <div class="cp-pf-cell-name">
             <span class="cp-pf-avatar"
@@ -621,18 +664,63 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
 </div>
 
 <script>
-// Clicking a patient row sets the active patient at the EMR shell level —
-// which makes header2 (the demographics banner) appear and lets the user
-// then choose any tab (Demographics, History, Co-Pilot ✦, etc.) from the
-// patient navigation menu.
+// Clear any prior patient context the moment the finder loads. Without
+// this, header2 (the demographics banner) keeps showing the previously
+// selected patient even after the user has navigated back to the
+// finder to look for someone else — which makes the EMR look stuck on
+// the wrong patient. `top.clearPatient(false)` is OpenEMR's canonical
+// "drop the active patient" hook (see tabs_view_model.js); the `false`
+// arg tells it not to re-navigate to the finder (we're already here).
+try {
+    if (typeof top !== 'undefined' && typeof top.clearPatient === 'function') {
+        top.clearPatient(false);
+    }
+} catch (e) { /* finder loaded outside EMR shell — nothing to clear */ }
+
+// Clicking a patient row needs to (a) paint header2 with the new patient
+// instantly — no waiting for demographics.php to round-trip — and
+// (b) navigate the main iframe to demographics so the chart loads.
 //
-// This matches the pattern OpenEMR's legacy dynamic_finder uses (see
-// dynamic_finder.original.php.bak): navigate top.RTop to demographics.php
-// with set_pid=N, which the OpenEMR session middleware interprets as
-// "switch active patient to N." demographics.php's onload then calls the
-// parent frame's setPatient JS hook, which redraws header2.
-function cpSelectPatient(pid) {
+// We achieve (a) by calling left_nav.setPatient directly from the
+// finder using data we've already rendered server-side (name, pid,
+// pubpid, str_dob, provider, insurance, allergies — see the row's
+// data-pdata attribute). That repaints header2 in the parent frame
+// immediately. demographics.php's own setMyPatient onload will later
+// call setPatient again with the same pid; left_nav.setPatient
+// short-circuits when the pid hasn't changed (frame_proxies.js:29),
+// so the second call only refreshes already-current data.
+//
+// We achieve (b) by also navigating top.RTop to demographics.php with
+// set_pid=N — the same idiom the legacy dynamic_finder uses. This
+// also tells the OpenEMR session middleware to switch the active
+// patient on the server side.
+function cpSelectPatient(rowEl) {
+    if (!rowEl) return;
+    var pid = parseInt(rowEl.getAttribute('data-pid') || '0', 10);
     if (!pid) return;
+
+    // (a) Update header2 immediately with the patient data we already have.
+    try {
+        var pdata = JSON.parse(rowEl.getAttribute('data-pdata') || '{}');
+        if (top && top.left_nav && typeof top.left_nav.setPatient === 'function') {
+            top.left_nav.setPatient(
+                pdata.pname || '',
+                pdata.pid,
+                pdata.pubpid || '',
+                '',
+                pdata.str_dob || '',
+                pdata.provider || '',
+                pdata.insurance || '',
+                Array.isArray(pdata.allergies) ? pdata.allergies : []
+            );
+        }
+    } catch (e) {
+        // setPatient call is the optimization path; if it fails we
+        // still navigate, demographics.php will paint header2 normally.
+    }
+
+    // (b) Navigate to demographics so the chart loads + the server-side
+    //     session active-patient gets set via set_pid.
     var target = "../../patient_file/summary/demographics.php?set_pid=" + encodeURIComponent(pid);
     if (top && top.RTop) {
         top.RTop.location = target;
