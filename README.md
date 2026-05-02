@@ -65,7 +65,7 @@ This is a **fork of OpenEMR** with three layered pieces of new work:
    Langfuse Datasets. Runs against the production agent.
 
 The OpenEMR skeleton underneath provides the database schema
-(MariaDB), the auth/session layer, and the surrounding clinical
+(MySQL/MariaDB-compatible), the auth/session layer, and the surrounding clinical
 workflow primitives. The fork is intentionally light-touch on the
 core OpenEMR code — almost all new files live in their own
 namespaces (`copilot_*.php`, `copilot/agent/`, `tests/.../Copilot/`)
@@ -77,7 +77,7 @@ so the fork stays mergeable with upstream.
 
 | Layer | Technology |
 |---|---|
-| EHR shell | OpenEMR 7.x (PHP 8.2+, MariaDB 10.11) |
+| EHR shell | OpenEMR 7.x (PHP 8.2+) — MySQL 9.4 in Railway envs, MariaDB 11.8 in local dev |
 | Agent runtime | Python 3.13, FastAPI, Anthropic SDK |
 | Agent model | Claude Sonnet 4.6 (production), Haiku 4.5 (eval judge) |
 | Patient data API | OpenEMR FHIR R4 endpoints |
@@ -106,7 +106,7 @@ so the fork stays mergeable with upstream.
                   │ JDBC                          FHIR R4  │  Anthropic
                   ▼                                        ▼  Messages API
         ┌────────────────────┐                   ┌────────────────────┐
-        │  MariaDB           │                   │ Claude (Sonnet 4.6)│
+        │  MySQL 9.4         │                   │ Claude (Sonnet 4.6)│
         │  (patients, encs,  │                   └────────────────────┘
         │   Rxs, vitals,     │                              │
         │   audit log, ...)  │                              │ trace
@@ -192,17 +192,43 @@ several compliance steps that are intentionally simplified here:
   storage layer — satisfies the addressable spec for the vast
   majority of HIPAA-aligned cloud deployments, and is the
   posture used by the major HIPAA-eligible cloud-EHR vendors.
-  Application-level (InnoDB tablespace) encryption with a
-  **customer-managed key** is *not* additionally enabled in
-  this demo. That additional layer is defense-in-depth — it
-  matters when a tenant's policy requires the customer (rather
-  than the cloud provider) to hold the data-encryption key, or
-  when the threat model includes a cloud-provider-side
-  compromise. It is not required for baseline HIPAA compliance.
+
+  **Why a customer-managed key was scoped out of this demo:**
+  the production database is currently running on the official
+  `mysql:9.4` Community image. MySQL Community's keyring
+  components do not include native HashiCorp Vault, AWS KMS,
+  or KMIP integration — those plugins are MySQL Enterprise
+  features. Adding a real KMS-backed customer-managed key
+  therefore requires (1) switching the image to MariaDB 11.x
+  (which ships `hashicorp_key_management`, `aws_key_management`,
+  and `kmip_key_management` in Community), (2) deploying
+  HashiCorp Vault as an additional Railway service to hold the
+  master key, (3) building a custom MariaDB Dockerfile to load
+  the plugin and configure `innodb_encrypt_tables`, (4)
+  migrating the existing data via `mysqldump` and re-running
+  `ALTER TABLE ... ENCRYPTION='Y'` on each app table, and
+  (5) repeating the rollout across Dev → QA → Prod with a
+  rollback path. End-to-end estimate: 7–10 hours of careful
+  work plus a maintenance window per environment.
+
+  Doing this on top of provider-managed disk encryption is
+  worthwhile when a tenant's policy requires the customer (not
+  the cloud provider) to hold the data-encryption key — but
+  the seal-key bootstrap problem follows you even into Vault:
+  Vault's own unseal keys have to live somewhere, and on a
+  pure-Railway deployment they end up in Railway env vars,
+  which moves the trust boundary from "Railway-managed disk
+  encryption" to "Railway-managed env-var storage." A
+  meaningful step beyond that requires sealing Vault with an
+  external KMS (AWS KMS, GCP KMS), which adds a separate cloud
+  signup + IAM surface area. For a one-week demo with no real
+  patient data, the marginal security gain didn't justify the
+  rollout risk in the remaining time. The path is documented
+  here so a future operator can pick it up.
 - **Access control** — uses OpenEMR's native ACL. The demo seeds
   realistic provider / nurse / front-desk / billing roles.
 - **Database least-privilege (QA + Prod)** — the Co-Pilot agent
-  connects to MariaDB as a dedicated `copilot_agent` user with
+  connects to MySQL as a dedicated `copilot_agent` user with
   exactly the privileges it needs and nothing else: `SELECT` on
   `patient_data` (for OpenEMR-pid → FHIR-UUID resolution) and
   column-level `UPDATE (login_fail_counter)` on `users_secure` (for
@@ -210,7 +236,7 @@ several compliance steps that are intentionally simplified here:
   cannot write any clinical data, and cannot escalate. Dev keeps
   root-level access for fast iteration.
 - **Database network isolation (QA + Prod)** — Railway's public
-  TCP proxy is disabled on both MariaDB instances. The DB is
+  TCP proxy is disabled on both MySQL instances. The DB is
   reachable only on `mysql.railway.internal` from inside the
   Railway project's private network. Compromising any DB
   credential now requires first compromising the Railway-side
