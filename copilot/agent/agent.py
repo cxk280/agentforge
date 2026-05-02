@@ -112,7 +112,7 @@ async def run_agent(
             ) as gen:
                 response = await client.messages.create(
                     model=settings.model,
-                    max_tokens=512,
+                    max_tokens=1024,
                     system=_system_blocks(patient_id),
                     tools=_TOOLS_CACHED,
                     messages=working_messages,
@@ -286,7 +286,7 @@ async def run_agent_stream(
             ) as gen:
                 async with client.messages.stream(
                     model=settings.model,
-                    max_tokens=512,
+                    max_tokens=1024,
                     system=_system_blocks(patient_id),
                     tools=_TOOLS_CACHED,
                     messages=working_messages,
