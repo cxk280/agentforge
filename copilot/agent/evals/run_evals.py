@@ -39,6 +39,8 @@ import httpx
 from anthropic import Anthropic
 from langfuse import Langfuse
 
+from redaction import redact
+
 DATASET_NAME = "copilot-golden-v1"
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
 DEFAULT_AGENT_ENDPOINT = "https://copilot-agent-production-41de.up.railway.app/chat"
@@ -265,6 +267,12 @@ def run() -> int:
 
         if lf:
             try:
+                # Redact PHI from the reply before it leaves the process —
+                # see SECURITY.md (S4). Patient names, DOBs, and other
+                # PHI shapes are scrubbed; the structural eval data
+                # (case_id, score, latency, judge reason) stays intact.
+                redacted_reply = redact(results[-1].reply)
+                redacted_judge_reason = redact(results[-1].judge_reason)
                 with lf.start_as_current_observation(
                     name="eval-case",
                     as_type="span",
@@ -274,11 +282,11 @@ def run() -> int:
                         "message": case["message"],
                     },
                 ) as span:
-                    span.update(output={"reply": results[-1].reply})
+                    span.update(output={"reply": redacted_reply})
                     lf.score_current_span(
                         name="judge-score",
                         value=results[-1].score,
-                        comment=results[-1].judge_reason,
+                        comment=redacted_judge_reason,
                     )
                     lf.score_current_span(
                         name="passed",

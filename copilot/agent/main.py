@@ -4,17 +4,38 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from agent import run_agent, run_agent_stream
 from fhir_client import fhir_get, bundle_entries, aclose_http_client
 from observability import flush as langfuse_flush
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+def _rate_limit_key(request: Request) -> str:
+    """Limit per session_id when present in the request body, else per IP.
+
+    Rate-limiting by IP alone gets ineffective behind a CDN / shared
+    NAT — every clinician at the same clinic looks like one limit
+    bucket. Pulling session_id out of the JSON body keeps each chat
+    session in its own bucket and keeps a noisy session from starving
+    its neighbours.
+    """
+    sid = getattr(request.state, "rate_limit_session_id", None)
+    if sid:
+        return f"sid:{sid}"
+    return f"ip:{get_remote_address(request)}"
+
+
+limiter = Limiter(key_func=_rate_limit_key)
 
 
 @asynccontextmanager
@@ -28,6 +49,47 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Clinical Co-Pilot", lifespan=lifespan)
+
+# Rate limiter — see _rate_limit_key for the per-session vs per-IP logic.
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": f"Rate limit exceeded: {exc.detail}"},
+    )
+
+
+@app.middleware("http")
+async def _security_headers(request: Request, call_next):
+    """Add CSP + standard hardening headers on every response.
+
+    The chat surface only renders model-generated text (sanitized via
+    structural-only markdown — see SECURITY.md S1) and never needs
+    inline scripts or remote origins. CSP gives us a backstop in case
+    a future change reintroduces an XSS sink.
+    """
+    response = await call_next(request)
+    response.headers.setdefault(
+        "Content-Security-Policy",
+        # script-src 'self' blocks inline <script>; img/style 'self' +
+        # data: covers the inline SVG icons the chat UI already uses.
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "frame-ancestors 'self'; "
+        "base-uri 'self'; "
+        "form-action 'self'",
+    )
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    return response
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,9 +111,14 @@ _pid_to_fhir_id: dict[str, str] = {}
 # ── Models ────────────────────────────────────────────────────────────────
 
 class ChatRequest(BaseModel):
-    session_id: str
-    patient_id: str
-    message: str
+    # Tight bounds on every field — defends T1 / T4 from SECURITY.md.
+    # session_id and patient_id are short identifiers; message is the
+    # user-typed prompt and gets a 4 KB ceiling (well above any
+    # plausible clinician question, well below anything that would
+    # blow up token spend).
+    session_id: str = Field(..., min_length=1, max_length=128)
+    patient_id: str = Field(..., min_length=1, max_length=128)
+    message: str = Field(..., min_length=1, max_length=4000)
 
 
 class ChatResponse(BaseModel):
@@ -130,9 +197,14 @@ async def resolve_patient(pid: str):
 
 
 @app.post("/chat", response_model=ChatResponse)
-async def chat(req: ChatRequest):
+@limiter.limit("30/minute")
+async def chat(request: Request, req: ChatRequest):
     if not req.patient_id:
         raise HTTPException(status_code=400, detail="patient_id is required")
+
+    # Hand the limiter the session_id so the rate window is per session
+    # rather than per IP (see _rate_limit_key docstring).
+    request.state.rate_limit_session_id = req.session_id
 
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
@@ -176,7 +248,8 @@ async def _resolve_fhir_id(patient_id: str) -> str:
 
 
 @app.post("/chat/stream")
-async def chat_stream(req: ChatRequest):
+@limiter.limit("30/minute")
+async def chat_stream(request: Request, req: ChatRequest):
     """Stream the agent response as NDJSON events.
 
     Each line is one JSON object. Event types:
@@ -184,6 +257,8 @@ async def chat_stream(req: ChatRequest):
     """
     if not req.patient_id:
         raise HTTPException(status_code=400, detail="patient_id is required")
+
+    request.state.rate_limit_session_id = req.session_id
 
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
