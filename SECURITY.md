@@ -162,7 +162,70 @@ one-week sprint but should land before any real clinical deployment.
 | **Cross-session anomaly detection** (alert on usage spikes, repeated identical prompts, sudden cost jumps) | T4 | Needs a Langfuse query scheduler; punted to "after demo" |
 | **Per-clinician identity in `/chat` requests** (currently all chat happens as the agent's single OAuth principal) | T2, T3 | Today the OpenEMR session cookie is the only clinician-identity signal; the agent doesn't pass it through. Real deployment needs each chat tied to the requesting clinician for audit |
 | **Anthropic + Langfuse BAA** | T2 | Operational, not code |
-| **Customer-managed key for at-rest encryption on MySQL** (deferred — see README compliance section for the migration path) | T2 | Belt-and-suspenders — Railway's underlying GCP volumes are already encrypted at rest. Adding a customer-managed key requires switching the DB image to MariaDB 11 (which has the `hashicorp_key_management` plugin) and standing up Vault as a separate Railway service. Scoped out of the demo for time + low marginal real-world security benefit on a Railway-only deployment |
+| **Customer-managed key for at-rest encryption on MySQL** (punted; see "Why we punted on the customer-managed key migration" below) | T2 | Marginal real-world security benefit on a Railway-only deployment + 7–10h of careful migration work |
+
+---
+
+### Why we punted on the customer-managed key migration
+
+The existing posture is **provider-managed encryption at rest**:
+Railway runs on Google Cloud Platform, and every Railway volume sits
+on a GCE persistent disk that's encrypted at rest by default with a
+GCP-managed key. Railway is HIPAA-certified and SOC 2 Type 2 / SOC 3
+attested. Per the HIPAA Security Rule (§164.312(a)(2)(iv) and
+§164.312(e)(2)(ii)), encryption at rest is an *addressable*
+implementation specification, and provider-managed disk encryption
+combined with a signed BAA satisfies the addressable spec for the
+vast majority of HIPAA-aligned cloud deployments. That's the
+baseline this demo runs on.
+
+Adding a **customer-managed key** on top would mean the *customer*
+(not the cloud provider) holds the data-encryption key. That matters
+when (a) tenancy policy explicitly requires customer-held keys, or
+(b) the threat model includes a cloud-provider-side compromise. For
+this one-week demo with no real PHI it does not materially raise
+the security floor.
+
+**What the migration would entail (documented for any future
+operator who picks this up):**
+
+1. **Switch the DB image to MariaDB 11.x.** MySQL 9.4 Community —
+   which we now run in every environment — does not include the
+   HashiCorp Vault, AWS KMS, or KMIP keyring plugins. Those are
+   MySQL Enterprise features. MariaDB 11.x ships
+   `hashicorp_key_management`, `aws_key_management`, and
+   `kmip_key_management` in its Community build.
+2. **Deploy HashiCorp Vault as a Railway service** (one per
+   environment) to hold the master encryption key. Vault's own
+   unseal keys would live in Railway env vars unless we further
+   chain the seal to an external KMS like AWS or GCP KMS — that
+   chained-KMS step is the only way to escape the
+   "trust-Railway-env-vars" boundary.
+3. **Build a custom MariaDB Dockerfile** that loads the
+   `hashicorp_key_management` plugin and sets
+   `innodb_encrypt_tables=ON`, `innodb_encrypt_log=ON`,
+   `innodb_encryption_threads=4`.
+4. **Migrate existing data**: `mysqldump` from MySQL → restore
+   into MariaDB → run `ALTER TABLE ... ENCRYPTION='Y'` on each app
+   table.
+5. **Roll out across Dev → QA → Prod** with a rollback path for
+   each environment.
+
+**Honest cost/benefit:** end-to-end this is 7–10 hours of careful
+work plus a maintenance window per environment. The seal-key
+bootstrap problem (#2) means that without an external-KMS-sealed
+Vault, the trust boundary moves only from "Railway-managed disk
+encryption" to "Railway-managed env-var storage" — both are still
+trusting Railway. A meaningful step beyond requires AWS KMS or GCP
+KMS as the seal source, adding another cloud signup + IAM surface.
+For a one-week sprint with a noon-CT demo deadline, the marginal
+security gain didn't justify the rollout risk in the remaining
+time.
+
+This decision should be revisited if (a) AgentForge moves beyond
+demo into a real clinical deployment, or (b) any tenant's policy
+requires customer-held DEKs — in either case, follow steps 1–5
+above.
 
 ---
 
