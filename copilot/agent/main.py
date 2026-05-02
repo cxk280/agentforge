@@ -1,6 +1,7 @@
 """FastAPI entry point for the Clinical Co-Pilot agent."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -62,6 +63,22 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded):
     )
 
 
+# Origins allowed to iframe the Co-Pilot chat surface. The agent is
+# embedded inside OpenEMR's `interface/copilot/index.php`, which lives
+# on a different port (or in prod a different host) than the agent —
+# so 'self' is not enough. Configurable via env so prod can list its
+# own OpenEMR origins. Defaults cover local dev (localhost:8300/9300)
+# plus the demo's Railway and custom-domain prod URLs.
+_DEFAULT_IFRAME_ORIGINS = (
+    "http://localhost:8300 https://localhost:9300 "
+    "https://openemr-production-971e.up.railway.app "
+    "https://app.agentforgedemo.com"
+)
+_FRAME_ANCESTORS = "'self' " + os.environ.get(
+    "ALLOWED_IFRAME_ORIGINS", _DEFAULT_IFRAME_ORIGINS
+).strip()
+
+
 @app.middleware("http")
 async def _security_headers(request: Request, call_next):
     """Add CSP + standard hardening headers on every response.
@@ -70,6 +87,16 @@ async def _security_headers(request: Request, call_next):
     structural-only markdown — see SECURITY.md S1) and never needs
     inline scripts or remote origins. CSP gives us a backstop in case
     a future change reintroduces an XSS sink.
+
+    Note on `frame-ancestors`: the Co-Pilot is iframed by OpenEMR's
+    `interface/copilot/index.php`, which is served from a different
+    origin (different port locally, different host in prod). `'self'`
+    is not enough — we explicitly allow the OpenEMR origins via the
+    `ALLOWED_IFRAME_ORIGINS` env var (defaults cover local + the
+    Railway prod URLs). We do NOT also send `X-Frame-Options` because
+    that header has no allow-list form (only DENY / SAMEORIGIN /
+    deprecated ALLOW-FROM); modern browsers prefer CSP's
+    `frame-ancestors` and ignore X-Frame-Options when CSP is present.
     """
     response = await call_next(request)
     response.headers.setdefault(
@@ -81,13 +108,12 @@ async def _security_headers(request: Request, call_next):
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "connect-src 'self'; "
-        "frame-ancestors 'self'; "
+        f"frame-ancestors {_FRAME_ANCESTORS}; "
         "base-uri 'self'; "
         "form-action 'self'",
     )
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("Referrer-Policy", "no-referrer")
-    response.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
     return response
 
 
@@ -129,8 +155,6 @@ class ChatResponse(BaseModel):
 
 
 # ── Routes ────────────────────────────────────────────────────────────────
-
-import os
 
 _BUILD_MARKER = "loinc+limit50+stream-2026-05-02"
 
