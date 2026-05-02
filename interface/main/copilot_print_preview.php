@@ -1053,7 +1053,7 @@ foreach ($output_types as $ot) {
           <h2><?php echo text($selectedTypeLabel); ?></h2>
           <p><?php echo xlt('This output type is coming soon. For now, use the existing OpenEMR print route.'); ?></p>
           <?php if ($selectedTypeExternal): ?>
-            <a href="<?php echo attr($selectedTypeExternal); ?>" target="_top">
+            <a href="<?php echo attr($selectedTypeExternal); ?>" target="_self">
               <?php echo xlt('Open existing print route'); ?> →
             </a>
           <?php else: ?>

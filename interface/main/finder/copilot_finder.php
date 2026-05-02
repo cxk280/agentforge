@@ -566,7 +566,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
              autocomplete="off">
     </label>
   </form>
-  <a class="cp-pf-new" href="../../new/new.php" target="_top" role="button">
+  <a class="cp-pf-new" href="/interface/new/copilot_new_patient.php" target="_self" role="button">
     <span class="cp-pf-new-plus">+</span>
     <span><?php echo xlt('New Patient'); ?></span>
   </a>

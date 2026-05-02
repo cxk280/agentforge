@@ -149,7 +149,7 @@ $groups = [
       <h2><?php echo text(strtoupper($title)); ?></h2>
       <div class="cp-mi-list">
         <?php foreach ($items as [$lbl, $href]): ?>
-          <a class="cp-mi-item" href="<?php echo attr($href); ?>" target="_top">
+          <a class="cp-mi-item" href="<?php echo attr($href); ?>" target="_self">
             <span><?php echo text($lbl); ?></span>
             <span class="arrow">→</span>
           </a>

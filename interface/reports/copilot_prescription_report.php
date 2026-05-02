@@ -585,20 +585,7 @@ $buildUrl = static function (array $overrides) use ($selfPath, $range, $tab): st
 </head>
 <body class="cp-arch">
 
-<div class="cp-shell">
-  <aside class="cp-rep-side">
-    <div class="header"><?php echo xlt('REPORTS'); ?></div>
-    <?php foreach ($sidebar as $cat => $items): ?>
-      <div class="grp">
-        <div class="lbl"><?php echo text(ucfirst(strtolower((string)$cat))); ?></div>
-        <?php foreach ($items as [$nm, $act]): ?>
-          <a href="#" class="item<?php echo $act ? ' active' : ''; ?>"><?php echo text($nm); ?></a>
-        <?php endforeach; ?>
-      </div>
-    <?php endforeach; ?>
-  </aside>
-
-  <div style="flex:1 1 auto; display:flex; flex-direction:column; min-width:0;">
+<div class="cp-shell" style="flex-direction:column;">
     <header class="cp-pagehead">
       <div class="info">
         <div style="display:flex; align-items:center; gap:8px;">
@@ -773,7 +760,6 @@ $buildUrl = static function (array $overrides) use ($selfPath, $range, $tab): st
       </div>
 
     </main>
-  </div>
 </div>
 
 </body>

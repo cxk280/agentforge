@@ -319,7 +319,7 @@ $activity = [
 
   <aside class="cp-adm-sidebar">
     <?php foreach ($categories as $c): ?>
-      <a class="cp-adm-cat<?php echo $c[1] ? ' active' : ''; ?>" href="<?php echo attr($c[2]); ?>" target="_top">
+      <a class="cp-adm-cat<?php echo $c[1] ? ' active' : ''; ?>" href="<?php echo attr($c[2]); ?>" target="_self">
         <?php echo text($c[0]); ?>
       </a>
     <?php endforeach; ?>
@@ -349,7 +349,7 @@ $activity = [
           <div class="cp-adm-panel-title"><?php echo xlt('Quick Actions'); ?></div>
         </div>
         <?php foreach ($quickActions as $a): ?>
-          <a class="cp-adm-action" href="<?php echo attr($a[3]); ?>" target="_top">
+          <a class="cp-adm-action" href="<?php echo attr($a[3]); ?>" target="_self">
             <span class="cp-adm-action-icon"><?php echo $a[0]; ?></span>
             <div class="cp-adm-action-text">
               <div class="cp-adm-action-title"><?php echo text($a[1]); ?></div>
@@ -365,7 +365,7 @@ $activity = [
           <div class="cp-adm-panel-title"><?php echo xlt('System'); ?></div>
         </div>
         <?php foreach ($systemActions as $a): ?>
-          <a class="cp-adm-action" href="<?php echo attr($a[3]); ?>" target="_top">
+          <a class="cp-adm-action" href="<?php echo attr($a[3]); ?>" target="_self">
             <span class="cp-adm-action-icon"><?php echo $a[0]; ?></span>
             <div class="cp-adm-action-text">
               <div class="cp-adm-action-title"><?php echo text($a[1]); ?></div>
@@ -383,7 +383,7 @@ $activity = [
       <div class="cp-adm-activity-head">
         <div class="cp-adm-activity-title"><?php echo xlt('Recent Admin Activity'); ?></div>
         <div class="cp-adm-activity-spacer"></div>
-        <a class="cp-adm-activity-link" href="/interface/super/copilot_audit.php" target="_top"><?php echo xlt('View all →'); ?></a>
+        <a class="cp-adm-activity-link" href="/interface/super/copilot_audit.php" target="_self"><?php echo xlt('View all →'); ?></a>
       </div>
       <?php foreach ($activity as $row): ?>
         <div class="cp-adm-activity-row">

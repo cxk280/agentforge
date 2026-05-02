@@ -214,7 +214,7 @@ $sections = [
       ?>
       <div class="cp-rep-grid<?php echo (count($sec['cards']) === 4) ? ' cols-4' : ''; ?>">
         <?php foreach ($sec['cards'] as $card): ?>
-          <a class="cp-rep-card" href="<?php echo attr($card[3]); ?>" target="_top">
+          <a class="cp-rep-card" href="<?php echo attr($card[3]); ?>" target="_self">
             <span class="cp-rep-icon" style="background-color: <?php echo attr($iconBg); ?>;"><?php echo $card[0]; ?></span>
             <div class="cp-rep-icon-spacer"></div>
             <div class="cp-rep-card-title"><?php echo text($card[1]); ?></div>
