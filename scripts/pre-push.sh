@@ -80,14 +80,32 @@ else
         "${EVAL_VENV}/bin/pip" install -q -r "${EVAL_DIR}/requirements.txt"
     fi
 
+    # Capture output so we can gate on pass count, not just exit code.
+    # run_evals.py exits 1 on any single failure, but Haiku-as-judge
+    # introduces ~10% per-case variance — a single failed case isn't
+    # signal of a regression. CI's eval-smoke-dev job uses min_pass=4,
+    # we match that here.
+    SMOKE_LOG=$(mktemp)
+    trap 'rm -f "$SMOKE_LOG"' EXIT
     "${EVAL_VENV}/bin/python" "${EVAL_DIR}/run_evals.py" --smoke --no-langfuse \
-        || {
-            echo "" >&2
-            echo "✗ pre-push: eval smoke failed against production Co-Pilot." >&2
-            echo "  This usually means the LAST push broke the agent — investigate" >&2
-            echo "  before pushing more on top." >&2
-            echo "  To bypass intentionally: COPILOT_SKIP_EVAL_SMOKE=1 git push" >&2
-            exit 1
-        }
-    echo "✓ pre-push: eval smoke passed."
+        | tee "$SMOKE_LOG" || true
+    PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" "$SMOKE_LOG" \
+             | awk '{print $2}' | cut -d/ -f1)
+    REQUIRED=4
+    if [[ -z "${PASSED:-}" ]]; then
+        echo "" >&2
+        echo "✗ pre-push: eval smoke could not parse a TOTAL line." >&2
+        echo "  Likely the agent endpoint is unreachable. Investigate or skip:" >&2
+        echo "  COPILOT_SKIP_EVAL_SMOKE=1 git push" >&2
+        exit 1
+    fi
+    if (( PASSED < REQUIRED )); then
+        echo "" >&2
+        echo "✗ pre-push: eval smoke passed ${PASSED}/5 (require ${REQUIRED}/5)." >&2
+        echo "  More than one failure suggests a real regression — investigate" >&2
+        echo "  before pushing more on top." >&2
+        echo "  To bypass intentionally: COPILOT_SKIP_EVAL_SMOKE=1 git push" >&2
+        exit 1
+    fi
+    echo "✓ pre-push: eval smoke passed (${PASSED}/5, threshold ${REQUIRED}/5)."
 fi
