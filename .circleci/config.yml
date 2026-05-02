@@ -202,14 +202,16 @@ jobs:
           smoke: true
           min_pass: 4
 
+  # Pipeline only redeploys the copilot-agent service. OpenEMR is
+  # stable infrastructure (rarely changes) and redeploying it risks
+  # wiping the seeded MariaDB volume, which blows away demo data and
+  # forces a manual re-seed. To redeploy OpenEMR, do it manually via
+  # `railway up --service openemr` from a workstation.
   deploy-dev:
     executor: railway
     steps:
       - checkout
       - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_DEV
       - railway-deploy:
           service: copilot-agent
           env_token: RAILWAY_TOKEN_DEV
@@ -226,9 +228,6 @@ jobs:
     steps:
       - checkout
       - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_QA
       - railway-deploy:
           service: copilot-agent
           env_token: RAILWAY_TOKEN_QA
@@ -254,9 +253,6 @@ jobs:
     steps:
       - checkout
       - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_PROD
       - railway-deploy:
           service: copilot-agent
           env_token: RAILWAY_TOKEN_PROD
