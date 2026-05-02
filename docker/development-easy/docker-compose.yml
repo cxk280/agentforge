@@ -1,8 +1,11 @@
 services:
   mysql:
     restart: always
-    image: mariadb:11.8.6@sha256:78a5047d3ba33975f183f183c2464cc7f1eab13ec8667e57cc9a5821d6da7577
-    command: ['mariadbd', '--character-set-server=utf8mb4', '--ssl-ca=/etc/ssl/ca.pem', '--ssl_cert=/etc/ssl/server-cert.pem', '--ssl_key=/etc/ssl/server-key.pem']
+    # AgentForge runs MySQL 9.4 in every Railway environment (dev / qa / prod).
+    # Local dev tracks the same image so we don't get "works locally, breaks on
+    # Railway" surprises from MySQL/MariaDB dialect drift.
+    image: mysql:9.4
+    command: ['mysqld', '--character-set-server=utf8mb4', '--ssl-ca=/etc/ssl/ca.pem', '--ssl-cert=/etc/ssl/server-cert.pem', '--ssl-key=/etc/ssl/server-key.pem']
     ports:
     - "${WT_MYSQL_PORT:-8320}:3306"
     volumes:
@@ -13,12 +16,9 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: root
     healthcheck:
-      test:
-      - CMD
-      - /usr/local/bin/healthcheck.sh
-      - --su-mysql
-      - --connect
-      - --innodb_initialized
+      # MariaDB shipped /usr/local/bin/healthcheck.sh; MySQL does not.
+      # mysqladmin ping is the standard MySQL liveness probe.
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-proot"]
       start_period: 1m
       start_interval: 10s
       interval: 1m

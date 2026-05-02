@@ -65,7 +65,7 @@ This is a **fork of OpenEMR** with three layered pieces of new work:
    Langfuse Datasets. Runs against the production agent.
 
 The OpenEMR skeleton underneath provides the database schema
-(MySQL/MariaDB-compatible), the auth/session layer, and the surrounding clinical
+(MySQL), the auth/session layer, and the surrounding clinical
 workflow primitives. The fork is intentionally light-touch on the
 core OpenEMR code — almost all new files live in their own
 namespaces (`copilot_*.php`, `copilot/agent/`, `tests/.../Copilot/`)
@@ -77,7 +77,7 @@ so the fork stays mergeable with upstream.
 
 | Layer | Technology |
 |---|---|
-| EHR shell | OpenEMR 7.x (PHP 8.2+) — MySQL 9.4 in Railway envs, MariaDB 11.8 in local dev |
+| EHR shell | OpenEMR 7.x (PHP 8.2+, MySQL 9.4) |
 | Agent runtime | Python 3.13, FastAPI, Anthropic SDK |
 | Agent model | Claude Sonnet 4.6 (production), Haiku 4.5 (eval judge) |
 | Patient data API | OpenEMR FHIR R4 endpoints |
@@ -194,22 +194,23 @@ several compliance steps that are intentionally simplified here:
   posture used by the major HIPAA-eligible cloud-EHR vendors.
 
   **Why a customer-managed key was scoped out of this demo:**
-  the production database is currently running on the official
-  `mysql:9.4` Community image. MySQL Community's keyring
-  components do not include native HashiCorp Vault, AWS KMS,
-  or KMIP integration — those plugins are MySQL Enterprise
-  features. Adding a real KMS-backed customer-managed key
-  therefore requires (1) switching the image to MariaDB 11.x
-  (which ships `hashicorp_key_management`, `aws_key_management`,
-  and `kmip_key_management` in Community), (2) deploying
-  HashiCorp Vault as an additional Railway service to hold the
-  master key, (3) building a custom MariaDB Dockerfile to load
-  the plugin and configure `innodb_encrypt_tables`, (4)
-  migrating the existing data via `mysqldump` and re-running
-  `ALTER TABLE ... ENCRYPTION='Y'` on each app table, and
-  (5) repeating the rollout across Dev → QA → Prod with a
-  rollback path. End-to-end estimate: 7–10 hours of careful
-  work plus a maintenance window per environment.
+  the database runs on the official `mysql:9.4` Community
+  image (matched across local dev + Railway dev/qa/prod).
+  MySQL Community's keyring components do not include native
+  HashiCorp Vault, AWS KMS, or KMIP integration — those
+  plugins are MySQL Enterprise features. Adding a real
+  KMS-backed customer-managed key therefore requires
+  (1) switching the image to MariaDB 11.x (which ships
+  `hashicorp_key_management`, `aws_key_management`, and
+  `kmip_key_management` in Community), (2) deploying
+  HashiCorp Vault as an additional Railway service to hold
+  the master key, (3) building a custom MariaDB Dockerfile to
+  load the plugin and configure `innodb_encrypt_tables`,
+  (4) migrating the existing data via `mysqldump` and
+  re-running `ALTER TABLE ... ENCRYPTION='Y'` on each app
+  table, and (5) repeating the rollout across Dev → QA →
+  Prod with a rollback path. End-to-end estimate: 7–10 hours
+  of careful work plus a maintenance window per environment.
 
   Doing this on top of provider-managed disk encryption is
   worthwhile when a tenant's policy requires the customer (not

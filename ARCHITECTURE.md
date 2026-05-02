@@ -6,7 +6,7 @@ The Clinical Co-Pilot is a Python FastAPI sidecar service that runs alongside Op
 
 **Why a sidecar service, not a PHP module:** OpenEMR is a synchronous PHP monolith. Streaming LLM responses and managing multi-turn conversation state in PHP is possible but painful. A Python sidecar gives us async-native streaming (FastAPI + httpx), clean tool use patterns with the Anthropic SDK, and a deployment unit we can iterate on independently of OpenEMR's PHP build. The PHP footprint in OpenEMR is minimal: one new page (`interface/patient_file/summary/copilot.php`) that renders the iframe and passes the patient ID and session identity.
 
-**Why FHIR over direct DB access:** The FHIR R4 endpoints normalize OpenEMR's messy underlying data (free-text dosages, mixed date formats, inconsistent nulls) into structured FHIR resources. They enforce OAuth scopes, so the agent's data access is explicitly bounded at the API layer. They also make the agent portable — if a future deployment uses a different FHIR-compliant EHR, the tools need only a URL change. Direct DB access would tie us to MariaDB schema details and bypass the ACL system.
+**Why FHIR over direct DB access:** The FHIR R4 endpoints normalize OpenEMR's messy underlying data (free-text dosages, mixed date formats, inconsistent nulls) into structured FHIR resources. They enforce OAuth scopes, so the agent's data access is explicitly bounded at the API layer. They also make the agent portable — if a future deployment uses a different FHIR-compliant EHR, the tools need only a URL change. Direct DB access would tie us to OpenEMR's MySQL schema details and bypass the ACL system.
 
 **Authorization design:** The agent backend validates the physician's OpenEMR session by calling OpenEMR's token introspection endpoint. It never issues its own tokens — it inherits the session user's identity and resolves it to an OAuth access token with only the scopes needed for that user's role. A physician gets `user/Patient.rs user/Observation.rs user/MedicationRequest.rs user/Condition.rs user/AllergyIntolerance.rs user/Encounter.rs`. Tool calls are gated by a middleware check that confirms the requested patient is accessible to the requesting user.
 
@@ -35,7 +35,7 @@ The Clinical Co-Pilot is a Python FastAPI sidecar service that runs alongside Op
 │         │◄──────────────────┘ (external)            │
 │         │                                           │
 │  ┌──────▼───────┐    ┌──────────────┐              │
-│  │   mariadb    │    │  langfuse    │              │
+│  │  mysql 9.4   │    │  langfuse    │              │
 │  │   :8320      │    │  (traces)    │              │
 │  └──────────────┘    └──────────────┘              │
 └─────────────────────────────────────────────────────┘
@@ -82,7 +82,7 @@ Physician browser session
     → copilot.php (OpenEMR session validated)
         → Agent backend (session introspected, role resolved)
             → FHIR API (OAuth token with role-appropriate scopes)
-                → MariaDB (ACL enforced by OpenEMR service layer)
+                → MySQL (ACL enforced by OpenEMR service layer)
 ```
 
 ---

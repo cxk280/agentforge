@@ -188,7 +188,7 @@ def slide_system_diagram(prs):
 
     box("OpenEMR",   "PHP + Apache  :8300/:9300",  Inches(0.6),  Inches(1.4), Inches(3.2), Inches(1.0))
     box("Copilot",   "Python FastAPI  :8400",        Inches(4.6),  Inches(1.4), Inches(3.2), Inches(1.0), TEAL)
-    box("MariaDB",   ":8320",                        Inches(0.6),  Inches(3.2), Inches(3.2), Inches(0.9))
+    box("MySQL",   ":8320",                        Inches(0.6),  Inches(3.2), Inches(3.2), Inches(0.9))
     box("Langfuse",  "Traces  :3000",                Inches(4.6),  Inches(3.2), Inches(3.2), Inches(0.9))
     box("Claude API","External / Anthropic",         Inches(8.6),  Inches(1.4), Inches(4.2), Inches(0.9), AMBER)
 
@@ -210,8 +210,8 @@ def slide_system_diagram(prs):
     # legend
     add_rect(slide, Inches(0.5), Inches(4.5), Inches(12.3), Inches(0.04), TEAL)
     add_bullets(slide, [
-        ("Physician browser → copilot.php (OpenEMR) → Agent backend → FHIR API → MariaDB", 0),
-        ("Agent never touches MariaDB directly — all data access via FHIR R4 REST", 1),
+        ("Physician browser → copilot.php (OpenEMR) → Agent backend → FHIR API → MySQL", 0),
+        ("Agent never touches MySQL directly — all data access via FHIR R4 REST", 1),
     ], Inches(0.5), Inches(4.6), Inches(12.3), Inches(2.5), base_size=14)
 
 
@@ -318,7 +318,7 @@ def slide_fhir_over_db(prs):
     ], Inches(0.5), Inches(1.7), Inches(5.7), Inches(5.0), base_size=14)
 
     add_bullets(slide, [
-        ("Tied to MariaDB schema internals", 0),
+        ("Tied to MySQL schema internals", 0),
         ("Schema changes break the agent", 1),
         ("Bypasses OpenEMR's ACL system", 0),
         ("phpGACL not enforced on raw SQL", 1),
@@ -390,7 +390,7 @@ def slide_auth(prs):
         "FHIR API",
         "(OAuth scopes)",
         "     ↓",
-        "MariaDB",
+        "MySQL",
         "(ACL enforced)",
     ]
     add_text_box(slide, "\n".join(chain),
@@ -441,18 +441,18 @@ def slide_verification(prs):
 
 
 def slide_tech_justification(prs):
-    """Why MariaDB, FastAPI, and httpx vs alternatives."""
+    """Why MySQL, FastAPI, and httpx vs alternatives."""
     slide = prs.slides.add_slide(blank_layout(prs))
     fill_bg(slide, LIGHT)
     slide_header(slide, "Technology Choices — Why These, Not Others")
 
-    # MariaDB
+    # MySQL
     add_rect(slide, Inches(0.4), Inches(1.25), Inches(12.5), Inches(0.35), TEAL)
-    add_text_box(slide, "MariaDB",
+    add_text_box(slide, "MySQL",
                  Inches(0.5), Inches(1.27), Inches(12.0), Inches(0.3),
                  font_size=14, bold=True, color=WHITE)
     add_bullets(slide, [
-        ("OpenEMR requires it — the codebase was built and tested against MySQL/MariaDB semantics; PostgreSQL is not supported", 0),
+        ("OpenEMR requires it — the codebase was built and tested against MySQL/MySQL semantics; PostgreSQL is not supported", 0),
         ("Strict SQL mode enforces data integrity at the database layer — bad values are rejected, not silently coerced", 0),
         ("MySQL-compatible wire protocol: Railway production runs MySQL 9.4, zero code changes required", 0),
     ], Inches(0.5), Inches(1.65), Inches(12.0), Inches(1.1), base_size=13)

@@ -308,9 +308,9 @@ def audit_architecture(prs):
     panel(slide, "System Layers",
           [
               ("UI layer (/interface/) → Service layer (/src/Services/)", 0),
-              ("REST/FHIR API (/apis/ + /src/RestControllers/) → Service layer → MariaDB", 0),
+              ("REST/FHIR API (/apis/ + /src/RestControllers/) → Service layer → MySQL", 0),
               ("No domain model / ORM — thin services over raw SQL via QueryUtils / sqlQuery()", 0),
-              ("Agent path: OAuth token → FHIR API → RestController → Service → MariaDB", 0),
+              ("Agent path: OAuth token → FHIR API → RestController → Service → MySQL", 0),
           ],
           Inches(0.4), Inches(1.2), Inches(5.8), Inches(2.7), base=13)
 

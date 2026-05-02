@@ -162,7 +162,7 @@ one-week sprint but should land before any real clinical deployment.
 | **Cross-session anomaly detection** (alert on usage spikes, repeated identical prompts, sudden cost jumps) | T4 | Needs a Langfuse query scheduler; punted to "after demo" |
 | **Per-clinician identity in `/chat` requests** (currently all chat happens as the agent's single OAuth principal) | T2, T3 | Today the OpenEMR session cookie is the only clinician-identity signal; the agent doesn't pass it through. Real deployment needs each chat tied to the requesting clinician for audit |
 | **Anthropic + Langfuse BAA** | T2 | Operational, not code |
-| **Encryption at rest on MariaDB** (#54 in our task list, in flight) | T2 | Belt-and-suspenders — Railway already encrypts disks; per-tablespace encryption is the next layer |
+| **Customer-managed key for at-rest encryption on MySQL** (deferred — see README compliance section for the migration path) | T2 | Belt-and-suspenders — Railway's underlying GCP volumes are already encrypted at rest. Adding a customer-managed key requires switching the DB image to MariaDB 11 (which has the `hashicorp_key_management` plugin) and standing up Vault as a separate Railway service. Scoped out of the demo for time + low marginal real-world security benefit on a Railway-only deployment |
 
 ---
 

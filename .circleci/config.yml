@@ -45,7 +45,7 @@ executors:
         environment:
           OE_USER: admin
           OE_PASS: pass
-      - image: mariadb:10.11
+      - image: mysql:9.4
         environment:
           MYSQL_ROOT_PASSWORD: openemr
           MYSQL_DATABASE: openemr
@@ -204,7 +204,7 @@ jobs:
 
   # Pipeline only redeploys the copilot-agent service. OpenEMR is
   # stable infrastructure (rarely changes) and redeploying it risks
-  # wiping the seeded MariaDB volume, which blows away demo data and
+  # wiping the seeded MySQL volume, which blows away demo data and
   # forces a manual re-seed. To redeploy OpenEMR, do it manually via
   # `railway up --service openemr` from a workstation.
   deploy-dev:

@@ -79,7 +79,7 @@ Total first-boot time: ~10–15 minutes. This is a one-time cost; subsequent sta
 
 - **PHP monolith:** Every request is a full PHP bootstrap. No persistent process like Node or Gunicorn — each request re-initializes framework state
 - **No built-in caching layer:** No Redis/Memcached in the default stack. Repeated queries for the same patient hit the DB every time
-- **ORM pattern:** Services use raw SQL queries against MariaDB. Complex patient summaries (labs + meds + notes) require multiple sequential queries
+- **ORM pattern:** Services use raw SQL queries against MySQL. Complex patient summaries (labs + meds + notes) require multiple sequential queries
 - **N+1 risk:** Encounter list queries that then individually fetch notes per encounter are a known pattern in the codebase
 
 ### Agent Response Latency Implications
@@ -122,9 +122,9 @@ OpenEMR is a PHP monolith organized as:
 ### Data Flow
 
 ```
-Browser → PHP page (/interface/) → Service (/src/Services/) → MariaDB
-Browser → REST API (/apis/) → RestController → Service → MariaDB
-Agent → OAuth token → FHIR/REST API → RestController → Service → MariaDB
+Browser → PHP page (/interface/) → Service (/src/Services/) → MySQL
+Browser → REST API (/apis/) → RestController → Service → MySQL
+Agent → OAuth token → FHIR/REST API → RestController → Service → MySQL
 ```
 
 ### Integration Points for AI Layer
