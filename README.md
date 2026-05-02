@@ -183,11 +183,22 @@ several compliance steps that are intentionally simplified here:
   encrypted at-rest on the storage level... at the lowest
   level."* Railway is **HIPAA-certified** and **SOC 2 Type 2 +
   SOC 3 attested** (Trust Center: https://trust.railway.com).
-  Application-level (InnoDB tablespace) encryption with an
-  app-managed key is **not** additionally enabled for this
-  demo — adding it on top of provider-managed encryption is
-  defense-in-depth, not a baseline HIPAA requirement, and the
-  demo's BAA premise covers the existing posture.
+
+  **HIPAA compliance note:** under the HIPAA Security Rule,
+  encryption at rest is an *addressable* implementation
+  specification (§164.312(a)(2)(iv) and §164.312(e)(2)(ii)),
+  not a strict requirement. Cloud-provider-managed disk
+  encryption — combined with a signed BAA covering the
+  storage layer — satisfies the addressable spec for the vast
+  majority of HIPAA-aligned cloud deployments, and is the
+  posture used by the major HIPAA-eligible cloud-EHR vendors.
+  Application-level (InnoDB tablespace) encryption with a
+  **customer-managed key** is *not* additionally enabled in
+  this demo. That additional layer is defense-in-depth — it
+  matters when a tenant's policy requires the customer (rather
+  than the cloud provider) to hold the data-encryption key, or
+  when the threat model includes a cloud-provider-side
+  compromise. It is not required for baseline HIPAA compliance.
 - **Access control** — uses OpenEMR's native ACL. The demo seeds
   realistic provider / nurse / front-desk / billing roles.
 - **Database least-privilege (QA + Prod)** — the Co-Pilot agent
@@ -207,8 +218,10 @@ several compliance steps that are intentionally simplified here:
 
 If you are evaluating this for production use, the remaining
 homework is signing the BAAs (with Anthropic, Langfuse, and
-New Relic) and adding application-level InnoDB tablespace
-encryption if a customer-managed key is required by policy.
+New Relic). Application-level InnoDB tablespace encryption
+with a customer-managed key is only needed if your tenancy
+or policy requires it — provider-managed encryption-at-rest
+plus a BAA satisfies baseline HIPAA on its own.
 
 ---
 
