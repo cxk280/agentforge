@@ -173,8 +173,21 @@ several compliance steps that are intentionally simplified here:
 - **Audit logging** — every tool call from the Co-Pilot agent
   flows through OpenEMR's existing `log` table, so PHI access is
   traceable to the authenticated user.
-- **Encryption** — TLS in transit (Railway-managed certs); MariaDB
-  at-rest encryption is **not** enabled in this demo.
+- **Encryption in transit** — TLS for browser → OpenEMR, browser →
+  Co-Pilot agent, and agent → Anthropic API (Railway-managed
+  certificates).
+- **Encryption at rest** — provided by Railway's underlying
+  Google Cloud Platform infrastructure: GCE persistent-disk
+  encryption is on by default for every Railway volume. Per
+  Railway's official statement: *"All data that you hold is
+  encrypted at-rest on the storage level... at the lowest
+  level."* Railway is **HIPAA-certified** and **SOC 2 Type 2 +
+  SOC 3 attested** (Trust Center: https://trust.railway.com).
+  Application-level (InnoDB tablespace) encryption with an
+  app-managed key is **not** additionally enabled for this
+  demo — adding it on top of provider-managed encryption is
+  defense-in-depth, not a baseline HIPAA requirement, and the
+  demo's BAA premise covers the existing posture.
 - **Access control** — uses OpenEMR's native ACL. The demo seeds
   realistic provider / nurse / front-desk / billing roles.
 - **Database least-privilege (QA + Prod)** — the Co-Pilot agent
@@ -192,8 +205,10 @@ several compliance steps that are intentionally simplified here:
   credential now requires first compromising the Railway-side
   network — not just acquiring the password.
 
-If you are evaluating this for production use, treat the BAA and
-encryption-at-rest items as required pre-launch.
+If you are evaluating this for production use, the remaining
+homework is signing the BAAs (with Anthropic, Langfuse, and
+New Relic) and adding application-level InnoDB tablespace
+encryption if a customer-managed key is required by policy.
 
 ---
 
