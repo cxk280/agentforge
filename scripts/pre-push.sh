@@ -53,11 +53,12 @@ echo "✓ pre-push: tests passed."
 # clone), or when COPILOT_SKIP_EVAL_SMOKE=1 is exported (e.g. when prod
 # is intentionally down).
 
-if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-    if [[ -f "${REPO_ROOT}/copilot/agent/.env" ]]; then
-        # shellcheck disable=SC1091,SC2046
-        export $(grep -E '^ANTHROPIC_API_KEY=' "${REPO_ROOT}/copilot/agent/.env" | xargs)
-    fi
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]] && [[ -f "${REPO_ROOT}/copilot/agent/.env" ]]; then
+    # eval the matching line directly. Avoids xargs (mangles `=` and
+    # special chars) and process substitution (unreliable here under
+    # `set -e` for reasons that aren't worth chasing).
+    eval "$(grep -E '^ANTHROPIC_API_KEY=' "${REPO_ROOT}/copilot/agent/.env")"
+    export ANTHROPIC_API_KEY
 fi
 
 if [[ "${COPILOT_SKIP_EVAL_SMOKE:-0}" = "1" ]]; then
