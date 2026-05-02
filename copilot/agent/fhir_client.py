@@ -61,7 +61,13 @@ async def aclose_http_client() -> None:
         _http_client = None
 
 
-async def _get_db_pool() -> aiomysql.Pool:
+async def get_db_pool() -> aiomysql.Pool | None:
+    """Shared aiomysql pool. Returns None when no db_host is configured.
+
+    Reused by main.py:resolve_patient and fhir_client._reset_fail_counter
+    so we don't pay the per-call connection-setup cost (40-1200ms on
+    docker, depending on whether the network is warm).
+    """
     global _db_pool
     if _db_pool is None and settings.db_host:
         _db_pool = await aiomysql.create_pool(
@@ -70,11 +76,30 @@ async def _get_db_pool() -> aiomysql.Pool:
             user=settings.db_user,
             password=settings.db_password,
             db=settings.db_name,
-            minsize=1,
-            maxsize=3,
+            minsize=2,
+            maxsize=10,
             connect_timeout=5,
+            # Recycle connections every 5 min so we don't keep stale ones
+            # past MariaDB/MySQL's wait_timeout (usually 8h, but Railway's
+            # managed MySQL has been observed to drop idle connections
+            # earlier).
+            pool_recycle=300,
         )
     return _db_pool
+
+
+# Backwards-compat alias for the original private name (still used
+# inside this module by _reset_fail_counter).
+_get_db_pool = get_db_pool
+
+
+async def aclose_db_pool() -> None:
+    """Close the shared db pool. Call from FastAPI lifespan shutdown."""
+    global _db_pool
+    if _db_pool is not None:
+        _db_pool.close()
+        await _db_pool.wait_closed()
+        _db_pool = None
 
 
 async def _reset_fail_counter() -> None:
