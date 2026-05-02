@@ -175,7 +175,7 @@
       "patient_id": "1",
       "message": "Has the patient's blood pressure improved over time?",
       "expected": {
-        "rubric": "Pulls vitals across visits and discusses trend. Ted Shaw's recent BPs: 144/90, 136/84, 138/86, 144/86 (slightly variable, not clearly improving). Acceptable answer: 'roughly stable, still above target'."
+        "rubric": "Pulls multiple BP readings across visits (Ted Shaw has 5 on file: 148/92 on 2023-10-15, 142/88 on 2024-01-22, 138/86 on 2024-04-08, 136/84 on 2024-07-17, 144/90 on 2024-10-30) and offers a trend interpretation. The reply MUST: (1) cite at least 4 of the 5 readings with dates, (2) explain the trend in clinically-meaningful terms, (3) note that all readings remain above the standard hypertension goal (~130/80). Multiple framings are clinically valid given the data: 'gradual improvement Oct-2023 through Jul-2024 with a recent uptick in Oct-2024', 'roughly stable but persistently above target', 'fluctuating around an elevated baseline'. Any of these is acceptable. Reject answers that conclude purely 'improved' or purely 'worsened' without engaging the back-and-forth, or that cite fewer than 4 readings."
       }
     },
     {
