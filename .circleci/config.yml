@@ -82,13 +82,18 @@ commands:
     steps:
       - run:
           name: Deploy << parameters.service >>
+          # Tee the deploy output to a per-service log so the deploy
+          # job can publish it as an artifact for later debugging.
           command: |
+            mkdir -p /tmp/deploy-logs
             export RAILWAY_TOKEN="${<< parameters.env_token >>}"
             cd << parameters.service_path >>
             if [ "<< parameters.use_path_as_root >>" = "true" ]; then
-              railway up --service << parameters.service >> --path-as-root . --detach
+              railway up --service << parameters.service >> --path-as-root . --detach \
+                2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
             else
-              railway up --service << parameters.service >> --detach
+              railway up --service << parameters.service >> --detach \
+                2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
             fi
 
   wait-for-url:
@@ -125,9 +130,13 @@ commands:
         type: integer
         default: 23
     steps:
+      # Two-step structure: capture run output unconditionally, then enforce
+      # the threshold in a separate gate step. That way store_artifacts
+      # below always runs — failure logs are the most useful artifacts.
       - run:
-          name: Run evals
+          name: Run evals (capture output)
           command: |
+            mkdir -p /tmp/eval-artifacts
             cd copilot/agent/evals
             python -m venv .venv
             source .venv/bin/activate
@@ -135,9 +144,15 @@ commands:
             export EVAL_AGENT_ENDPOINT="<< parameters.endpoint >>"
             ARGS=""
             if [ "<< parameters.smoke >>" = "true" ]; then ARGS="--smoke"; fi
-            python run_evals.py $ARGS | tee /tmp/eval-output.txt
-            # Gate on pass count
-            PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" /tmp/eval-output.txt | awk '{print $2}' | cut -d/ -f1)
+            python run_evals.py $ARGS 2>&1 | tee /tmp/eval-artifacts/eval-output.txt || true
+            cp cases.json /tmp/eval-artifacts/cases.json
+      - store_artifacts:
+          path: /tmp/eval-artifacts
+          destination: evals
+      - run:
+          name: Enforce pass threshold
+          command: |
+            PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" /tmp/eval-artifacts/eval-output.txt | awk '{print $2}' | cut -d/ -f1)
             REQUIRED=<< parameters.min_pass >>
             echo "Passed: $PASSED / required: $REQUIRED"
             if [ -z "$PASSED" ] || [ "$PASSED" -lt "$REQUIRED" ]; then
@@ -202,6 +217,9 @@ jobs:
           use_path_as_root: true
       - wait-for-url:
           url: "https://copilot-agent-dev.up.railway.app/health"
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: railway-dev
 
   deploy-qa:
     executor: railway
@@ -218,6 +236,9 @@ jobs:
           use_path_as_root: true
       - wait-for-url:
           url: "https://copilot-agent-qa.up.railway.app/health"
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: railway-qa
 
   eval-full-qa:
     executor: python
@@ -243,6 +264,9 @@ jobs:
           use_path_as_root: true
       - wait-for-url:
           url: "https://copilot-agent-production-41de.up.railway.app/health"
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: railway-prod
 
   eval-full-prod:
     executor: python
