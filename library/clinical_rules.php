@@ -184,29 +184,16 @@ function clinical_summary_widget($patient_id, $mode, $dateTarget = '', $organize
     }
     echo "</div>";
 
-  // Compare the current with most recent action log (this function will also log the current actions)
-  // Only when $mode is reminders-due
+    // Always run compare_log_alerts in reminders-due mode — it has the
+    // side effect of writing the current targets to the audit log so we
+    // can detect "new since last visit" later. Returning value is no
+    // longer used for a modal popup (the legacy `<img onload="alert(...)">`
+    // hack that fired a native browser alert with "New Due Clinical
+    // Reminders" was removed: the same reminders already render inline
+    // in this widget directly above, so a duplicate modal is just
+    // noise that disrupts the chart-open workflow). Logging stays.
     if ($mode == "reminders-due" && OEGlobalsBag::getInstance()->getBoolean('enable_alert_log')) {
-        $new_targets = compare_log_alerts($patient_id, $current_targets, 'clinical_reminder_widget', $session->get('authUserID'));
-        if (!empty($new_targets) && OEGlobalsBag::getInstance()->getBoolean('enable_cdr_new_crp')) {
-            $message = xl('New Due Clinical Reminders') . "\n\n";
-
-            // coached claude sonnet 4.5 to rework
-            foreach ($new_targets as $key => $value) {
-                $category_item = explode(":", (string) $key);
-                $category = $category_item[0] ?? '';
-                $item = $category_item[1] ?? '';
-
-                $cat_display = generate_display_field(['data_type' => '1','list_id' => 'rule_action_category'], $category);
-                $item_display = generate_display_field(['data_type' => '1','list_id' => 'rule_action'], $item);
-
-                $message .= $cat_display . ': ' . $item_display . "\n";
-            }
-
-            $message .= "\n" . xl('See the Clinical Reminders widget for more details');
-            echo '<img src="../../pic/empty.gif" onload="alert(' . attr_js($message) . ');this.parentNode.removeChild(this);" />';
-            // end claude code
-        }
+        compare_log_alerts($patient_id, $current_targets, 'clinical_reminder_widget', $session->get('authUserID'));
     }
 }
 
