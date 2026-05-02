@@ -1,0 +1,7 @@
+# Output of harvest_failures.py — review locally, don't ship.
+harvested/
+
+# Local venvs and run output
+.venv/
+__pycache__/
+*.pyc

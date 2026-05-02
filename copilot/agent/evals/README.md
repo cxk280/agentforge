@@ -12,6 +12,8 @@ Haiku 4.5 (LLM-as-judge). Results are uploaded to Langfuse Datasets
   `must_contain`, `must_not_contain`, and free-text `rubric` fields.
 - `run_evals.py` — the harness. Loads cases, calls `/chat`, judges,
   uploads scores to Langfuse, prints a summary, exits 0/1/2.
+- `harvest_failures.py` — pulls failed `eval-case` traces from
+  Langfuse and writes a candidate cases JSON for human review.
 - `requirements.txt` — Python deps for the harness only (anthropic,
   httpx, langfuse). Does not pull the full agent stack.
 
@@ -47,7 +49,28 @@ These cases were authored by Claude (Opus). Lookup cases queried the
 real DB for ground truth and are reliable; summary / multi_step /
 refusal cases are subjective rubrics and benefit from clinician review.
 Treat this as a v0 baseline. Replace cases over time with traces of
-real production failures (see `harvest_failures.py`).
+real production failures (see *Harvesting failures* below).
+
+## Harvesting failures from Langfuse
+
+`harvest_failures.py` mines the self-hosted Langfuse instance for
+`eval-case` spans whose `passed` score is 0, deduplicates by case id
+(keeping the most recent failure), and writes a candidate cases JSON
+the engineer reviews and selectively merges into `cases.json`.
+
+```bash
+python harvest_failures.py                     # last 7 days, default output
+python harvest_failures.py --since 2026-04-25  # explicit cutoff
+python harvest_failures.py --out /tmp/foo.json # custom output
+```
+
+Output goes to `harvested/candidates.json` by default. That directory
+is gitignored so harvest output never accidentally lands in the test
+suite. Each candidate carries `_source.failure_count_in_window` (so
+flaky cases bubble up first), the deep-link `trace_url`, the judge's
+rubric reason, and the agent's actual reply. Promote a candidate by
+editing `expected.rubric`, flipping `category` from `harvested` to a
+real category, and copy-pasting the entry into `cases.json`.
 
 ## CI integration
 
