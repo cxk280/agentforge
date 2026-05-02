@@ -87,6 +87,20 @@ _FRAME_ANCESTORS = "'self' " + os.environ.get(
 
 
 @app.middleware("http")
+async def _no_cache_for_chat_assets(request: Request, call_next):
+    """Force no-store on the chat UI HTML + JS so the browser never
+    serves a stale copy. The /static mount otherwise sets ETag-based
+    revalidation, which can pin a browser to a broken version when
+    we ship a security-header or CSP change.
+    """
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.startswith("/static/"):
+        response.headers["Cache-Control"] = "no-store, must-revalidate"
+    return response
+
+
+@app.middleware("http")
 async def _security_headers(request: Request, call_next):
     """Add CSP + standard hardening headers on every response.
 
@@ -110,9 +124,14 @@ async def _security_headers(request: Request, call_next):
         "Content-Security-Policy",
         # script-src 'self' blocks inline <script>; img/style 'self' +
         # data: covers the inline SVG icons the chat UI already uses.
+        # Google Fonts (Inter) needs the stylesheet origin in style-src
+        # and the font-file origin in font-src; the `display=swap` font
+        # gracefully falls back to the system stack if either is blocked,
+        # so this is a polish concern, not a functional one.
         "default-src 'self'; "
         "script-src 'self'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
         "img-src 'self' data:; "
         "connect-src 'self'; "
         f"frame-ancestors {_FRAME_ANCESTORS}; "
@@ -182,8 +201,17 @@ async def version():
 
 @app.get("/")
 async def serve_chat_ui():
-    """Serve the chat UI. Pass ?pid=<openemr_pid> to pre-load a patient."""
-    return FileResponse(STATIC_DIR / "chat.html")
+    """Serve the chat UI. Pass ?pid=<openemr_pid> to pre-load a patient.
+
+    Cache-Control: no-store so iframe reloads always pick up the latest
+    chat.html/chat.js. Without this, browsers happily serve a stale
+    version that may reference an older API or a CSP-blocked inline
+    script — exactly the state the user reported as "infinite spinner."
+    """
+    return FileResponse(
+        STATIC_DIR / "chat.html",
+        headers={"Cache-Control": "no-store, must-revalidate"},
+    )
 
 
 @app.get("/api/patient-fhir-id/{pid}")
