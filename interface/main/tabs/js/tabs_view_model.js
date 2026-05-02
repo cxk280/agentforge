@@ -350,6 +350,21 @@ function menuActionClick(data,evt)
 
     if(data.enabled())
     {
+        // Optional on_click hook from the menu JSON. Lets a menu entry
+        // run a small JS expression (e.g. top.clearPatient(false) on the
+        // Patient Finder) before the tab navigation. Tab-switch case has
+        // to be covered here because the iframe doesn't reload, so any
+        // page-level JS won't re-fire.
+        if (typeof data.on_click === 'string' && data.on_click.length > 0) {
+            try {
+                // new Function scopes the snippet to the global scope rather
+                // than this function's locals — slightly less footgun than eval.
+                (new Function(data.on_click))();
+            } catch (e) {
+                console.error('menu on_click failed:', e);
+            }
+        }
+
         if(data.requirement===2)
         {
             var encounterID=app_view_model.application_data[attendant_type]().selectedEncounterID();

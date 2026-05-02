@@ -48,6 +48,13 @@
         {
             self.helperText=object.helperText;
         }
+        // on_click — optional JS hook that runs before the tab navigation.
+        // Used e.g. by the Patient Finder menu entry to call
+        // top.clearPatient(false) so header2 doesn't carry the previous
+        // patient over when the user returns to the finder tab.
+        if ('on_click' in object) {
+            self.on_click = object.on_click;
+        }
         self.helperText=object.helperText;
 
         if(object.requirement===0)
