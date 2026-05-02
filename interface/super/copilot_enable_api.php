@@ -28,13 +28,28 @@ if (($_GET['confirm'] ?? '') !== '1') {
 
 header('Content-Type: text/plain; charset=utf-8');
 
+// site_addr_oath must be the URL of THIS OpenEMR instance — every
+// env (local/dev/qa/prod) needs its own value. We derive it from
+// the OE_SELF_BASE_URL env var when set (each Railway env exports
+// its own); otherwise fall back to the request's own scheme+host.
+// Do NOT hardcode a specific env's URL here — that breaks
+// environment isolation (see feedback_environment_isolation.md):
+// running this script in qa/dev with a prod URL baked in writes
+// prod's URL into qa/dev's globals table.
+$siteAddrOath = getenv('OE_SELF_BASE_URL');
+if ($siteAddrOath === false || $siteAddrOath === '') {
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $siteAddrOath = $scheme . '://' . $host;
+}
+
 $flags = [
     'rest_api'                       => '1',  // legacy REST API
     'rest_fhir_api'                  => '1',  // FHIR R4 API
     'rest_portal_api'                => '0',
     'oauth_password_grant'           => '1',  // password-grant flow (what the agent uses)
     'oauth_app_manual_approval'      => '0',  // skip per-client approval prompts
-    'site_addr_oath'                 => 'https://openemr-production-971e.up.railway.app',
+    'site_addr_oath'                 => $siteAddrOath,
 ];
 
 echo "AgentForge — enabling OpenEMR APIs\n";
@@ -62,6 +77,71 @@ foreach ($flags as $name => $value) {
 echo "\nForce-enable all OAuth2 clients (idempotent):\n";
 $enabled = sqlStatement("UPDATE oauth_clients SET is_enabled = 1 WHERE COALESCE(is_enabled, 0) <> 1");
 echo "  oauth_clients UPDATE done\n";
+
+// AgentForge agent client registration. The agent authenticates via
+// the password grant using OPENEMR_CLIENT_ID + OPENEMR_CLIENT_SECRET
+// from its Railway env vars; the matching row has to exist in
+// oauth_clients on this OpenEMR instance for that to work. On a
+// fresh container the row isn't seeded, hence "invalid_client" 401s.
+//
+// We INSERT (or refresh) the row using the same flow OpenEMR's
+// dynamic client registration uses, encrypting the secret via
+// CryptoGen::encryptStandard so the OAuth server can decrypt it
+// back at token-grant time.
+$agentClientId = getenv('OPENEMR_CLIENT_ID');
+$agentClientSecret = getenv('OPENEMR_CLIENT_SECRET');
+if ($agentClientId && $agentClientSecret) {
+    $existing = sqlQuery(
+        "SELECT client_id, is_enabled FROM oauth_clients WHERE client_id = ?",
+        [$agentClientId]
+    );
+    $cryptoGen = \OpenEMR\BC\ServiceContainer::getCrypto();
+    $encryptedSecret = $cryptoGen->encryptStandard($agentClientSecret);
+    if (!$existing) {
+        // Fresh row — insert with sane defaults for a confidential
+        // service-to-service client using the password grant.
+        sqlStatement(
+            "INSERT INTO oauth_clients
+                (client_id, client_role, client_name, client_secret,
+                 registration_token, registration_uri_path,
+                 register_date, contacts, redirect_uri, grant_types,
+                 scope, user_id, site_id, is_confidential,
+                 logout_redirect_uris, is_enabled, dsi_type)
+             VALUES (?, ?, ?, ?, ?, ?, NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                $agentClientId,
+                'user',
+                'AgentForge Co-Pilot agent',
+                $encryptedSecret,
+                '',                    // no registration_token (out-of-band registration)
+                '',                    // no dynamic registration_uri_path
+                'agentforge@local',    // contacts
+                $siteAddrOath . '/oauth2/default/registration', // redirect_uri (unused for password grant)
+                'password',            // grant_types
+                'openid api:fhir user/Patient.read user/Observation.read user/MedicationRequest.read user/Condition.read user/AllergyIntolerance.read user/Encounter.read offline_access',
+                1,                     // user_id (admin)
+                'default',             // site_id
+                1,                     // is_confidential
+                null,                  // logout_redirect_uris
+                1,                     // is_enabled
+                0,                     // dsi_type (none)
+            ]
+        );
+        echo "  REGISTERED agent OAuth client : client_id=$agentClientId\n";
+    } else {
+        // Row exists — refresh the encrypted secret so a rotated
+        // env var lands cleanly without a manual re-registration.
+        sqlStatement(
+            "UPDATE oauth_clients
+                SET client_secret = ?, is_enabled = 1
+              WHERE client_id = ?",
+            [$encryptedSecret, $agentClientId]
+        );
+        echo "  REFRESHED agent OAuth client  : client_id=$agentClientId\n";
+    }
+} else {
+    echo "  (OPENEMR_CLIENT_ID / OPENEMR_CLIENT_SECRET not set in env — skipping agent client registration)\n";
+}
 
 echo "\nOAuth2 client registration check:\n";
 $client = sqlQuery("SELECT client_id, client_name, is_enabled FROM oauth_clients ORDER BY client_id LIMIT 5");
