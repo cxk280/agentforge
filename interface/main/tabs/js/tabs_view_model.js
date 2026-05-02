@@ -44,6 +44,25 @@ function tabs_view_model()
     return this;
 }
 
+// AgentForge: header2 (the patient demographics banner) should only
+// render when the active tab is patient-scoped. Per
+// feedback_header_full_width.md the banner is full-width, but per the
+// 2026-05-02 update it's also context-scoped — visible only on the
+// patient demographics view + its linked navtab pages, hidden on
+// Reports / Admin / Calendar / Messages / Patient Finder etc.
+//
+// `pat` is the patient demographics + navtab iframe (Dashboard,
+// History, Co-Pilot, Assessments, Report, Documents, Transactions,
+// Issues, Ledger, External Data, PRO, Modules — all load inside it).
+// `enc` is the encounter detail iframe. Both are patient-context.
+const CP_PATIENT_FRAMES = ['pat', 'enc'];
+function cpUpdateBannerVisibility(activeName) {
+    var banner = document.getElementById('attendantData');
+    if (!banner) { return; }
+    var isPatient = CP_PATIENT_FRAMES.indexOf(activeName) !== -1;
+    banner.style.display = isPatient ? '' : 'none';
+}
+
 function activateTab(data)
 {
     for(var tabIdx=0;tabIdx<app_view_model.application_data.tabs.tabsList().length;tabIdx++)
@@ -60,6 +79,9 @@ function activateTab(data)
         {
             curTab.visible(true);
         }
+    }
+    if (data && typeof data.name === 'function') {
+        cpUpdateBannerVisibility(data.name());
     }
 }
 
@@ -81,6 +103,7 @@ function activateTabByName(name,hideOthers)
             }
         }
     }
+    cpUpdateBannerVisibility(name);
 }
 
 function tabClicked(data,evt)

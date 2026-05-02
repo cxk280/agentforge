@@ -530,6 +530,24 @@ $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->get
     <script>
         ko.applyBindings(app_view_model);
 
+        // AgentForge: set the initial header2 (patient demographics
+        // banner) visibility based on the tab that's visible on first
+        // load. The activateTab/activateTabByName helpers handle every
+        // tab change after that — this only seeds the initial state
+        // so a fresh load doesn't render the banner over a non-patient
+        // page (Calendar, Reports, etc.) until the user clicks something.
+        $(function () {
+            try {
+                var tabs = app_view_model.application_data.tabs.tabsList();
+                for (var i = 0; i < tabs.length; i++) {
+                    if (tabs[i].visible() && typeof cpUpdateBannerVisibility === 'function') {
+                        cpUpdateBannerVisibility(tabs[i].name());
+                        break;
+                    }
+                }
+            } catch (e) { /* defensive — never block KO binding */ }
+        });
+
         $(function () {
             $('.dropdown-toggle').dropdown();
             $('#patient_caret').click(function () {
