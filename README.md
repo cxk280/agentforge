@@ -250,6 +250,33 @@ with a customer-managed key is only needed if your tenancy
 or policy requires it — provider-managed encryption-at-rest
 plus a BAA satisfies baseline HIPAA on its own.
 
+### AI-specific threat model
+
+LLM-backed agents introduce a threat surface that classic
+EHR controls don't cover (XSS via model output, prompt
+injection-driven data exfiltration, excessive agency, model
+DoS). [`SECURITY.md`](./SECURITY.md) documents how each of
+those four threat classes maps to AgentForge controls. At a
+glance, the agent already gets the architectural defenses
+right:
+
+- **Excessive agency:** the agent has six read-only FHIR
+  tools and zero write tools; the active patient_id is
+  enforced in the agent loop, not in the prompt — so the
+  model literally cannot query a different patient.
+- **PHI leakage:** production Langfuse traces contain only
+  hashed patient IDs and structural metadata (counts, tool
+  names, latencies), never the patient data itself.
+  Eval-trace uploads run a separate redaction pass for
+  names / DOBs / MRN-shaped digit runs.
+- **XSS via model output:** the chat UI's markdown renderer
+  escapes input first and only injects a fixed set of
+  structural tags, with no attribute pass-through. CSP +
+  X-Frame-Options + nosniff are layered on top as a backstop.
+- **Model DoS:** `/chat` is rate-limited (30 req/min per
+  session, 30 req/min per IP via slowapi) and `max_tokens`
+  is capped at 1024 per turn.
+
 ---
 
 ## Local development
