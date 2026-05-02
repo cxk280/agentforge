@@ -43,3 +43,47 @@ docker exec -i "${CONTAINER}" sh -c \
     }
 
 echo "✓ pre-push: tests passed."
+
+# ─── Eval smoke (5 cases vs. production Co-Pilot) ────────────────────────
+#
+# Catches agent regressions from the *previous* push before another change
+# lands on top. Costs ~$0.05 / ~30s per push.
+#
+# Skipped automatically when ANTHROPIC_API_KEY is unset (e.g. on a fresh
+# clone), or when COPILOT_SKIP_EVAL_SMOKE=1 is exported (e.g. when prod
+# is intentionally down).
+
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    if [[ -f "${REPO_ROOT}/copilot/agent/.env" ]]; then
+        # shellcheck disable=SC1091,SC2046
+        export $(grep -E '^ANTHROPIC_API_KEY=' "${REPO_ROOT}/copilot/agent/.env" | xargs)
+    fi
+fi
+
+if [[ "${COPILOT_SKIP_EVAL_SMOKE:-0}" = "1" ]]; then
+    echo "⏭  pre-push: COPILOT_SKIP_EVAL_SMOKE=1 — skipping eval smoke."
+elif [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+    echo "⏭  pre-push: ANTHROPIC_API_KEY not set — skipping eval smoke."
+elif ! command -v python3 >/dev/null 2>&1; then
+    echo "⏭  pre-push: python3 not on PATH — skipping eval smoke."
+else
+    echo "▶ pre-push: running 5-case eval smoke against production Co-Pilot..."
+    EVAL_DIR="${REPO_ROOT}/copilot/agent/evals"
+    EVAL_VENV="${EVAL_DIR}/.venv"
+
+    if [[ ! -x "${EVAL_VENV}/bin/python" ]]; then
+        python3 -m venv "${EVAL_VENV}" >/dev/null
+        "${EVAL_VENV}/bin/pip" install -q -r "${EVAL_DIR}/requirements.txt"
+    fi
+
+    "${EVAL_VENV}/bin/python" "${EVAL_DIR}/run_evals.py" --smoke --no-langfuse \
+        || {
+            echo "" >&2
+            echo "✗ pre-push: eval smoke failed against production Co-Pilot." >&2
+            echo "  This usually means the LAST push broke the agent — investigate" >&2
+            echo "  before pushing more on top." >&2
+            echo "  To bypass intentionally: COPILOT_SKIP_EVAL_SMOKE=1 git push" >&2
+            exit 1
+        }
+    echo "✓ pre-push: eval smoke passed."
+fi

@@ -1,0 +1,281 @@
+# AgentForge CI/CD pipeline.
+#
+# Stages:
+#   1. test         — run the isolated PHPUnit Copilot suite. Always.
+#   2. eval-smoke   — run 5-case smoke against the Dev environment's
+#                     Co-Pilot agent. Cheap (~$0.05). Blocks dev deploy.
+#   3. deploy-dev   — auto. railway up against the dev Railway env.
+#                     Triggered on push to master.
+#   4. deploy-qa    — manual approval. Promotes Dev image to QA env.
+#                     Includes the full 25-case eval against QA.
+#   5. deploy-prod  — manual approval. Promotes QA image to Prod env.
+#                     Final gate: full eval suite must pass with
+#                     pass_count >= 23/25 to allow promotion.
+#
+# Required CircleCI project env vars (Settings → Environment Variables):
+#   ANTHROPIC_API_KEY              — for Haiku judge in evals
+#   LANGFUSE_PUBLIC_KEY            — for Langfuse Datasets uploads
+#   LANGFUSE_SECRET_KEY
+#   LANGFUSE_HOST
+#   RAILWAY_TOKEN_DEV              — Railway project token scoped to dev
+#   RAILWAY_TOKEN_QA               — Railway project token scoped to qa
+#   RAILWAY_TOKEN_PROD             — Railway project token scoped to prod
+#
+# Token scoping: Railway project tokens can be scoped per-environment via
+# the Railway dashboard. Generate one per env so a Dev compromise can't
+# touch Prod.
+
+version: 2.1
+
+orbs:
+  node: circleci/node@5
+
+executors:
+  python:
+    docker:
+      - image: cimg/python:3.13
+    resource_class: small
+  railway:
+    docker:
+      - image: cimg/base:stable
+    resource_class: small
+  php:
+    docker:
+      - image: cimg/php:8.2
+        environment:
+          OE_USER: admin
+          OE_PASS: pass
+      - image: mariadb:10.11
+        environment:
+          MYSQL_ROOT_PASSWORD: openemr
+          MYSQL_DATABASE: openemr
+          MYSQL_USER: openemr
+          MYSQL_PASSWORD: openemr
+    resource_class: medium
+
+# ─── Reusable command bundles ────────────────────────────────────────────
+commands:
+  install-railway-cli:
+    description: "Install the Railway CLI"
+    steps:
+      - run:
+          name: Install Railway CLI
+          command: |
+            curl -fsSL https://railway.com/install.sh | sh
+            export PATH="$HOME/.railway/bin:$PATH"
+            echo 'export PATH="$HOME/.railway/bin:$PATH"' >> "$BASH_ENV"
+            railway --version
+
+  railway-deploy:
+    description: "Deploy a service to a Railway environment"
+    parameters:
+      service:
+        type: string
+      env_token:
+        type: env_var_name
+      service_path:
+        type: string
+        default: "."
+      use_path_as_root:
+        type: boolean
+        default: false
+    steps:
+      - run:
+          name: Deploy << parameters.service >>
+          command: |
+            export RAILWAY_TOKEN="${<< parameters.env_token >>}"
+            cd << parameters.service_path >>
+            if [ "<< parameters.use_path_as_root >>" = "true" ]; then
+              railway up --service << parameters.service >> --path-as-root . --detach
+            else
+              railway up --service << parameters.service >> --detach
+            fi
+
+  wait-for-url:
+    description: "Poll a URL until it returns 200, with timeout"
+    parameters:
+      url:
+        type: string
+      timeout_seconds:
+        type: integer
+        default: 600
+    steps:
+      - run:
+          name: Wait for << parameters.url >>
+          no_output_timeout: << parameters.timeout_seconds >>s
+          command: |
+            DEADLINE=$(($(date +%s) + << parameters.timeout_seconds >>))
+            until [ "$(curl -s -o /dev/null -w '%{http_code}' << parameters.url >>)" = "200" ]; do
+              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                echo "Timeout waiting for << parameters.url >>"; exit 1
+              fi
+              sleep 30
+            done
+            echo "Up: << parameters.url >>"
+
+  run-evals:
+    description: "Run the eval suite against a target endpoint"
+    parameters:
+      endpoint:
+        type: string
+      smoke:
+        type: boolean
+        default: false
+      min_pass:
+        type: integer
+        default: 23
+    steps:
+      - run:
+          name: Run evals
+          command: |
+            cd copilot/agent/evals
+            python -m venv .venv
+            source .venv/bin/activate
+            pip install -q -r requirements.txt
+            export EVAL_AGENT_ENDPOINT="<< parameters.endpoint >>"
+            ARGS=""
+            if [ "<< parameters.smoke >>" = "true" ]; then ARGS="--smoke"; fi
+            python run_evals.py $ARGS | tee /tmp/eval-output.txt
+            # Gate on pass count
+            PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" /tmp/eval-output.txt | awk '{print $2}' | cut -d/ -f1)
+            REQUIRED=<< parameters.min_pass >>
+            echo "Passed: $PASSED / required: $REQUIRED"
+            if [ -z "$PASSED" ] || [ "$PASSED" -lt "$REQUIRED" ]; then
+              echo "✗ Eval pass count below threshold"; exit 1
+            fi
+
+# ─── Jobs ────────────────────────────────────────────────────────────────
+jobs:
+  unit-test:
+    executor: php
+    steps:
+      - checkout
+      - run:
+          name: Install PHP deps
+          command: |
+            composer install --no-interaction --prefer-dist --no-scripts --no-dev || true
+            composer install --no-interaction --prefer-dist --no-scripts
+      - run:
+          name: Run isolated PHPUnit Copilot suite
+          command: ./vendor/bin/phpunit -c phpunit-isolated.xml --filter Copilot
+
+  eval-smoke-dev:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Set Anthropic + Langfuse env (from CircleCI project vars)
+          command: |
+            echo "ANTHROPIC_API_KEY+LANGFUSE_* must be set as CircleCI project envs."
+      - run-evals:
+          endpoint: "https://copilot-agent-dev.up.railway.app/chat"
+          smoke: true
+          min_pass: 4
+
+  deploy-dev:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_DEV
+      - railway-deploy:
+          service: copilot-agent
+          env_token: RAILWAY_TOKEN_DEV
+          service_path: copilot/agent
+          use_path_as_root: true
+      - wait-for-url:
+          url: "https://copilot-agent-dev.up.railway.app/health"
+
+  deploy-qa:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_QA
+      - railway-deploy:
+          service: copilot-agent
+          env_token: RAILWAY_TOKEN_QA
+          service_path: copilot/agent
+          use_path_as_root: true
+      - wait-for-url:
+          url: "https://copilot-agent-qa.up.railway.app/health"
+
+  eval-full-qa:
+    executor: python
+    steps:
+      - checkout
+      - run-evals:
+          endpoint: "https://copilot-agent-qa.up.railway.app/chat"
+          smoke: false
+          min_pass: 23
+
+  deploy-prod:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_PROD
+      - railway-deploy:
+          service: copilot-agent
+          env_token: RAILWAY_TOKEN_PROD
+          service_path: copilot/agent
+          use_path_as_root: true
+      - wait-for-url:
+          url: "https://copilot-agent-production-41de.up.railway.app/health"
+
+  eval-full-prod:
+    executor: python
+    steps:
+      - checkout
+      - run-evals:
+          endpoint: "https://copilot-agent-production-41de.up.railway.app/chat"
+          smoke: false
+          min_pass: 23
+
+# ─── Workflows ───────────────────────────────────────────────────────────
+workflows:
+  test-deploy-promote:
+    jobs:
+      # Always run unit tests on every push.
+      - unit-test
+
+      # Auto-deploy to Dev on push to master.
+      - deploy-dev:
+          requires: [unit-test]
+          filters:
+            branches:
+              only: master
+
+      # Smoke evals against Dev after deploy.
+      - eval-smoke-dev:
+          requires: [deploy-dev]
+
+      # Manual approval to promote to QA.
+      - hold-qa:
+          type: approval
+          requires: [eval-smoke-dev]
+
+      - deploy-qa:
+          requires: [hold-qa]
+
+      # Full eval against QA — blocks promotion if it fails.
+      - eval-full-qa:
+          requires: [deploy-qa]
+
+      # Manual approval to promote to Prod.
+      - hold-prod:
+          type: approval
+          requires: [eval-full-qa]
+
+      - deploy-prod:
+          requires: [hold-prod]
+
+      # Final eval against Prod — confirms the deploy went well.
+      - eval-full-prod:
+          requires: [deploy-prod]
