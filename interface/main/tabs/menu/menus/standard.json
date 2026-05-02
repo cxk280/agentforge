@@ -3,7 +3,7 @@
         "label": "Calendar",
         "menu_id": "cal0",
         "target": "cal",
-        "url": "/interface/main/main_info.php",
+        "url": "/interface/main/calendar/copilot_calendar.php",
         "children": [],
         "requirement": 0,
         "acl_req": [
@@ -19,7 +19,7 @@
         "label": "Messages",
         "menu_id": "msg0",
         "target": "msg",
-        "url": "/interface/main/messages/messages.php?form_active=1",
+        "url": "/interface/main/messages/copilot_messages.php",
         "children": [],
         "requirement": 0,
         "acl_req": [
@@ -80,7 +80,7 @@
                 "menu_id": "fin0",
                 "target": "fin",
                 "on_click": "top.clearPatient(false)",
-                "url": "/interface/main/finder/dynamic_finder.php",
+                "url": "/interface/main/finder/copilot_finder.php",
                 "children": [],
                 "requirement": 0,
                 "acl_req": [
@@ -92,7 +92,7 @@
                 "label": "Flow",
                 "menu_id": "pfb0",
                 "target": "flb",
-                "url": "/interface/patient_tracker/patient_tracker.php?skip_timeout_reset=1",
+                "url": "/interface/main/copilot_patient_tracker.php",
                 "children": [],
                 "requirement": 0,
                 "acl_req": [
@@ -108,7 +108,7 @@
                 "label": "Recalls",
                 "menu_id": "pfb0",
                 "target": "rcb",
-                "url": "/interface/main/messages/messages.php?go=Recalls",
+                "url": "/interface/main/messages/copilot_recalls.php",
                 "children": [],
                 "requirement": 0,
                 "acl_req": [
@@ -127,7 +127,7 @@
                         "label": "New/Search",
                         "menu_id": "new0",
                         "target": "pat",
-                        "url": "/interface/new/new.php",
+                        "url": "/interface/new/copilot_new_patient.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -142,7 +142,7 @@
                         "label": "New",
                         "menu_id": "new0",
                         "target": "pat",
-                        "url": "/interface/new/new.php",
+                        "url": "/interface/new/copilot_new_patient.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -189,7 +189,7 @@
                                 "label": "Create Visit",
                                 "menu_id": "nen1",
                                 "target": "enc",
-                                "url": "/interface/forms/newpatient/new.php?autoloaded=1&calenc=",
+                                "url": "/interface/forms/newpatient/copilot_create_visit.php",
                                 "children": [],
                                 "requirement": 1
                             },
@@ -209,7 +209,7 @@
                                 "label": "Visit History",
                                 "menu_id": "ens1",
                                 "target": "enc",
-                                "url": "/interface/patient_file/history/encounters.php",
+                                "url": "/interface/patient_file/encounter/copilot_visit_history.php",
                                 "children": [],
                                 "requirement": 1,
                                 "acl_req": [
@@ -228,7 +228,7 @@
                                 "label": "Patient Record Request",
                                 "menu_id": "prq1",
                                 "target": "enc",
-                                "url": "/interface/patient_file/transaction/record_request.php",
+                                "url": "/interface/patient_file/transaction/copilot_record_request.php",
                                 "children": [],
                                 "requirement": 1,
                                 "acl_req": [
@@ -360,7 +360,7 @@
                                 "label": "Visit History",
                                 "menu_id": "gvh4",
                                 "target": "enc",
-                                "url": "/interface/patient_file/history/encounters.php",
+                                "url": "/interface/patient_file/encounter/copilot_visit_history.php",
                                 "children": [],
                                 "requirement": 4,
                                 "acl_req": [
@@ -391,7 +391,7 @@
                         "label": "Fee Sheet",
                         "menu_id": "cod2",
                         "target": "enc",
-                        "url": "/interface/patient_file/encounter/load_form.php?formname=fee_sheet",
+                        "url": "/interface/forms/fee_sheet/copilot_fee_sheet.php",
                         "children": [],
                         "requirement": 2,
                         "acl_req": [
@@ -549,7 +549,7 @@
                         "label": "Manage Modules",
                         "menu_id": "adm0",
                         "target": "adm",
-                        "url": "/interface/modules/zend_modules/public/Installer",
+                        "url": "/interface/super/copilot_module_installer.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -572,7 +572,7 @@
                         "label": "Management",
                         "menu_id": "adm0",
                         "target": "adm",
-                        "url": "/interface/drugs/drug_inventory.php",
+                        "url": "/interface/billing/copilot_inventory.php",
                         "children": [],
                         "requirement": 0
                     },
@@ -680,7 +680,7 @@
                         "label": "Pending Review",
                         "menu_id": "orp1",
                         "target": "enc",
-                        "url": "/interface/orders/orders_results.php?review=1",
+                        "url": "/interface/orders/copilot_pending_review.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -692,7 +692,7 @@
                         "label": "Patient Results",
                         "menu_id": "orr1",
                         "target": "enc",
-                        "url": "/interface/orders/orders_results.php",
+                        "url": "/interface/orders/copilot_results.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -704,7 +704,7 @@
                         "label": "Lab Overview",
                         "menu_id": "lda1",
                         "target": "enc",
-                        "url": "/interface/patient_file/summary/labdata.php",
+                        "url": "/interface/orders/copilot_lab_overview.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -716,7 +716,7 @@
                         "label": "Batch Results",
                         "menu_id": "orb0",
                         "target": "pat",
-                        "url": "/interface/orders/orders_results.php?batch=1",
+                        "url": "/interface/orders/copilot_batch_results.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -728,7 +728,7 @@
                         "label": "Electronic Reports",
                         "menu_id": "ore0",
                         "target": "pat",
-                        "url": "/interface/orders/list_reports.php",
+                        "url": "/interface/reports/copilot_electronic_reports.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -740,7 +740,7 @@
                         "label": "Lab Documents",
                         "menu_id": "dld0",
                         "target": "pat",
-                        "url": "/interface/main/display_documents.php",
+                        "url": "/interface/patient_file/documents/copilot_lab_documents.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -759,7 +759,7 @@
                         "label": "e-Rx",
                         "menu_id": "ncr0",
                         "target": "pat",
-                        "url": "/interface/eRx.php",
+                        "url": "/interface/eRx/copilot_erx.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -771,7 +771,7 @@
                         "label": "e-Rx Renewal",
                         "menu_id": "ncr1",
                         "target": "pat",
-                        "url": "/interface/eRx.php?page=status",
+                        "url": "/interface/eRx/copilot_erx_renewal.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -783,7 +783,7 @@
                         "label": "e-Rx EPCS",
                         "menu_id": "ncr2",
                         "target": "pat",
-                        "url": "/interface/eRx.php?page=epcs-admin",
+                        "url": "/interface/eRx/copilot_erx_epcs.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -807,7 +807,7 @@
                         "label": "Portal Dashboard",
                         "menu_id": "por2",
                         "target": "por",
-                        "url": "/portal/patient/provider",
+                        "url": "/portal/copilot_provider_portal.php",
                         "children": [],
                         "requirement": 0,
                         "global_req_strict": "portal_onsite_two_enable",
@@ -832,7 +832,7 @@
                         "label": "Patient Education",
                         "menu_id": "ped0",
                         "target": "msc",
-                        "url": "/interface/reports/patient_edu_web_lookup.php",
+                        "url": "/interface/patient_file/education/copilot_education.php",
                         "children": [],
                         "requirement": 0
                     },
@@ -840,7 +840,7 @@
                         "label": "Authorizations",
                         "menu_id": "aun0",
                         "target": "msc",
-                        "url": "/interface/main/authorizations/authorizations.php",
+                        "url": "/interface/patient_file/transaction/copilot_authorizations.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -874,7 +874,7 @@
                         "label": "Chart Tracker",
                         "menu_id": "cht0",
                         "target": "msc",
-                        "url": "/custom/chart_tracker.php",
+                        "url": "/custom/copilot_chart_tracker.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -887,7 +887,7 @@
                         "label": "Office Notes",
                         "menu_id": "ono0",
                         "target": "msc",
-                        "url": "/interface/main/onotes/office_comments.php",
+                        "url": "/interface/main/onotes/copilot_office_notes.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -942,21 +942,21 @@
                         "children": [
                             {
                                 "label": "Demographics",
-                                "url": "/interface/patient_file/summary/demographics_print.php",
+                                "url": "/interface/main/copilot_print_preview.php?type=demographics",
                                 "target": "msc",
                                 "children": [],
                                 "requirement": 0
                             },
                             {
                                 "label": "Superbill/Fee Sheet",
-                                "url": "/interface/patient_file/printed_fee_sheet.php",
+                                "url": "/interface/main/copilot_print_preview.php?type=superbill",
                                 "target": "msc",
                                 "children": [],
                                 "requirement": 0
                             },
                             {
                                 "label": "Referral",
-                                "url": "/interface/patient_file/transaction/print_referral.php",
+                                "url": "/interface/main/copilot_print_preview.php?type=referral",
                                 "target": "msc",
                                 "children": [],
                                 "requirement": 0
@@ -1066,7 +1066,7 @@
                     {
                         "label": "Letter",
                         "menu_id": "Popup:Letter",
-                        "url": "/interface/patient_file/letter.php",
+                        "url": "/interface/main/copilot_print_preview.php?type=letter",
                         "target": "pop",
                         "children": [],
                         "requirement": 1,
@@ -1078,7 +1078,7 @@
                     {
                         "label": "Chart Label",
                         "menu_id": "Popup:Chart Label",
-                        "url": "/interface/patient_file/label.php",
+                        "url": "/interface/main/copilot_print_preview.php?type=labels",
                         "target": "pop",
                         "children": [],
                         "requirement": 1,

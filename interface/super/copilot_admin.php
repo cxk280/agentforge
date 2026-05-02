@@ -18,16 +18,16 @@ require_once(__DIR__ . "/../globals.php");
 // work would route based on a query param.
 $categories = [
     ['Overview',          true,  '/interface/super/copilot_admin.php'],
-    ['Practice Settings', false, '/controller.php?practice_settings&pharmacy&action=list'],
-    ['Users & Groups',    false, '/interface/usergroup/usergroup_admin.php'],
-    ['ACL',               false, '/interface/usergroup/adminacl.php'],
-    ['Facilities',        false, '/interface/usergroup/facilities.php'],
-    ['Forms & Layouts',   false, '/interface/super/edit_layout.php'],
-    ['Templates',         false, '/interface/super/manage_document_templates.php'],
-    ['Coding & Lists',    false, '/interface/super/edit_list.php'],
-    ['Modules',           false, '/interface/modules/zend_modules/public/Installer'],
-    ['System',            false, '/interface/main/backup.php'],
-    ['Logs & Audit',      false, '/interface/logview/logview.php'],
+    ['Practice Settings', false, '/interface/super/copilot_practice_settings.php'],
+    ['Users & Groups',    false, '/interface/super/copilot_users.php'],
+    ['ACL',               false, '/interface/super/copilot_acl.php'],
+    ['Facilities',        false, '/interface/super/copilot_facilities.php'],
+    ['Forms & Layouts',   false, '/interface/super/copilot_forms_layouts.php'],
+    ['Templates',         false, '/interface/super/copilot_templates.php'],
+    ['Coding & Lists',    false, '/interface/super/copilot_coding_lists.php'],
+    ['Modules',           false, '/interface/super/copilot_module_installer.php'],
+    ['System',            false, '/interface/super/copilot_system.php'],
+    ['Logs & Audit',      false, '/interface/super/copilot_audit.php'],
 ];
 
 // Top-line stats.
@@ -40,16 +40,16 @@ $stats = [
 
 // Two action panels.
 $quickActions = [
-    ['👤', 'Add new user',       'Provision a clinical or admin account',  '/interface/usergroup/usergroup_admin.php'],
-    ['📋', 'Create form layout', 'Add a custom intake or note form',       '/interface/super/edit_layout.php'],
-    ['🏥', 'Add facility',       'Register a new clinic or location',      '/interface/usergroup/facilities.php'],
-    ['🔐', 'Update ACL roles',   'Adjust permissions for an existing role','/interface/usergroup/adminacl.php'],
+    ['👤', 'Add new user',       'Provision a clinical or admin account',  '/interface/super/copilot_users.php'],
+    ['📋', 'Create form layout', 'Add a custom intake or note form',       '/interface/super/copilot_forms_layouts.php'],
+    ['🏥', 'Add facility',       'Register a new clinic or location',      '/interface/super/copilot_facilities.php'],
+    ['🔐', 'Update ACL roles',   'Adjust permissions for an existing role','/interface/super/copilot_acl.php'],
 ];
 $systemActions = [
-    ['🔄', 'Run backup now',     'Database snapshot to local + S3',        '/interface/main/backup.php'],
-    ['📜', 'View audit log',     'Access events for last 24 hours',        '/interface/logview/logview.php'],
-    ['🌐', 'Manage modules',     'Enable / disable installed modules',     '/interface/modules/zend_modules/public/Installer'],
-    ['⚙',  'Site preferences',   'Globals.php and feature flags',          '/interface/super/edit_globals.php'],
+    ['🔄', 'Run backup now',     'Database snapshot to local + S3',        '/interface/super/copilot_system.php'],
+    ['📜', 'View audit log',     'Access events for last 24 hours',        '/interface/super/copilot_audit.php'],
+    ['🌐', 'Manage modules',     'Enable / disable installed modules',     '/interface/super/copilot_module_installer.php'],
+    ['⚙',  'Site preferences',   'Globals.php and feature flags',          '/interface/super/copilot_practice_settings.php'],
 ];
 
 // Recent admin activity (mock-faithful).
@@ -383,7 +383,7 @@ $activity = [
       <div class="cp-adm-activity-head">
         <div class="cp-adm-activity-title"><?php echo xlt('Recent Admin Activity'); ?></div>
         <div class="cp-adm-activity-spacer"></div>
-        <a class="cp-adm-activity-link" href="/interface/logview/logview.php" target="_top"><?php echo xlt('View all →'); ?></a>
+        <a class="cp-adm-activity-link" href="/interface/super/copilot_audit.php" target="_top"><?php echo xlt('View all →'); ?></a>
       </div>
       <?php foreach ($activity as $row): ?>
         <div class="cp-adm-activity-row">
