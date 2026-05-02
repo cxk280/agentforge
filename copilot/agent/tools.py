@@ -54,20 +54,76 @@ async def get_medications(patient_id: str) -> dict:
     return {"patient_id": patient_id, "medications": meds}
 
 
+# LOINC code sets for splitting OpenEMR's flat Observation stream into
+# vitals vs labs. OpenEMR doesn't reliably populate FHIR's `category`
+# field for either, so we filter in Python by code. The vitals set
+# covers the standard core panel (BP systolic/diastolic + the 85354-9
+# panel wrapper, HR, RR, temp, height, weight, BMI, O2 sat, head circ);
+# anything outside it is treated as a lab.
+_VITAL_LOINC_CODES = frozenset({
+    "8480-6",   # Systolic BP
+    "8462-4",   # Diastolic BP
+    "85354-9",  # BP panel
+    "85353-1",  # Vital signs, weight, height, head circ, O2 sat and BMI panel
+    "8867-4",   # Heart rate
+    "9279-1",   # Respiratory rate
+    "8310-5",   # Body temperature
+    "8302-2",   # Body height
+    "29463-7",  # Body weight
+    "39156-5",  # BMI
+    "2708-6",   # O2 saturation
+    "59408-5",  # SpO2
+    "9843-4",   # Head circumference
+})
+
+# Big enough to cover several years of mixed observations for a patient
+# with frequent labs. We still cap caller-visible results below; this
+# is just the upper bound on what we pull from FHIR before filtering.
+_OBSERVATION_FETCH_BATCH = 200
+
+
+def _obs_loinc_code(obs: dict) -> str:
+    for c in obs.get("code", {}).get("coding", []):
+        sys_uri = c.get("system") or ""
+        if "loinc" in sys_uri.lower() or sys_uri == "":
+            code = c.get("code")
+            if code:
+                return code
+    return ""
+
+
+def _is_vital(obs: dict) -> bool:
+    code = _obs_loinc_code(obs)
+    if code in _VITAL_LOINC_CODES:
+        return True
+    # Some panels carry sub-vitals only inside component[]; also count those.
+    for comp in obs.get("component", []) or []:
+        for c in comp.get("code", {}).get("coding", []):
+            if c.get("code") in _VITAL_LOINC_CODES:
+                return True
+    return False
+
+
 async def get_recent_labs(patient_id: str, limit: int = 10) -> dict:
-    """Most recent laboratory observations for a patient."""
-    # OpenEMR uses a non-standard 'numeric' category code; omit category filter
-    # and rely on LOINC codes to distinguish lab results.
+    """Most recent laboratory observations for a patient.
+
+    Pulls a wide batch of Observations and filters OUT anything that
+    looks like a vital sign (by LOINC code), so labs can't be crowded
+    out by a busy vitals visit. Caller-visible results are capped at
+    ``limit``.
+    """
     bundle = await fhir_get(
         "Observation",
         {
             "patient": patient_id,
             "_sort": "-date",
-            "_count": str(limit),
+            "_count": str(_OBSERVATION_FETCH_BATCH),
         },
     )
     labs = []
     for obs in bundle_entries(bundle):
+        if _is_vital(obs):
+            continue
         labs.append({
             "name": _coding_display(obs.get("code", {})),
             "value": _obs_value(obs),
@@ -77,34 +133,39 @@ async def get_recent_labs(patient_id: str, limit: int = 10) -> dict:
             "date": obs.get("effectiveDateTime") or obs.get("effectivePeriod", {}).get("start"),
             "status": obs.get("status"),
         })
+        if len(labs) >= limit:
+            break
     return {"patient_id": patient_id, "labs": labs}
 
 
 async def get_vitals(patient_id: str, limit: int = 20) -> dict:
     """Recent vital signs for a patient.
 
-    Default limit is 20 because OpenEMR returns one Observation per
-    LOINC code per measurement event (panel + 11 codes per visit), so a
-    single visit produces ~11 entries. limit=5 was hiding BP and BMI.
+    Pulls a wide batch of Observations and filters IN only vital-sign
+    LOINC codes, so trend questions ("has BP improved?") see the full
+    history of BP readings instead of being capped by interleaved lab
+    results. Caller-visible results are capped at ``limit``.
     """
-    # OpenEMR uses a non-standard category; fetch all observations and rely on
-    # LOINC codes to identify vitals (BP, HR, temp, weight, height, O2 sat).
     bundle = await fhir_get(
         "Observation",
         {
             "patient": patient_id,
             "_sort": "-date",
-            "_count": str(limit),
+            "_count": str(_OBSERVATION_FETCH_BATCH),
         },
     )
     vitals = []
     for obs in bundle_entries(bundle):
+        if not _is_vital(obs):
+            continue
         vitals.append({
             "name": _coding_display(obs.get("code", {})),
             "value": _obs_value(obs),
             "unit": obs.get("valueQuantity", {}).get("unit"),
             "date": obs.get("effectiveDateTime") or obs.get("effectivePeriod", {}).get("start"),
         })
+        if len(vitals) >= limit:
+            break
     return {"patient_id": patient_id, "vitals": vitals}
 
 
