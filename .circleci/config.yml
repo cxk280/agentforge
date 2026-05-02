@@ -162,7 +162,17 @@ jobs:
               --ignore-platform-reqs
       - run:
           name: Run isolated PHPUnit Copilot suite
-          command: ./vendor/bin/phpunit -c phpunit-isolated.xml --filter Copilot
+          command: |
+            mkdir -p /tmp/test-results
+            ./vendor/bin/phpunit \
+              -c phpunit-isolated.xml \
+              --filter Copilot \
+              --log-junit /tmp/test-results/junit.xml
+      - store_test_results:
+          path: /tmp/test-results
+      - store_artifacts:
+          path: /tmp/test-results
+          destination: phpunit
 
   eval-smoke-dev:
     executor: python
