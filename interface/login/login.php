@@ -62,7 +62,14 @@ $secondaryLogo = $logoService->getLogo("core/login/secondary");
 $smallLogoOne = $logoService->getLogo("core/login/small_logo_1");
 $smallLogoTwo = $logoService->getLogo("core/login/small_logo_2");
 
-$layout = $globalsBag->get('login_page_layout');
+// Defensive default — when the `login_page_layout` global is missing
+// from the DB (fresh container before sql_upgrade runs, or seeded site
+// missing this row), $globalsBag->get() returns null and the
+// TemplatePageEvent constructor TypeErrors with
+//   "Argument #1 ($template) must be of type string, null given".
+// Fall back to the upstream default declared in globals.inc.php so
+// login renders even when the row hasn't been written yet.
+$layout = $globalsBag->get('login_page_layout') ?: 'login/layouts/vertical_band.html.twig';
 
 // mdsupport - Add 'App' functionality for user interfaces without standard menu and frames
 // If this script is called with app parameter, validate it without showing other apps.

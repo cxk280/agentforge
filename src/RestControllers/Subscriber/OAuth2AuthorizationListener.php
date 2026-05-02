@@ -99,9 +99,17 @@ class OAuth2AuthorizationListener implements EventSubscriberInterface
         }
         $session = $request->getSession();
         // exit if api is not turned on
+        // AgentForge demo: also accept an env-var override
+        // (OPENEMR_FORCE_REST_API=1) so the Co-Pilot agent can talk to
+        // OAuth2/FHIR even when the `rest_api` global hasn't been
+        // written into the DB yet on a fresh container. The override
+        // is intentionally narrow and only turns on the API gate; it
+        // does not bypass per-request auth or scope checks below.
+        $forceApi = getenv('OPENEMR_FORCE_REST_API');
         if (
             empty($globalsBag->get('rest_api')) && empty($globalsBag->get('rest_fhir_api'))
             && empty($globalsBag->get('rest_portal_api'))
+            && empty($forceApi)
         ) {
             $logger->debug("api disabled exiting call");
             $session->invalidate();
