@@ -13,6 +13,15 @@
 | Co-Pilot agent (FastAPI) | https://copilot-agent-production-41de.up.railway.app | — |
 | Langfuse (observability) | https://langfuse-web-production-368f.up.railway.app | see operator |
 
+CI/CD also runs against two pre-production environments. Each carries
+the same seeded patient data as Prod; QA runs the full Langfuse stack
+for eval traces, while Dev is intentionally minimal.
+
+| Env | OpenEMR | Co-Pilot agent |
+|---|---|---|
+| Dev | https://openemr-dev-59c5.up.railway.app | https://copilot-agent-dev.up.railway.app |
+| QA  | https://openemr-qa.up.railway.app | https://copilot-agent-qa.up.railway.app |
+
 Once signed in, the Co-Pilot tab on any patient chart opens the chat
 view backed by the agent. The "Mock Index" page at
 `/interface/main/copilot_mock_index.php` lists every redesigned screen
@@ -168,6 +177,20 @@ several compliance steps that are intentionally simplified here:
   at-rest encryption is **not** enabled in this demo.
 - **Access control** — uses OpenEMR's native ACL. The demo seeds
   realistic provider / nurse / front-desk / billing roles.
+- **Database least-privilege (QA + Prod)** — the Co-Pilot agent
+  connects to MariaDB as a dedicated `copilot_agent` user with
+  exactly the privileges it needs and nothing else: `SELECT` on
+  `patient_data` (for OpenEMR-pid → FHIR-UUID resolution) and
+  column-level `UPDATE (login_fail_counter)` on `users_secure` (for
+  the post-token fail-counter reset). It cannot read other tables,
+  cannot write any clinical data, and cannot escalate. Dev keeps
+  root-level access for fast iteration.
+- **Database network isolation (QA + Prod)** — Railway's public
+  TCP proxy is disabled on both MariaDB instances. The DB is
+  reachable only on `mysql.railway.internal` from inside the
+  Railway project's private network. Compromising any DB
+  credential now requires first compromising the Railway-side
+  network — not just acquiring the password.
 
 If you are evaluating this for production use, treat the BAA and
 encryption-at-rest items as required pre-launch.
