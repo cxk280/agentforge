@@ -47,14 +47,19 @@ docker exec -i "${CONTAINER}" sh -c \
 
 echo "✓ pre-push: tests passed."
 
-# ─── Eval smoke (5 cases vs. production Co-Pilot) ────────────────────────
+# ─── Eval smoke (5 cases vs. LOCAL Co-Pilot) ─────────────────────────────
 #
 # Catches agent regressions from the *previous* push before another change
 # lands on top. Costs ~$0.05 / ~30s per push.
 #
+# Pinned to the local agent at http://localhost:8400/chat — pre-push runs
+# on a developer workstation, so it must hit the local environment, not
+# any deployed env. CI runs the same suite against dev/qa/prod from the
+# corresponding CircleCI jobs.
+#
 # Skipped automatically when ANTHROPIC_API_KEY is unset (e.g. on a fresh
-# clone), or when COPILOT_SKIP_EVAL_SMOKE=1 is exported (e.g. when prod
-# is intentionally down).
+# clone), when COPILOT_SKIP_EVAL_SMOKE=1 is exported, or when the local
+# agent isn't running on :8400.
 
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]] && [[ -f "${REPO_ROOT}/copilot/agent/.env" ]]; then
     # eval the matching line directly. Avoids xargs (mangles `=` and
@@ -64,14 +69,20 @@ if [[ -z "${ANTHROPIC_API_KEY:-}" ]] && [[ -f "${REPO_ROOT}/copilot/agent/.env" 
     export ANTHROPIC_API_KEY
 fi
 
+LOCAL_AGENT_ENDPOINT="http://localhost:8400/chat"
+
 if [[ "${COPILOT_SKIP_EVAL_SMOKE:-0}" = "1" ]]; then
     echo "⏭  pre-push: COPILOT_SKIP_EVAL_SMOKE=1 — skipping eval smoke."
 elif [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
     echo "⏭  pre-push: ANTHROPIC_API_KEY not set — skipping eval smoke."
 elif ! command -v python3 >/dev/null 2>&1; then
     echo "⏭  pre-push: python3 not on PATH — skipping eval smoke."
+elif ! curl -fsS -m 3 -o /dev/null "${LOCAL_AGENT_ENDPOINT%/chat}/" 2>/dev/null; then
+    echo "⏭  pre-push: local agent at ${LOCAL_AGENT_ENDPOINT} not reachable — skipping eval smoke."
+    echo "   Start it with: cd copilot/agent && uvicorn main:app --port 8400"
+    echo "   Do NOT redirect this hook at a deployed env — local↔dev↔qa↔prod must stay isolated."
 else
-    echo "▶ pre-push: running 5-case eval smoke against production Co-Pilot..."
+    echo "▶ pre-push: running 5-case eval smoke against local Co-Pilot (${LOCAL_AGENT_ENDPOINT})..."
     EVAL_DIR="${REPO_ROOT}/copilot/agent/evals"
     EVAL_VENV="${EVAL_DIR}/.venv"
 
@@ -87,7 +98,8 @@ else
     # we match that here.
     SMOKE_LOG=$(mktemp)
     trap 'rm -f "$SMOKE_LOG"' EXIT
-    "${EVAL_VENV}/bin/python" "${EVAL_DIR}/run_evals.py" --smoke --no-langfuse \
+    EVAL_AGENT_ENDPOINT="${LOCAL_AGENT_ENDPOINT}" \
+        "${EVAL_VENV}/bin/python" "${EVAL_DIR}/run_evals.py" --smoke --no-langfuse \
         | tee "$SMOKE_LOG" || true
     PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" "$SMOKE_LOG" \
              | awk '{print $2}' | cut -d/ -f1)

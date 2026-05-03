@@ -43,7 +43,10 @@ from redaction import redact
 
 DATASET_NAME = "copilot-golden-v1"
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
-DEFAULT_AGENT_ENDPOINT = "https://copilot-agent-production-41de.up.railway.app/chat"
+# The eval target must match the environment the eval is run from
+# (local↔dev↔qa↔prod; never cross). The default is local; CI jobs and the
+# pre-push hook set EVAL_AGENT_ENDPOINT explicitly to the matching env URL.
+DEFAULT_AGENT_ENDPOINT = "http://localhost:8400/chat"
 SMOKE_CASE_IDS = [
     "lookup-conditions-ted",
     "lookup-meds-ted",

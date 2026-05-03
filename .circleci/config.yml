@@ -119,7 +119,11 @@ commands:
             echo "Up: << parameters.url >>"
 
   run-evals:
-    description: "Run the eval suite against a target endpoint"
+    description: |
+      Run the eval suite against a target endpoint. The endpoint MUST match the
+      environment the eval job runs in: dev jobs hit dev, qa hits qa, prod hits
+      prod. Never cross environments — see feedback_evals_match_environment in
+      project memory and SECURITY.md isolation rules.
     parameters:
       endpoint:
         type: string

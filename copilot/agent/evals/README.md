@@ -19,28 +19,38 @@ Haiku 4.5 (LLM-as-judge). Results are uploaded to Langfuse Datasets
 
 ## Usage
 
+The eval target must match the environment you're running from
+(local↔dev↔qa↔prod; never cross). The harness defaults to
+`http://localhost:8400/chat`. CI jobs and the pre-push hook set
+`EVAL_AGENT_ENDPOINT` explicitly to the matching env URL — do not
+re-point a local run at a deployed env.
+
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 export ANTHROPIC_API_KEY=...
-export LANGFUSE_PUBLIC_KEY=pk-lf-copilot-prod
-export LANGFUSE_SECRET_KEY=sk-lf-copilot-prod-fa805936e58055
-export LANGFUSE_HOST=https://langfuse-web-production-368f.up.railway.app
+# Skip Langfuse for local runs (we don't run Langfuse locally — see
+# feedback_no_local_langfuse). For CI runs against dev/qa/prod, the
+# CircleCI project envs supply LANGFUSE_PUBLIC_KEY/SECRET_KEY/HOST.
 
-# Full 25-case run against production
-python run_evals.py
+# Make sure the LOCAL agent is up first:
+#   cd copilot/agent && uvicorn main:app --port 8400
 
-# 5-case smoke (used by pre-push hook)
-python run_evals.py --smoke
+# Full 25-case run against the local agent (default endpoint)
+python run_evals.py --no-langfuse
+
+# 5-case smoke (used by pre-push hook, also against local)
+python run_evals.py --smoke --no-langfuse
 
 # Filter by category or id
-python run_evals.py --filter clinical_lookup
-python run_evals.py --filter "tool_*"
-python run_evals.py --case lookup-meds-ted
+python run_evals.py --no-langfuse --filter clinical_lookup
+python run_evals.py --no-langfuse --filter "tool_*"
+python run_evals.py --no-langfuse --case lookup-meds-ted
 
-# Skip Langfuse upload (e.g. while iterating offline)
-python run_evals.py --no-langfuse
+# Run against a non-local env (only when you ARE that env, e.g. inside CI)
+EVAL_AGENT_ENDPOINT=https://copilot-agent-dev.up.railway.app/chat \
+    python run_evals.py
 ```
 
 ## Trust model
