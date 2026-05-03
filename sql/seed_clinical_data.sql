@@ -177,6 +177,20 @@ INSERT INTO form_vitals (date, pid, user, groupname, authorized, activity, bps, 
 ('2024-06-19 14:30:00', 8, 'admin', 'Default', 1, 1, '118', '72', 155.000000, 63.000000, 98.200000, 60.000000, 14.000000, 25.200000, 'Normal', 99.00),
 ('2024-10-08 11:00:00', 8, 'admin', 'Default', 1, 1, '120', '74', 159.000000, 63.000000, 97.800000, 56.000000, 14.000000, 25.900000, 'Overweight', 98.00);
 
+-- Register the vitals rows in `forms` so the FHIR Observation endpoint
+-- can find them (vital-signs reads join `forms` → `form_vitals`). Without
+-- this block, vitals are silently invisible to FHIR consumers including
+-- the Co-Pilot agent. See sql/copilot_seeds/register_vitals_in_forms.sql
+-- for the standalone idempotent version.
+INSERT INTO forms
+    (date, encounter, form_name, form_id, pid, user, groupname, authorized, deleted, formdir)
+SELECT v.date, e.encounter, 'Vitals', v.id, v.pid, 'admin', 'Default', 1, 0, 'vitals'
+FROM form_vitals v
+JOIN form_encounter e ON e.pid = v.pid AND DATE(e.date) = DATE(v.date)
+WHERE NOT EXISTS (
+    SELECT 1 FROM forms f WHERE f.formdir = 'vitals' AND f.form_id = v.id
+);
+
 -- ============================================================
 -- LAB RESULTS (form_observation)
 -- LOINC codes: 4548-4=HbA1c, 2160-0=Creatinine, 2345-7=Glucose,
