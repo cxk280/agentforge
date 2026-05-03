@@ -29,7 +29,9 @@ if (!AclMain::aclCheckCore('patients', 'demo')) {
 }
 
 // Agent backend URL — set COPILOT_BACKEND_URL in your environment or globals
-$backend_url = $GLOBALS['copilot_backend_url'] ?? 'http://localhost:8400';
+// Order: $GLOBALS (DB-backed) → COPILOT_BACKEND_URL env var → localhost (local dev)
+$backend_url = $GLOBALS['copilot_backend_url']
+    ?? (getenv('COPILOT_BACKEND_URL') ?: 'http://localhost:8400');
 $backend_url = rtrim($backend_url, '/');
 
 // Build the iframe src — pass pid so the UI can resolve the FHIR UUID
