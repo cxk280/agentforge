@@ -6,7 +6,7 @@
     "default_agent_endpoint": "http://localhost:8400/chat",
     "seed_lock": "Cases are pinned to the seed snapshot documented in evals/seed_lock.md as of 2026-05-02. If a case starts failing because the agent's reply no longer matches, first check whether the seed has drifted (run the queries in seed_lock.md) before assuming an agent regression.",
     "patient_seed_data": {
-      "1":  "Ted Shaw, M, 1947-03-11. Conditions: T2DM (E11.9), Hypertension (I10), CKD Stage 3a (N18.31), Hyperlipidemia (E78.5). Active Rx (7 entries): Metformin 1000mg, Lisinopril 20mg, Atorvastatin 20mg, Empagliflozin 10mg, plus later additions Lisinopril 10mg, Tramadol 50mg, Oxycodone 5mg. Encounters: 8 total — 5 from 2023-10/2024-10 plus 3 same-day entries on 2026-05-02. Vitals exist in form_vitals but are not registered in the `forms` table, so the FHIR Observation endpoint returns empty — agent correctly reports 'no vitals on file'.",
+      "1":  "Ted Shaw, M, 1947-03-11. Conditions: T2DM (E11.9), Hypertension (I10), CKD Stage 3a (N18.31), Hyperlipidemia (E78.5). Active Rx (7 entries): Metformin 1000mg, Lisinopril 20mg, Atorvastatin 20mg, Empagliflozin 10mg, plus later additions Lisinopril 10mg, Tramadol 50mg, Oxycodone 5mg. Encounters: 8 total — 5 from 2023-10 to 2024-10 (1001-1005) plus 3 same-day entries on 2026-05-02 (Walk-in, Annual physical exam, test from curl) added via UI activity. Vitals: 5 readings on the 2023-2024 encounters with BP 148/92, 142/88, 138/86, 136/84, 144/90 (latest BMI 30.6) — visible to FHIR after the seed-fix in scripts/fix-vitals-seed.sh.",
       "4":  "Eduardo Perez, M, 1957-01-09. Sparse data — used to test 'no data on file' handling.",
       "5":  "Farrah Rolle, F, 1973-10-11. Conditions: Asthma moderate persistent, GERD, Hyperlipidemia. Allergies: Aspirin, NSAIDs, Latex. 5 encounters.",
       "8":  "Nora Cohen, F, 1967-06-04. (Has Rx: Levothyroxine, Alendronate, Sertraline.)",
@@ -54,8 +54,8 @@
       "patient_id": "1",
       "message": "Show me the latest vitals for this patient.",
       "expected": {
-        "must_not_contain": ["144", "BMI 30", "BP 14"],
-        "rubric": "Ted's vitals exist in form_vitals but are NOT registered in the `forms` table, so the FHIR Observation endpoint returns empty for vital-signs (see seed_lock.md). The agent must report that no vital signs are on file. NOT acceptable: hallucinating BP, BMI, weight, height, or any specific values."
+        "must_contain": ["144", "BMI"],
+        "rubric": "Reports recent vitals for Ted Shaw — most recent BP is 144/90 (from the 2024-10-30 visit), BMI ~30.6. Bonus if it flags the BP as elevated."
       }
     },
     {
@@ -65,8 +65,7 @@
       "patient_id": "1",
       "message": "When did this patient last visit? What was the reason?",
       "expected": {
-        "must_contain": ["fatigue"],
-        "rubric": "Cites the most recent encounter (date 2024-10-30 or any equivalent format like 'October 30, 2024' or 'Oct 30 2024') and the reason 'Annual exam, worsening fatigue' (paraphrasing OK as long as 'fatigue' appears)."
+        "rubric": "Cites a 2026-05-02 visit (the seed has three same-day encounters from UI testing on that date — 'Walk-in', 'Annual physical exam', and 'test from curl'). Acceptable to (a) name any one of those reasons, (b) list all three, or (c) call out that there are multiple same-day entries. NOT acceptable: ignoring the 2026-05-02 visits and citing the older 2024-10-30 'fatigue' encounter as 'most recent', or hallucinating a different date or reason."
       }
     },
     {
@@ -106,7 +105,7 @@
       "patient_id": "1",
       "message": "How many encounters does this patient have on record?",
       "expected": {
-        "must_contain": ["5"],
+        "must_contain": ["8"],
         "must_not_contain": ["unable", "error"]
       }
     },
@@ -127,7 +126,7 @@
       "patient_id": "1",
       "message": "Summarize this patient's last visit in 2-3 sentences.",
       "expected": {
-        "rubric": "Produces a 2-3 sentence narrative referencing the 2024-10-30 visit and 'Annual exam, worsening fatigue'. Acceptable to mention vitals/conditions for context. Length materially over 4 sentences fails."
+        "rubric": "Produces a 2-3 sentence narrative referencing a 2026-05-02 visit (the seed has three same-day entries from UI activity — Walk-in / Annual physical exam / test from curl). Acceptable to mention any of those reasons, to flag the multiple same-day entries, or to add brief vitals/conditions context. Length materially over 4 sentences fails. Hallucinating a different date or a clinical reason not in the chart fails."
       }
     },
     {
