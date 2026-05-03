@@ -199,6 +199,21 @@ several compliance steps that are intentionally simplified here:
       Settings → Account → High Security (irreversible), then set
       the agent env var. We chose not to do this so the toggle
       stays reversible during the demo period.
+
+      **NR Logs obfuscation rules (planned, not in place):** The
+      cleanest way to mask MRN / SSN / phone / email patterns in
+      forwarded logs is via NR's account-level Log obfuscation
+      rules (Logs → Manage data → Obfuscation rules). This is a
+      paid-tier feature and is **not enabled** during the Gauntlet
+      demo period to avoid the upgrade cost. For a real
+      production deployment under the BAA assumption above, the
+      first hardening step is to upgrade to NR's paid tier and
+      add obfuscation rules with this filter
+      (`entity.name LIKE 'AgentForge%'`) and these patterns:
+      `MRN[\s#]*\d{4,8}`, `\b\d{3}-\d{2}-\d{4}\b` (SSN),
+      `\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}` (US phone),
+      `[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}` (email),
+      with method `MASK`.
 - **Audit logging** — every tool call from the Co-Pilot agent
   flows through OpenEMR's existing `log` table, so PHI access is
   traceable to the authenticated user.
