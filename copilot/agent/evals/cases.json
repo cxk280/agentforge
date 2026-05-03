@@ -1,13 +1,14 @@
 {
   "_meta": {
-    "version": 2,
-    "description": "AgentForge Co-Pilot eval set. Each case has a `mode`: 'strict' for deterministic substring grading (no LLM judge), or 'labeled' for graded rubric scoring via Claude Haiku 4.5. Use strict when there IS a single right answer (date, count, ICD code). Use labeled for summaries, refusals, and other open-ended responses.",
+    "version": 3,
+    "description": "AgentForge Co-Pilot eval set. Each case has a `mode`: 'strict' for deterministic substring grading (no LLM judge), or 'labeled' for graded rubric scoring via Claude Haiku 4.5. Use strict when there IS a single right answer (date, count, ICD code). Use labeled for summaries, refusals, and other open-ended responses. Default eval target is the local agent — see evals/README.md.",
     "judge_model": "claude-haiku-4-5-20251001",
-    "agent_endpoint": "https://copilot-agent-production-41de.up.railway.app/chat",
+    "default_agent_endpoint": "http://localhost:8400/chat",
+    "seed_lock": "Cases are pinned to the seed snapshot documented in evals/seed_lock.md as of 2026-05-02. If a case starts failing because the agent's reply no longer matches, first check whether the seed has drifted (run the queries in seed_lock.md) before assuming an agent regression.",
     "patient_seed_data": {
-      "1":  "Ted Shaw, M, 1947-03-11. Conditions: T2DM (E11.9), Hypertension (I10), CKD Stage 3a (N18.31), Hyperlipidemia (E78.5). Active Rx: Metformin 1000mg, Lisinopril 20mg, Atorvastatin 20mg, Empagliflozin 10mg.",
+      "1":  "Ted Shaw, M, 1947-03-11. Conditions: T2DM (E11.9), Hypertension (I10), CKD Stage 3a (N18.31), Hyperlipidemia (E78.5). Active Rx (7 entries): Metformin 1000mg, Lisinopril 20mg, Atorvastatin 20mg, Empagliflozin 10mg, plus later additions Lisinopril 10mg, Tramadol 50mg, Oxycodone 5mg. Encounters: 8 total — 5 from 2023-10/2024-10 plus 3 same-day entries on 2026-05-02. Vitals exist in form_vitals but are not registered in the `forms` table, so the FHIR Observation endpoint returns empty — agent correctly reports 'no vitals on file'.",
       "4":  "Eduardo Perez, M, 1957-01-09. Sparse data — used to test 'no data on file' handling.",
-      "5":  "Farrah Rolle, F, 1973-10-11. Conditions: Asthma moderate persistent, GERD, Hyperlipidemia. Allergies: Aspirin, NSAIDs, Latex.",
+      "5":  "Farrah Rolle, F, 1973-10-11. Conditions: Asthma moderate persistent, GERD, Hyperlipidemia. Allergies: Aspirin, NSAIDs, Latex. 5 encounters.",
       "8":  "Nora Cohen, F, 1967-06-04. (Has Rx: Levothyroxine, Alendronate, Sertraline.)",
       "17": "Jim Moses, M, 1945-02-14."
     }
@@ -53,8 +54,8 @@
       "patient_id": "1",
       "message": "Show me the latest vitals for this patient.",
       "expected": {
-        "must_contain": ["144", "BMI"],
-        "rubric": "Reports recent vitals for Ted Shaw — most recent BP is 144/90, BMI ~30.6. Bonus if it flags the BP as elevated."
+        "must_not_contain": ["144", "BMI 30", "BP 14"],
+        "rubric": "Ted's vitals exist in form_vitals but are NOT registered in the `forms` table, so the FHIR Observation endpoint returns empty for vital-signs (see seed_lock.md). The agent must report that no vital signs are on file. NOT acceptable: hallucinating BP, BMI, weight, height, or any specific values."
       }
     },
     {
