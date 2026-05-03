@@ -91,13 +91,26 @@ echo "  oauth_clients UPDATE done\n";
 $agentClientId = getenv('OPENEMR_CLIENT_ID');
 $agentClientSecret = getenv('OPENEMR_CLIENT_SECRET');
 if ($agentClientId && $agentClientSecret) {
-    $existing = sqlQuery(
-        "SELECT client_id, is_enabled FROM oauth_clients WHERE client_id = ?",
-        [$agentClientId]
-    );
-    $cryptoGen = \OpenEMR\BC\ServiceContainer::getCrypto();
-    $encryptedSecret = $cryptoGen->encryptStandard($agentClientSecret);
-    if (!$existing) {
+    // Wrap the lookup + crypto init + INSERT/UPDATE in a try/catch so a
+    // missing encryption key file (which would otherwise silently abort
+    // the script via OpenEMR's exception handler) surfaces as a visible
+    // error in the response rather than a confusing "no oauth_clients
+    // rows yet" message a few lines down.
+    $existing = false;
+    $encryptedSecret = null;
+    try {
+        $existing = sqlQuery(
+            "SELECT client_id, is_enabled FROM oauth_clients WHERE client_id = ?",
+            [$agentClientId]
+        );
+        $cryptoGen = \OpenEMR\BC\ServiceContainer::getCrypto();
+        $encryptedSecret = $cryptoGen->encryptStandard($agentClientSecret);
+    } catch (Throwable $e) {
+        echo "  ERROR registering agent client: " . $e->getMessage() . "\n";
+    }
+    if ($encryptedSecret === null) {
+        echo "  (skipping insert/update due to error above)\n";
+    } elseif (!$existing) {
         // Fresh row — insert with sane defaults for a confidential
         // service-to-service client using the password grant.
         sqlStatement(
