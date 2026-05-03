@@ -9,7 +9,7 @@
 
 | Service | URL | Credentials |
 |---|---|---|
-| OpenEMR + Co-Pilot UI | https://openemr-production-971e.up.railway.app | `admin` / `admin` |
+| OpenEMR + Co-Pilot UI | https://openemr-production-971e.up.railway.app | `admin` / `pass` |
 | Co-Pilot agent (FastAPI) | https://copilot-agent-production-41de.up.railway.app | — |
 | Langfuse (observability) | https://langfuse-web-production-368f.up.railway.app | see operator |
 
@@ -358,7 +358,7 @@ watch progress with `docker compose logs -f openemr`.
 | OpenEMR (HTTPS) | https://localhost:9300/ | `admin` / `pass` |
 | phpMyAdmin | http://localhost:8310/ | root / `root` |
 
-Note the local-dev password is `pass`; on Railway production it's `admin`.
+The Railway Dev/QA/Prod environments use the same `admin` / `pass` credentials as local-dev.
 
 ### 4. Seed demo data
 
