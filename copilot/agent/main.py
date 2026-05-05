@@ -16,7 +16,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from slowapi import Limiter
@@ -566,6 +566,68 @@ async def extract_route(request: Request, req: ExtractRequest):
         "validation_error": result.validation_error,
         "payload": result.payload,
     }
+
+
+@app.get("/copilot/lab-trend/{patient_id}")
+async def lab_trend_svg(patient_id: int, test_name: str, unit: str = "", title: str = ""):
+    """Return an inline-SVG sparkline of a single lab over time.
+
+    Combines extracted facts (cp_extracted_facts where fact_type =
+    'lab_result' and fact_json.test_name matches) with any existing
+    FHIR Observations on the chart, sorted by date. The chat UI can
+    drop this in via markdown image syntax (`![](.../lab-trend/...)`)
+    when the agent decides a longitudinal trend is worth showing.
+    """
+    from charts import TrendPoint, render_sparkline
+
+    pool = await get_db_pool()
+    if pool is None:
+        raise HTTPException(status_code=500, detail="DB pool unavailable")
+
+    points: list[TrendPoint] = []
+
+    # Source 1: cp_extracted_facts (lab_result rows for this patient).
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                # MySQL JSON_EXTRACT — works on MySQL 5.7+. Strip enclosing quotes.
+                await cur.execute(
+                    "SELECT JSON_UNQUOTE(JSON_EXTRACT(fact_json, '$.collection_date')) AS dt, "
+                    "       JSON_UNQUOTE(JSON_EXTRACT(fact_json, '$.value')) AS val, "
+                    "       JSON_UNQUOTE(JSON_EXTRACT(fact_json, '$.abnormal_flag')) AS flg "
+                    "FROM cp_extracted_facts "
+                    "WHERE patient_id = %s AND fact_type = 'lab_result' "
+                    "  AND LOWER(JSON_UNQUOTE(JSON_EXTRACT(fact_json, '$.test_name'))) "
+                    "      LIKE LOWER(%s) "
+                    "ORDER BY dt ASC",
+                    (patient_id, f"%{test_name}%"),
+                )
+                for dt, val, flg in await cur.fetchall():
+                    if not val:
+                        continue
+                    try:
+                        v = float(str(val).split()[0])
+                    except (ValueError, IndexError):
+                        continue
+                    points.append(TrendPoint(
+                        date=str(dt or ""),
+                        value=v,
+                        flag=str(flg or "").lower() if flg and flg != "unknown" else "",
+                    ))
+    except Exception:
+        # Swallow DB-shape mismatches; the SVG still renders from the
+        # FHIR side and from any successful rows.
+        pass
+
+    svg = render_sparkline(
+        points,
+        title=title or f"{test_name} trend",
+        unit=unit,
+        ref_low=None,
+        ref_high=None,
+    )
+    return Response(content=svg, media_type="image/svg+xml",
+                    headers={"Cache-Control": "private, max-age=60"})
 
 
 @app.get("/copilot/extractions/{patient_id}")
