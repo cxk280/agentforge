@@ -310,7 +310,12 @@ $earlier = [
   </aside>
 
   <main class="cp-doc-main">
-    <?php if (!empty($liveDocs)): ?>
+    <?php if (!empty($liveDocs)):
+        // Agent backend URL — same source order as interface/copilot/index.php.
+        $copilotBackend = $GLOBALS['copilot_backend_url']
+            ?? (getenv('COPILOT_BACKEND_URL') ?: 'http://localhost:8400');
+        $copilotBackend = rtrim((string)$copilotBackend, '/');
+    ?>
       <div class="cp-section-label" style="display:flex;align-items:center;gap:8px">
         <?php echo xlt('LIVE — uploaded on this chart'); ?>
         <span style="background:#E5ECF7;color:#1f3a68;font-size:9px;font-weight:700;
@@ -324,26 +329,91 @@ $earlier = [
                 : "/controller.php?document&retrieve&patient_id=" . $activePid
                   . "&document_id=" . (int)$d['id']
                   . "&as_file=true&original_file=true";
+            // Inline detection of doc_type from filename hints — overridable
+            // via the dropdown on each row when the guess is wrong.
+            $nameLower = strtolower($d['name']);
+            $guessType = (strpos($nameLower, 'lab') !== false || strpos($nameLower, 'cmp') !== false ||
+                          strpos($nameLower, 'panel') !== false || strpos($nameLower, 'a1c') !== false)
+                ? 'lab_pdf'
+                : ((strpos($nameLower, 'intake') !== false || strpos($nameLower, 'history') !== false)
+                    ? 'intake_form'
+                    : ((strpos($nameLower, 'med') !== false || strpos($nameLower, 'rx') !== false)
+                        ? 'medication_list'
+                        : 'lab_pdf'));
         ?>
-          <a class="cp-earl-row" href="<?php echo attr($href); ?>"
-             target="<?php echo $isPdf ? '_self' : '_blank'; ?>"
-             style="text-decoration:none;color:inherit">
-            <div class="cp-earl-icon"><?php echo $isPdf ? '📄' : '📎'; ?></div>
-            <div class="cp-earl-info">
-              <div class="cp-earl-title"><?php echo text($d['name']); ?></div>
-              <div class="cp-earl-sub">
-                <span class="cp-earl-cat-pill"><?php echo text($d['mime']); ?></span>
-                <span>doc #<?php echo (int)$d['id']; ?></span>
-                <?php if ($isPdf): ?>
-                  <span style="color:#1f3a68;font-weight:600">→ open with bbox viewer</span>
-                <?php endif; ?>
+          <div class="cp-earl-row" style="display:flex;align-items:center;gap:12px">
+            <a href="<?php echo attr($href); ?>"
+               target="<?php echo $isPdf ? '_self' : '_blank'; ?>"
+               style="display:flex;flex:1;align-items:center;gap:12px;text-decoration:none;color:inherit;min-width:0">
+              <div class="cp-earl-icon"><?php echo $isPdf ? '📄' : '📎'; ?></div>
+              <div class="cp-earl-info">
+                <div class="cp-earl-title"><?php echo text($d['name']); ?></div>
+                <div class="cp-earl-sub">
+                  <span class="cp-earl-cat-pill"><?php echo text($d['mime']); ?></span>
+                  <span>doc #<?php echo (int)$d['id']; ?></span>
+                  <?php if ($isPdf): ?>
+                    <span style="color:#1f3a68;font-weight:600">→ open with bbox viewer</span>
+                  <?php endif; ?>
+                </div>
               </div>
-            </div>
-            <div class="cp-earl-spacer"></div>
-            <div class="cp-earl-date"><?php echo text($d['date']); ?></div>
-          </a>
+              <div class="cp-earl-spacer"></div>
+              <div class="cp-earl-date"><?php echo text($d['date']); ?></div>
+            </a>
+            <?php if ($isPdf): ?>
+              <select class="cp-extract-type"
+                      data-docid="<?php echo (int)$d['id']; ?>"
+                      style="border:1px solid #E4E5E8;border-radius:6px;
+                             padding:4px 8px;font-size:11px;background:#FFFFFF">
+                <option value="lab_pdf"          <?php echo $guessType === 'lab_pdf' ? 'selected' : ''; ?>>lab_pdf</option>
+                <option value="intake_form"      <?php echo $guessType === 'intake_form' ? 'selected' : ''; ?>>intake_form</option>
+                <option value="medication_list"  <?php echo $guessType === 'medication_list' ? 'selected' : ''; ?>>medication_list</option>
+              </select>
+              <button type="button" class="cp-extract-btn"
+                      data-docid="<?php echo (int)$d['id']; ?>"
+                      style="background:#008C8C;color:#FFFFFF;border:none;
+                             border-radius:999px;padding:6px 12px;font-size:11px;
+                             font-weight:600;cursor:pointer">
+                <?php echo xlt('Extract'); ?>
+              </button>
+            <?php endif; ?>
+          </div>
         <?php endforeach; ?>
       </div>
+      <script>
+        (function () {
+          const BACKEND = <?php echo json_encode($copilotBackend); ?>;
+          const PATIENT_ID = <?php echo (int)$activePid; ?>;
+          document.querySelectorAll('.cp-extract-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const docId = parseInt(btn.dataset.docid, 10);
+              const sel = document.querySelector('.cp-extract-type[data-docid="' + docId + '"]');
+              const docType = sel ? sel.value : 'lab_pdf';
+              const orig = btn.textContent;
+              btn.disabled = true; btn.textContent = 'Extracting…';
+              try {
+                const resp = await fetch(BACKEND + '/extract', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    patient_id: PATIENT_ID,
+                    doc_type: docType,
+                    document_id: docId,
+                  }),
+                });
+                const data = await resp.json();
+                if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
+                btn.textContent = `✓ ${data.fact_count} facts`;
+                btn.style.background = '#2d7a4f';
+                setTimeout(() => { window.location.reload(); }, 800);
+              } catch (err) {
+                btn.disabled = false;
+                btn.textContent = orig;
+                alert('Extraction failed: ' + (err.message || err));
+              }
+            });
+          });
+        })();
+      </script>
     <?php endif; ?>
 
     <div class="cp-section-label"><?php echo xlt('RECENT'); ?></div>
