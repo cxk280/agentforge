@@ -1,0 +1,12 @@
+# Dev-only deps — NOT installed into the production agent image.
+#
+# Used for:
+#   - copilot/agent/ingest/test_fixtures/generate_samples.py
+#     (regenerating the sample-PDF fixture set when layouts change)
+#   - copilot/agent/scripts/mvp_demo.py --generate-sample
+#
+# Install with:
+#   pip install -r copilot/agent/requirements-dev.txt
+
+-r requirements.txt
+reportlab>=4.0.0
