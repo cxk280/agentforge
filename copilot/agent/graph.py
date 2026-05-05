@@ -73,6 +73,11 @@ class AgentState(TypedDict, total=False):
     intake_done: bool
     evidence_done: bool
 
+    # --- Critic (extension) ---
+    retry_count: int          # number of times critic has bounced final_answer
+    critic_pass: bool         # True once the critic has approved the reply
+    critic_feedback: str      # last failure note, fed back to final_answer
+
     # --- Audit + streaming ---
     handoff_log: list[dict[str, Any]]
     events: list[dict[str, Any]]
@@ -317,6 +322,144 @@ async def final_answer_node(state: AgentState) -> AgentState:
 
 
 # ---------------------------------------------------------------------------
+# Worker: critic (extension)
+# ---------------------------------------------------------------------------
+
+# Hard cap on critic retries — one bounce, max. Without this the graph
+# could loop indefinitely on an irreducible citation gap.
+_MAX_CRITIC_RETRIES = 1
+
+
+async def critic_node(state: AgentState) -> AgentState:
+    """Reject uncited clinical claims and unsafe-action surfaces.
+
+    Reuses the deterministic rubrics from `copilot.agent.evals.rubrics`
+    so the critic and the eval gate are checking the same shape. If
+    `citation_present` or `safe_refusal` fail (and we have retries
+    remaining), append structured feedback to the messages list and
+    route back to final_answer. Otherwise approve the reply and end.
+    """
+    reply = state.get("reply_text", "")
+    events = list(state.get("events") or [])
+    events.append({"type": "handoff", "from": "final_answer", "to": "critic",
+                   "reason": "validate citations + safety on draft"})
+
+    # Soft-import rubrics (the critic is optional and we don't want a
+    # missing eval-suite checkout to break /chat/graph).
+    try:
+        try:
+            from copilot.agent.evals.rubrics import (  # type: ignore
+                citation_present, safe_refusal,
+            )
+        except ImportError:
+            import sys
+            from pathlib import Path as _P
+            sys.path.insert(0, str(_P(__file__).resolve().parent / "evals"))
+            from rubrics import citation_present, safe_refusal  # type: ignore[no-redef]
+    except Exception as exc:
+        events.append({"type": "critic_skip", "reason": f"rubrics import failed: {exc}"})
+        return {**state, "critic_pass": True, "events": events,
+                "handoff_log": (state.get("handoff_log") or []) + [
+                    _log_handoff(state, from_node="final_answer", to_node="critic",
+                                 reason="skipped — rubrics unavailable"),
+                ]}
+
+    # We synthesize a "case" so we can call the rubric functions directly.
+    last_user = None
+    for m in reversed(state.get("messages") or []):
+        if m.get("role") == "user":
+            last_user = m
+            break
+    is_refusal_target = False
+    if last_user:
+        text = str(last_user.get("content") or "").lower()
+        is_refusal_target = any(p in text for p in (
+            "falsify", "delete the diagnosis", "remove the diagnosis",
+            "email", "send to", "share with my friend",
+        ))
+    synthetic_case = {
+        "category": "refusal" if is_refusal_target else "clinical_lookup",
+        "expected": {"must_refuse": is_refusal_target},
+    }
+
+    cit_result = citation_present(synthetic_case, reply)
+    refusal_result = safe_refusal(synthetic_case, reply) if is_refusal_target else None
+
+    failures: list[str] = []
+    if not cit_result.passed:
+        failures.append(f"citation_present: {cit_result.reason}")
+    if refusal_result is not None and not refusal_result.passed:
+        failures.append(f"safe_refusal: {refusal_result.reason}")
+
+    retries_used = int(state.get("retry_count") or 0)
+    if not failures:
+        events.append({"type": "critic_pass"})
+        return {
+            **state,
+            "critic_pass": True,
+            "events": events,
+            "handoff_log": (state.get("handoff_log") or []) + [
+                _log_handoff(state, from_node="final_answer", to_node="critic",
+                             reason="approved"),
+            ],
+        }
+
+    if retries_used >= _MAX_CRITIC_RETRIES:
+        events.append({"type": "critic_warn", "failures": failures,
+                       "detail": "max retries exhausted; surfacing reply with warning"})
+        return {
+            **state,
+            "critic_pass": False,
+            "events": events,
+            "handoff_log": (state.get("handoff_log") or []) + [
+                _log_handoff(state, from_node="final_answer", to_node="critic",
+                             reason="max retries — emit with warning"),
+            ],
+        }
+
+    # Retry with structured feedback baked into the conversation.
+    feedback = (
+        "[Critic feedback — please revise the previous draft]\n"
+        + "\n".join(f"• {f}" for f in failures)
+        + "\n\nRevise the response to add citations for every clinical claim "
+          "(name the tool used or include the source as Sources: …). "
+          "Do not fabricate sources — if a claim has no support, omit it."
+    )
+    new_messages = list(state.get("messages") or []) + [
+        # Synthetic user-role turn carrying the critic's feedback. We
+        # use the user role because the assistant has already finished
+        # its response in the prior turn; the next final_answer pass
+        # will treat this as the new prompt to refine the answer.
+        {"role": "user", "content": feedback},
+    ]
+    events.append({"type": "critic_retry", "failures": failures, "retries_used": retries_used + 1})
+    return {
+        **state,
+        "messages": new_messages,
+        "retry_count": retries_used + 1,
+        "critic_pass": False,
+        "critic_feedback": "\n".join(failures),
+        "intake_done": True,        # don't re-extract on retry
+        "evidence_done": True,      # don't re-retrieve on retry
+        "events": events,
+        "handoff_log": (state.get("handoff_log") or []) + [
+            _log_handoff(state, from_node="final_answer", to_node="critic",
+                         reason=f"retry {retries_used + 1} of {_MAX_CRITIC_RETRIES}"),
+        ],
+    }
+
+
+def route_after_critic(state: AgentState) -> Literal["final_answer", "__end__"]:
+    if state.get("critic_pass"):
+        return END
+    if (state.get("retry_count") or 0) > _MAX_CRITIC_RETRIES:
+        return END
+    if state.get("critic_feedback"):
+        return "final_answer"
+    return END
+
+
+# ---------------------------------------------------------------------------
 # Supervisor — deterministic router
 # ---------------------------------------------------------------------------
 
@@ -357,6 +500,7 @@ def build_graph():
     g.add_node("intake_extractor", intake_extractor_node)
     g.add_node("evidence_retriever", evidence_retriever_node)
     g.add_node("final_answer", final_answer_node)
+    g.add_node("critic", critic_node)
 
     g.add_edge(START, "supervisor")
     g.add_conditional_edges("supervisor", route_after_supervisor, {
@@ -368,7 +512,13 @@ def build_graph():
     # (e.g. after intake completes, supervisor may still want evidence).
     g.add_edge("intake_extractor", "supervisor")
     g.add_edge("evidence_retriever", "supervisor")
-    g.add_edge("final_answer", END)
+    # final_answer flows into the critic; critic either approves (END)
+    # or bounces back to final_answer with feedback baked into messages.
+    g.add_edge("final_answer", "critic")
+    g.add_conditional_edges("critic", route_after_critic, {
+        "final_answer": "final_answer",
+        END: END,
+    })
     _compiled = g.compile()
     return _compiled
 
