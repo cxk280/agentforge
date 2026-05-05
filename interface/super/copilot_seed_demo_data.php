@@ -36,9 +36,51 @@ if (($_GET['confirm'] ?? '') !== '1') {
 
 header('Content-Type: text/plain; charset=utf-8');
 
+// ── ALWAYS-RUN: Backfill users_secure for seeded logins ────────────────
+//
+// AgentForge's demo seed has historically inserted bcrypt passwords
+// into users.password (the LEGACY column) — but OpenEMR's modern auth
+// reads from users_secure.password. Without a users_secure row the
+// seeded provider/nurse/etc. accounts can't log in at all, which is
+// why every login was bouncing back to admin.
+//
+// This block runs on EVERY page load (before the seed marker check)
+// and idempotently inserts users_secure rows for any seeded login
+// that's missing one. Existing deploys (where the seed already fired
+// before this fix) get repaired on the next visit; fresh DBs work
+// correctly the first time the seeder runs.
+$seeded_logins = [
+    'erivera', 'apark', 'jpatel', 'llee', 'kkim',
+    'mnunez', 'schoi', 'bhudson',
+];
+$shared_pwd_hash = password_hash('demopass', PASSWORD_BCRYPT);
+$backfilled = 0;
+foreach ($seeded_logins as $u) {
+    $row = sqlQuery("SELECT id FROM users WHERE username = ?", [$u]);
+    if (!$row) {
+        continue;
+    }
+    $userId = (int)$row['id'];
+    $existing = sqlQuery("SELECT id FROM users_secure WHERE id = ?", [$userId]);
+    if ($existing) {
+        continue;
+    }
+    sqlStatement(
+        "INSERT INTO users_secure
+            (id, username, password, last_update_password, last_update)
+         VALUES (?, ?, ?, NOW(), NOW())",
+        [$userId, $u, $shared_pwd_hash]
+    );
+    $backfilled++;
+}
+if ($backfilled > 0) {
+    echo "users_secure backfill: created {$backfilled} row(s) for seeded logins.\n";
+    echo "Each seeded user now logs in with password 'demopass'.\n\n";
+}
+
 $marker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_seed_v1'");
 if (!empty($marker['gl_value'])) {
-    echo "Already seeded (gl_name='copilot_seed_v1' = {$marker['gl_value']}). Skipping.\n";
+    echo "Already seeded (gl_name='copilot_seed_v1' = {$marker['gl_value']}). Skipping main seed.\n";
     echo "If you really need to re-run: DELETE FROM globals WHERE gl_name='copilot_seed_v1' (NOT recommended — UI changes will mix with re-seeded rows).\n";
     exit;
 }
@@ -67,6 +109,19 @@ foreach ($users as [$user, $fn, $ln, $email, $title, $auth, $npi, $dea]) {
         "INSERT INTO users (username, password, fname, lname, email, title, authorized, npi, federaldrugid, active, see_auth, facility_id, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 3, 0)",
         [$user, $pwd_hash, $fn, $ln, $email, $title, $auth, $npi, $dea]
     );
+    // users_secure is the modern auth table — without a row here, the
+    // login form rejects the user even though the legacy users.password
+    // column has the right hash. See backfill block at the top of this
+    // file for the explanation.
+    $newId = sqlQuery("SELECT id FROM users WHERE username = ?", [$user]);
+    if ($newId) {
+        sqlStatement(
+            "INSERT INTO users_secure
+                (id, username, password, last_update_password, last_update)
+             VALUES (?, ?, ?, NOW(), NOW())",
+            [(int)$newId['id'], $user, $pwd_hash]
+        );
+    }
     $inserted['users']++;
 }
 

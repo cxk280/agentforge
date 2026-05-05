@@ -228,6 +228,20 @@ python copilot/agent/scripts/mvp_demo.py \
 #    guideline chunks with proper citations.
 ```
 
+### Multi-user demo logins
+
+After running the seeder (`/interface/super/copilot_seed_demo_data.php?confirm=1`), the seeded provider / nurse / front-desk / billing users can each log in with their own credentials. This drives the per-user calendar filter and per-user audit trail — different users now see different event sets:
+
+| Username | Role | Password |
+|---|---|---|
+| `admin` | Administrator | `pass` |
+| `erivera`, `apark`, `jpatel`, `llee`, `kkim` | Provider (MD/DO) | `demopass` |
+| `mnunez` | Front desk | `demopass` |
+| `schoi` | RN | `demopass` |
+| `bhudson` | Billing | `demopass` |
+
+> The seeder writes both `users.password` (legacy column) and `users_secure.password` (modern auth column). Existing deploys where the seed pre-dates the multi-user fix get their `users_secure` rows backfilled idempotently on the next visit to the seeder URL.
+
 ### W2 endpoints (agent)
 
 - `POST /extract` — run extraction on an uploaded PDF
