@@ -13,6 +13,31 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
+// ─── Live data: real documents.* rows for the active patient ────────────
+// Surfaces W2 uploads (and any other real documents) above the static W1
+// mock sections, each linked to the bbox-overlay viewer
+// (copilot_doc_viewer.php). When the agent's /extract has been run on a
+// document, its citations are visible there.
+$activePid = (int)($_SESSION['pid'] ?? 0);
+$liveDocs = [];
+if ($activePid > 0) {
+    $rs = sqlStatement(
+        "SELECT id, name, mimetype, date FROM documents
+          WHERE foreign_id = ? AND deleted = 0
+          ORDER BY date DESC, id DESC
+          LIMIT 12",
+        [$activePid]
+    );
+    while ($r = sqlFetchArray($rs)) {
+        $liveDocs[] = [
+            'id'   => (int)$r['id'],
+            'name' => (string)($r['name'] ?? "Document #{$r['id']}"),
+            'mime' => (string)($r['mimetype'] ?? 'application/octet-stream'),
+            'date' => $r['date'] ? substr($r['date'], 0, 10) : '',
+        ];
+    }
+}
+
 // [icon, label, count, active]
 $categories = [
     ['📁', 'All Documents',    47, true],
@@ -285,6 +310,42 @@ $earlier = [
   </aside>
 
   <main class="cp-doc-main">
+    <?php if (!empty($liveDocs)): ?>
+      <div class="cp-section-label" style="display:flex;align-items:center;gap:8px">
+        <?php echo xlt('LIVE — uploaded on this chart'); ?>
+        <span style="background:#E5ECF7;color:#1f3a68;font-size:9px;font-weight:700;
+                     padding:2px 6px;border-radius:4px;letter-spacing:.04em">FHIR</span>
+      </div>
+      <div class="cp-earlier-card" style="margin-bottom:16px">
+        <?php foreach ($liveDocs as $d):
+            $isPdf = stripos($d['mime'], 'pdf') !== false;
+            $href = $isPdf
+                ? "/interface/patient_file/documents/copilot_doc_viewer.php?docref=" . (int)$d['id']
+                : "/controller.php?document&retrieve&patient_id=" . $activePid
+                  . "&document_id=" . (int)$d['id']
+                  . "&as_file=true&original_file=true";
+        ?>
+          <a class="cp-earl-row" href="<?php echo attr($href); ?>"
+             target="<?php echo $isPdf ? '_self' : '_blank'; ?>"
+             style="text-decoration:none;color:inherit">
+            <div class="cp-earl-icon"><?php echo $isPdf ? '📄' : '📎'; ?></div>
+            <div class="cp-earl-info">
+              <div class="cp-earl-title"><?php echo text($d['name']); ?></div>
+              <div class="cp-earl-sub">
+                <span class="cp-earl-cat-pill"><?php echo text($d['mime']); ?></span>
+                <span>doc #<?php echo (int)$d['id']; ?></span>
+                <?php if ($isPdf): ?>
+                  <span style="color:#1f3a68;font-weight:600">→ open with bbox viewer</span>
+                <?php endif; ?>
+              </div>
+            </div>
+            <div class="cp-earl-spacer"></div>
+            <div class="cp-earl-date"><?php echo text($d['date']); ?></div>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+
     <div class="cp-section-label"><?php echo xlt('RECENT'); ?></div>
     <div class="cp-recent-grid">
       <?php foreach ($recent as $r): ?>
