@@ -369,6 +369,59 @@ async def chat_stream(request: Request, req: ChatRequest):
     )
 
 
+@app.post("/chat/graph")
+@limiter.limit("30/minute")
+async def chat_graph_stream(request: Request, req: ChatRequest):
+    """Stream the agent response through the LangGraph state machine.
+
+    Today this is a thin wrapper around the W1 single-loop, mediated by
+    a LangGraph StateGraph with a single supervisor node. The point of
+    keeping it as a separate route is to validate the LangGraph
+    streaming bridge end-to-end before swapping the chat UI off the W1
+    /chat/stream path. As workers (intake_extractor, evidence_retriever,
+    critic) get added in copilot/agent/graph.py, behavior diverges
+    cleanly without disturbing the existing /chat surface.
+
+    Same NDJSON event shape as /chat/stream so the chat UI can A/B
+    between them by URL only.
+    """
+    from graph import run_graph_stream
+
+    if not req.patient_id:
+        raise HTTPException(status_code=400, detail="patient_id is required")
+
+    request.state.rate_limit_session_id = req.session_id
+
+    history = _sessions.get(req.session_id, [])
+    history.append({"role": "user", "content": req.message})
+    fhir_patient_id = await _resolve_fhir_id(req.patient_id)
+
+    async def event_stream():
+        try:
+            async for event in run_graph_stream(
+                session_id=req.session_id,
+                patient_id=req.patient_id,
+                fhir_patient_id=fhir_patient_id,
+                messages=history,
+            ):
+                if event.get("type") == "done":
+                    final_history = event.pop("history", history)
+                    _sessions[req.session_id] = final_history
+                    event["history_length"] = len(final_history)
+                yield json.dumps(event) + "\n"
+        except Exception as exc:
+            yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @app.delete("/chat/{session_id}")
 async def clear_session(session_id: str):
     _sessions.pop(session_id, None)

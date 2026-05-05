@@ -13,3 +13,5 @@ newrelic>=10.0.0
 rank-bm25>=0.2.2
 # Cohere is optional at runtime — imported lazily only when COHERE_API_KEY is set
 cohere>=5.10.0
+# Week 2 — multi-agent orchestration (supervisor + workers)
+langgraph>=0.2.50
