@@ -90,6 +90,41 @@ function _ownedEvent(int $eid, int $userId): ?array
 
 $ALLOWED_STATUS = ['-', '@', '~', '>', '$', 'x', '?'];
 
+// ─── Conflict detection ─────────────────────────────────────────────────
+//
+// Two events overlap when:  start1 < end2  AND  end1 > start2
+// We scope to same provider + same date + same env and exclude the event
+// being updated. Returns a list shaped for the modal warning UI.
+function _findConflicts(int $userId, string $date, string $startHM, string $endHM, int $excludeEid): array
+{
+    $rs = sqlStatement(
+        "SELECT e.pc_eid, e.pc_title, e.pc_startTime, e.pc_endTime, e.pc_pid,
+                p.fname, p.lname
+           FROM openemr_postcalendar_events e
+      LEFT JOIN patient_data p
+                  ON (p.pid IS NOT NULL AND e.pc_pid IS NOT NULL
+                      AND e.pc_pid != '' AND p.pid = e.pc_pid)
+          WHERE e.pc_aid = ?
+            AND e.pc_eventDate = ?
+            AND e.pc_eid != ?
+            AND e.pc_startTime < ?
+            AND e.pc_endTime   > ?",
+        [$userId, $date, $excludeEid, $endHM . ':00', $startHM . ':00']
+    );
+    $out = [];
+    while ($r = sqlFetchArray($rs)) {
+        $patName = trim(($r['fname'] ?? '') . ' ' . ($r['lname'] ?? ''));
+        $out[] = [
+            'eid'     => (int)$r['pc_eid'],
+            'title'   => (string)($r['pc_title'] ?? ''),
+            'start'   => substr((string)$r['pc_startTime'], 0, 5),
+            'end'     => substr((string)$r['pc_endTime'], 0, 5),
+            'patient' => $patName,
+        ];
+    }
+    return $out;
+}
+
 // ─── DELETE ─────────────────────────────────────────────────────────────
 
 if ($action === 'delete') {
@@ -154,6 +189,22 @@ $startStamp = strtotime($pcTime);
 $endStamp   = strtotime($date . ' ' . $end . ':00');
 $duration   = max(0, ($endStamp - $startStamp));
 
+// ─── Conflict check ─────────────────────────────────────────────────────
+// Run before the actual write. If conflicts exist and the client didn't
+// pass force=1, return them in the response and skip the write so the
+// UI can prompt for confirmation.
+$forceSave = ($_POST['force'] ?? '') === '1';
+$excludeEid = ($action === 'update') ? (int)($_POST['eid'] ?? 0) : 0;
+$conflicts = _findConflicts($activeUserId, $date, $start, $end, $excludeEid);
+if (!empty($conflicts) && !$forceSave) {
+    _emit([
+        'ok'         => true,
+        'saved'      => false,
+        'conflicts'  => $conflicts,
+        'event_date' => $date,
+    ]);
+}
+
 // ─── CREATE ─────────────────────────────────────────────────────────────
 
 if ($action === 'create') {
@@ -178,7 +229,7 @@ if ($action === 'create') {
         ]
     );
     $eid = (int)(sqlQuery("SELECT LAST_INSERT_ID() AS id")['id'] ?? 0);
-    _emit(['ok' => true, 'eid' => $eid]);
+    _emit(['ok' => true, 'saved' => true, 'eid' => $eid, 'conflicts' => $conflicts]);
 }
 
 // ─── UPDATE ─────────────────────────────────────────────────────────────
@@ -208,7 +259,7 @@ if ($action === 'update') {
             $start . ':00', $end . ':00', $status, $eid,
         ]
     );
-    _emit(['ok' => true, 'eid' => $eid]);
+    _emit(['ok' => true, 'saved' => true, 'eid' => $eid, 'conflicts' => $conflicts]);
 }
 
 // Should be unreachable (we already validated $action above).
