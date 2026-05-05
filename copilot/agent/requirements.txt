@@ -9,3 +9,7 @@ cryptography>=42.0.0
 langfuse>=3.0.0
 slowapi>=0.1.9
 newrelic>=10.0.0
+# Week 2 — hybrid RAG over guideline corpus
+rank-bm25>=0.2.2
+# Cohere is optional at runtime — imported lazily only when COHERE_API_KEY is set
+cohere>=5.10.0

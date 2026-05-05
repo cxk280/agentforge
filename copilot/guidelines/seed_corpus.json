@@ -1,0 +1,118 @@
+{
+  "_meta": {
+    "version": 1,
+    "purpose": "MVP seed corpus for evidence retrieval. Hand-curated paraphrases of major-society guidelines covering the seeded patient cohort's conditions (T2DM, HTN, CKD, asthma, hyperlipidemia). Each entry quotes the standard source and points to the authoritative URL — the model never hallucinates the URL, only reads it back.",
+    "_TODO_post_mvp": "Replace with chunked PDFs of the actual guideline documents (ADA Standards of Care, ACC/AHA HTN, USPSTF, GINA, KDIGO) once pgvector pg-rag service is stood up. See copilot/agent/rag/ingest_corpus.py.",
+    "_seed_locked_at": "2026-05-05"
+  },
+  "chunks": [
+    {
+      "id": "ada-2024-glycemic-target-most",
+      "source_id": "ada-standards-of-care-2024",
+      "source_title": "ADA Standards of Medical Care in Diabetes 2024",
+      "source_url": "https://diabetesjournals.org/care/issue/47/Supplement_1",
+      "section": "6. Glycemic Goals",
+      "page": 6,
+      "text": "An A1C goal of less than 7% is reasonable for many nonpregnant adults with diabetes. Less stringent A1C goals (such as <8%) may be appropriate for patients with limited life expectancy or where the harms of treatment outweigh the benefits."
+    },
+    {
+      "id": "ada-2024-metformin-egfr",
+      "source_id": "ada-standards-of-care-2024",
+      "source_title": "ADA Standards of Medical Care in Diabetes 2024",
+      "source_url": "https://diabetesjournals.org/care/issue/47/Supplement_1",
+      "section": "9. Pharmacologic Approaches to Glycemic Treatment",
+      "page": 12,
+      "text": "Metformin is the preferred initial pharmacologic agent for type 2 diabetes. Metformin is contraindicated when eGFR is below 30 mL/min/1.73 m^2 and is not recommended for initiation when eGFR is 30 to 45 mL/min/1.73 m^2; existing therapy may be continued at a reduced dose with eGFR monitored every 3-6 months."
+    },
+    {
+      "id": "ada-2024-sglt2-ckd",
+      "source_id": "ada-standards-of-care-2024",
+      "source_title": "ADA Standards of Medical Care in Diabetes 2024",
+      "source_url": "https://diabetesjournals.org/care/issue/47/Supplement_1",
+      "section": "11. Chronic Kidney Disease and Risk Management",
+      "page": 14,
+      "text": "In patients with type 2 diabetes and established diabetic kidney disease, an SGLT2 inhibitor with proven kidney benefit (such as empagliflozin or dapagliflozin) is recommended to reduce the risk of CKD progression, cardiovascular events, and heart failure hospitalization."
+    },
+    {
+      "id": "acc-aha-2017-htn-thresholds",
+      "source_id": "acc-aha-hypertension-2017",
+      "source_title": "2017 ACC/AHA Guideline for High Blood Pressure in Adults",
+      "source_url": "https://www.ahajournals.org/doi/10.1161/HYP.0000000000000065",
+      "section": "Definition and Classification of BP",
+      "page": 1,
+      "text": "Hypertension is defined as a systolic BP of 130 mm Hg or greater, or diastolic BP of 80 mm Hg or greater. Stage 1 hypertension is 130-139/80-89, and Stage 2 is 140 or greater systolic or 90 or greater diastolic."
+    },
+    {
+      "id": "acc-aha-2017-htn-bp-target-general",
+      "source_id": "acc-aha-hypertension-2017",
+      "source_title": "2017 ACC/AHA Guideline for High Blood Pressure in Adults",
+      "source_url": "https://www.ahajournals.org/doi/10.1161/HYP.0000000000000065",
+      "section": "BP Goals",
+      "page": 17,
+      "text": "For adults with confirmed hypertension and known cardiovascular disease or 10-year ASCVD risk of 10% or higher, a BP target of less than 130/80 mm Hg is recommended. The same target is reasonable for adults with hypertension regardless of comorbidities."
+    },
+    {
+      "id": "acc-aha-2017-acei-arb-htn-ckd",
+      "source_id": "acc-aha-hypertension-2017",
+      "source_title": "2017 ACC/AHA Guideline for High Blood Pressure in Adults",
+      "source_url": "https://www.ahajournals.org/doi/10.1161/HYP.0000000000000065",
+      "section": "Treatment of Hypertension in CKD",
+      "page": 24,
+      "text": "In adults with hypertension and CKD (stage 3 or higher, or stage 1 or 2 with albuminuria 300 mg/g or higher), an ACE inhibitor or ARB is reasonable to slow kidney disease progression. Lisinopril is a commonly used ACE inhibitor in this setting."
+    },
+    {
+      "id": "uspstf-2022-statin-cvd-prevention",
+      "source_id": "uspstf-statins-2022",
+      "source_title": "USPSTF Statin Use for the Primary Prevention of CVD in Adults (2022)",
+      "source_url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/statin-use-primary-prevention-cardiovascular-disease-adults",
+      "section": "Recommendation",
+      "page": 1,
+      "text": "The USPSTF recommends that adults aged 40 to 75 years with one or more cardiovascular risk factors and an estimated 10-year ASCVD risk of 10% or greater initiate use of a low- to moderate-dose statin for the primary prevention of cardiovascular disease (Grade B)."
+    },
+    {
+      "id": "uspstf-2021-cvd-aspirin",
+      "source_id": "uspstf-aspirin-2022",
+      "source_title": "USPSTF Aspirin Use to Prevent CVD: Preventive Medication (2022)",
+      "source_url": "https://www.uspreventiveservicestaskforce.org/uspstf/recommendation/aspirin-to-prevent-cardiovascular-disease-preventive-medication",
+      "section": "Recommendation",
+      "page": 1,
+      "text": "The USPSTF recommends against initiating low-dose aspirin for the primary prevention of cardiovascular disease in adults 60 years or older (Grade D). For adults aged 40 to 59 years with a 10% or greater 10-year CVD risk, the decision to initiate low-dose aspirin should be individualized."
+    },
+    {
+      "id": "kdigo-2024-ckd-classification",
+      "source_id": "kdigo-ckd-2024",
+      "source_title": "KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of CKD",
+      "source_url": "https://kdigo.org/guidelines/ckd-evaluation-and-management/",
+      "section": "Chapter 1: Evaluation of CKD",
+      "page": 7,
+      "text": "CKD is staged by GFR category: G1 (>=90), G2 (60-89), G3a (45-59), G3b (30-44), G4 (15-29), and G5 (<15) mL/min/1.73 m^2. Stage 3a (eGFR 45-59) carries an increased risk of cardiovascular events and progression and warrants annual albuminuria assessment."
+    },
+    {
+      "id": "kdigo-2024-ckd-bp-management",
+      "source_id": "kdigo-ckd-2024",
+      "source_title": "KDIGO 2024 Clinical Practice Guideline for the Evaluation and Management of CKD",
+      "source_url": "https://kdigo.org/guidelines/ckd-evaluation-and-management/",
+      "section": "Chapter 3: Delaying Progression of CKD",
+      "page": 21,
+      "text": "In adults with CKD, target a systolic blood pressure of less than 120 mm Hg when tolerated, using standardized office BP measurement. ACE inhibitors or ARBs are first-line for adults with CKD and albuminuria; titrate to the highest approved dose tolerated."
+    },
+    {
+      "id": "gina-2024-asthma-saba-only",
+      "source_id": "gina-asthma-2024",
+      "source_title": "Global Initiative for Asthma (GINA) Main Report 2024",
+      "source_url": "https://ginasthma.org/2024-gina-main-report/",
+      "section": "Track 1: ICS-formoterol reliever",
+      "page": 36,
+      "text": "GINA no longer recommends short-acting beta-2 agonist (SABA)-only treatment for asthma in adults and adolescents. All adults and adolescents with asthma should receive ICS-containing therapy, either taken regularly or, in mild asthma, as needed in combination with formoterol."
+    },
+    {
+      "id": "gina-2024-moderate-persistent",
+      "source_id": "gina-asthma-2024",
+      "source_title": "Global Initiative for Asthma (GINA) Main Report 2024",
+      "source_url": "https://ginasthma.org/2024-gina-main-report/",
+      "section": "Pharmacological Treatment of Asthma in Adults and Adolescents",
+      "page": 50,
+      "text": "For moderate persistent asthma (Step 4), the preferred maintenance and reliever therapy is medium-dose ICS-formoterol used as both daily controller and as-needed reliever. Add-on therapies include long-acting muscarinic antagonist (LAMA) or biologic therapy for severe asthma."
+    }
+  ]
+}

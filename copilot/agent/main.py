@@ -375,5 +375,101 @@ async def clear_session(session_id: str):
     return {"cleared": session_id}
 
 
+# ---------------------------------------------------------------------------
+# Week 2: document ingestion
+# ---------------------------------------------------------------------------
+
+class ExtractRequest(BaseModel):
+    patient_id: int
+    doc_type: str  # 'lab_pdf' | 'intake_form' | 'medication_list'
+    document_id: int | None = Field(
+        default=None,
+        description=(
+            "OpenEMR documents.id of an already-uploaded PDF. Preferred path: "
+            "the user uploads via the existing Documents tab, then triggers "
+            "extraction by document_id."
+        ),
+    )
+    file_path: str | None = Field(
+        default=None,
+        description=(
+            "Local file path. Demo / eval-harness path only — disabled in "
+            "production deploys via DISABLE_FILE_PATH_EXTRACT=1."
+        ),
+    )
+
+
+class SearchRequest(BaseModel):
+    query: str
+    top_k: int = Field(default=5, ge=1, le=20)
+
+
+@app.post("/search")
+@limiter.limit("60/minute")
+async def search_route(request: Request, req: SearchRequest):
+    """Hybrid retrieval over the clinical-guideline corpus.
+
+    MVP shape: BM25 sparse + optional Cohere Rerank. Returns up to top_k
+    evidence chunks with full citation metadata (source_id, source_url,
+    page, section, exact quote, score) — exactly the shape the agent's
+    citation contract expects.
+    """
+    from rag.retriever import search as rag_search
+
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="query must be non-empty")
+
+    results = rag_search(req.query, top_k=req.top_k)
+    return {"query": req.query, "top_k": req.top_k, "results": results}
+
+
+@app.post("/extract")
+@limiter.limit("12/minute")
+async def extract_route(request: Request, req: ExtractRequest):
+    """Run vision extraction on a clinical PDF and persist derived facts."""
+    from ingest.attach_and_extract import attach_and_extract
+
+    if (req.document_id is None) == (req.file_path is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide exactly one of document_id or file_path.",
+        )
+
+    if req.file_path is not None and os.environ.get("DISABLE_FILE_PATH_EXTRACT", "0") == "1":
+        raise HTTPException(
+            status_code=403,
+            detail="file_path extraction is disabled in this environment.",
+        )
+
+    try:
+        pool = await get_db_pool()
+        result = await attach_and_extract(
+            patient_id=req.patient_id,
+            doc_type=req.doc_type,
+            document_id=req.document_id,
+            file_path=req.file_path,
+            pool=pool,
+        )
+    except (ValueError, LookupError, PermissionError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    return {
+        "run_id": result.run_id,
+        "document_id": result.document_id,
+        "patient_id": result.patient_id,
+        "doc_type": result.doc_type,
+        "schema_valid": result.schema_valid,
+        "fact_count": result.fact_count,
+        "citation_count": result.citation_count,
+        "latency_ms": result.latency_ms,
+        "input_tokens": result.input_tokens,
+        "output_tokens": result.output_tokens,
+        "validation_error": result.validation_error,
+        "payload": result.payload,
+    }
+
+
 # Mount static directory last so API routes take precedence
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
