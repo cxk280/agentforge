@@ -260,3 +260,77 @@ attention.
 Ordered by impact and effort; S1–S5 fit in a half-day before the
 final deadline. Roadmap items are recorded in our task tracker
 when they're sized.*
+
+---
+
+## Week 2 surfaces (added 2026-05-05)
+
+The Week-2 build introduced six new attack surfaces. Each one is
+mapped to the same T1–T4 ladder; this section documents the controls
+shipped on each and flags the residual risks worth tracking.
+
+### W2 surface inventory
+
+| Surface | Where | Primary threats | Status |
+|---|---|---|---|
+| `POST /extract` | `copilot/agent/main.py` | T1 (PDF as model-controlled input → tool_use injection), T2 (PHI in extracted JSON → trace storage), T4 (large-PDF cost spike) | Shipped with controls |
+| `POST /search` | `copilot/agent/main.py` | T4 (rate-limit, query-length cap), T2 (no patient_id passed to corpus) | Shipped |
+| `POST /chat/graph` | `copilot/agent/main.py` | T1 + T3 (multi-agent expands the reasoning surface), T4 (rate-limit) | Shipped |
+| `GET /copilot/extractions/{patient_id}` | `copilot/agent/main.py` | T2 (returns derived facts incl. quote text), T3 (cross-patient leak) | Shipped, residual risk noted |
+| `GET /copilot/lab-trend/{patient_id}` | `copilot/agent/main.py` | T2 (returns numeric trend), T3 (cross-patient) | Shipped, residual risk noted |
+| `copilot_doc_viewer.php` (PDF.js + bbox) | `interface/patient_file/documents/` | T1 (XSS via fact rendering), T3 (foreign_id cross-check) | Shipped |
+| `copilot_calendar_api.php` (CRUD) | `interface/main/calendar/` | T3 (event ownership), T4 (write-rate) | Shipped |
+
+### Per-surface controls
+
+**S7 — `POST /extract` (vision extraction)**
+
+| Threat | Control |
+|---|---|
+| T1 PDF-as-input prompt injection | Sonnet-4.6 sees the PDF as a `document` content block (not free text). Forced `tool_choice` constrains output to a single tool call shape; we never read the model's free-form response. The extracted JSON is re-validated against the Pydantic schema on our side — invalid extractions fail closed (`schema_valid=false`). |
+| T2 PHI in extracted JSON | The `cp_extracted_facts.fact_json` column is the only place quote text lands; production Langfuse traces still log only `{run_id, doc_type, fact_count, schema_valid}` shape — no fact bodies. |
+| T2 cross-patient leak via `document_id` | `attach_and_extract` cross-checks `documents.foreign_id` against the requested `patient_id`; mismatch → `PermissionError`, no extraction runs. |
+| T4 cost / latency spike | `max_tokens` caps the extraction tool output. Sonnet's 32-page PDF cap bounds input. The `/extract` route is rate-limited at 12 req/min per session (vs 30 for /chat) since extraction is the most expensive call in the agent. |
+| Bypass: prompt injection text *inside* the PDF | Mitigated by `tool_choice` (the model literally cannot deviate to free-form prose), but we can't guarantee the schema-bound output won't carry adversarial content. Downstream consumers (chat agent, eval gate) treat extracted facts as untrusted input — no eval rubric ever exec's a quoted string. |
+
+**S8 — `GET /copilot/extractions/{patient_id}`** + **S9 — `GET /copilot/lab-trend/{patient_id}`**
+
+| Threat | Control |
+|---|---|
+| T2 / T3 cross-patient extraction leak | The route currently filters `WHERE patient_id = ?` against the URL param but does **NOT** verify the requesting user has a care relationship with that patient. **Residual risk.** The OpenEMR session ACL is the only barrier today. Mitigation: piggy-back on the FHIR layer's existing patient-access check before the SELECT. Tracked in roadmap. |
+| T2 PHI in API responses | Responses contain extracted quote text by design (the bbox UI needs it). Acceptable because: (a) only authenticated callers can hit the route, (b) trace storage logs the *count* not the bodies. |
+| T4 unbounded patient-id scan | `LIMIT 200` on the join; can't be abused to dump the side-table. |
+
+**S10 — `copilot_doc_viewer.php` (PDF.js + bbox overlay)**
+
+| Threat | Control |
+|---|---|
+| T3 cross-patient document view | Page rejects any `?docref=<id>` whose `documents.foreign_id` doesn't match `$_SESSION['pid']`. ACL `patients/docs` required. |
+| T1 XSS via extracted-fact rendering | All quote text + fact_type strings escape via `escapeHtml()` before DOM injection (matches the chat UI's pattern). Bbox titles use the `title=""` attribute (browser-escaped). |
+| Bypass: PDF served via `/controller.php?document&retrieve` | Re-uses OpenEMR's existing authenticated download path — no parallel route, no auth bypass surface added. |
+
+**S11 — `copilot_calendar_api.php`**
+
+| Threat | Control |
+|---|---|
+| T3 — edit / delete other users' events | `_ownedEvent()` rejects updates and deletes whose `pc_aid` doesn't match the active session user. Defense in depth on top of the `patients/appt` ACL. |
+| T1 — stored XSS via title / notes | Title capped at 150 chars; notes capped at 2000. Display side `text()` and `attr()` escape on render. Patient PID validated as a positive integer matching a real `patient_data` row. |
+| T4 — write-rate spike | The endpoint hangs off the OpenEMR session — it inherits OpenEMR's existing session-rate posture. No additional limiter added; if write spikes show up in monitoring, add slowapi-style rate limit. |
+
+### Residual W2 risks (tracked, not shipped)
+
+| # | Risk | Plan |
+|---|---|---|
+| R1 | `/copilot/extractions` and `/copilot/lab-trend` rely on OpenEMR session ACL alone — no per-patient care-relationship check before the query. | Add the same care-relationship check the FHIR layer already uses; reject when the requesting user has no encounter / provider link to the queried patient. |
+| R2 | Prompt injection text *inside* extracted PDFs persists in `cp_extracted_facts.fact_json`. A future agent that pastes those quotes into the chat reply (without escaping) could be steered. | Already partially mitigated by the chat UI's structural-only markdown renderer; add an explicit "treat extracted_facts.quote as untrusted text" line in the system prompt. |
+| R3 | Calendar API has no CSRF token. Same-origin + ACL is the current barrier. | Add the standard OpenEMR `CsrfUtils` token to the modal form; verify on every POST. |
+| R4 | Multi-user logins are now possible (S12 below) but the agent backend still inherits a single OAuth client identity — per-user audit attribution on the agent side is partial. | Pass the active user through to Langfuse trace metadata; tag every span with `actor_user_id`. |
+
+### S12 — Multi-user demo logins (shipped 2026-05-05)
+
+The seeded provider / nurse / front-desk / billing accounts can now
+log in as themselves. Previously only `admin` had a `users_secure`
+row, so every login bounced back to admin and all calendar events
+appeared under the same identity. The seeder's always-run backfill
+block now creates the missing `users_secure` rows idempotently —
+defends T3 by making per-user blast-radius actually distinct.
