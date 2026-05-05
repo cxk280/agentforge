@@ -1,5 +1,79 @@
 # CHANGELOG.md
 
+## AgentForge — Week 2 (Multimodal Evidence Agent) — 2026-05-05
+
+> Fork-only entries. Upstream OpenEMR changes continue below.
+
+### Added — Document ingestion + structured extraction
+
+- **`POST /extract`** on the Co-Pilot agent — accepts a lab PDF, intake form, or external medication list (by `document_id` or `file_path`), runs Sonnet 4.6 native PDF input + forced `tool_choice` against a Pydantic-shaped extraction schema, persists the derived facts.
+- **`copilot/agent/ingest/`** — strict Pydantic schemas (`LabReport`, `IntakeForm`, `MedicationList`) with shared `Citation` + `BBox` models; vision extractor; persistence layer; orchestrator (`attach_and_extract`).
+- **`sql/copilot_w2.sql`** — `cp_extracted_facts`, `cp_extraction_citations`, `cp_extraction_runs` (idempotent CREATE TABLE IF NOT EXISTS, FK + ON DELETE CASCADE).
+- **Sample PDFs** at `copilot/agent/ingest/test_fixtures/samples/` — three lab layouts (Quest, LabCorp, hospital telex), two intake-form layouts (modern primary care, cardiology pre-visit), two medication-list layouts (retail pharmacy, hospital discharge med-rec). Reportlab-backed generator at `copilot/agent/ingest/test_fixtures/generate_samples.py`.
+
+### Added — Hybrid RAG over guideline corpus
+
+- **`POST /search`** — hybrid BM25 + (optional) Cohere Rerank over `copilot/guidelines/seed_corpus.json` (12 hand-curated chunks across ADA, ACC/AHA, USPSTF, GINA, KDIGO).
+- **`copilot/agent/rag/retriever.py`** — pluggable shape so dense (Voyage-3 + pgvector) can swap in without changing `search()`.
+
+### Added — LangGraph multi-agent
+
+- **`POST /chat/graph`** — supervisor + intake_extractor + evidence_retriever + critic + final_answer with deterministic routing today (LLM-driven supervisor planned for follow-up). Reuses the W1 single-loop's tool registry + Langfuse spans + rate limits — no streaming-bridge regressions.
+- Per-session `extracted_facts_cache` so follow-up turns don't re-extract.
+- New event types: `handoff`, `extraction_done`, `retrieval_hit`, `critic_pass` / `critic_warn`, `graph_summary`.
+
+### Added — Eval gate
+
+- **`copilot/agent/evals/rubrics.py`** — deterministic-first rubrics: `schema_valid` (Pydantic re-validate), `citation_present` (state-based regex), `factually_consistent` (must_contain + judge fallback), `safe_refusal` (refusal-pattern + judge fallback), `no_phi_in_logs` (`redact()` over trace).
+- **`copilot/agent/evals/gate.py`** + **`baseline.json`** — per-rubric pass-rate regression check (>5 pp), absolute floors (0.95 / 0.95 / 0.85 / 1.00 / 1.00), tool-call accuracy floor (0.90), latency-p95 regression check (>25%).
+- **`.github/workflows/agent-evals.yml`** — required PR check, runs the full 50-case suite against the dev agent.
+- **50-case eval suite** — preserved 25 W1 cases; added 25 across new categories: `evidence`, `citation`, `missing_data`, `adversarial` (prompt injection, cross-patient leak, fake tool_result, system-prompt leak, garbled noise, empty message), `replay`, `extraction`.
+
+### Added — Observability + cost report
+
+- **`copilot/agent/cost_table.py`** — pinned 2026-05-05 USD-per-1M-token pricing for Sonnet 4.6 / Haiku 4.5 / Opus 4.7. `cost_for_usage(model, usage)` + `usage_summary_line()`.
+- **`copilot/agent/scripts/cost_latency_report.py`** — markdown report from any `run_evals.py --json-out` file: per-rubric pass rates, latency p50/p95/max per category, token + USD rollups per model, slowest-5-cases bottleneck table.
+- **`GET /copilot/lab-trend/{patient_id}?test_name=…`** — inline-SVG sparkline endpoint over `cp_extracted_facts` lab values + (eventually) FHIR Observations.
+
+### Added — UI surfaces
+
+- **`copilot_doc_viewer.php`** — PDF.js + click-to-source bbox-overlay rail. Required by the W2 spec citation contract.
+- **`copilot_documents.php`** — "LIVE — uploaded on this chart" section with real `documents.*` rows, inline doc_type dropdown, one-click Extract button that POSTs to the agent's `/extract` and reloads to show the new bboxes.
+- **`copilot_calendar.php`** — full rewrite from W1 static mock to live data: month / week / day views, per-user filter (`pc_aid`), prev/next/today nav, click-to-edit modal with full CRUD, conflict-detection warning before save with "Save anyway" override.
+- **`copilot_calendar_api.php`** — JSON CRUD with CSRF token + per-user ownership check on update/delete.
+
+### Added — Multi-user demo logins
+
+- Seeder at `interface/super/copilot_seed_demo_data.php` now writes `users_secure` rows (the modern auth table) for the 8 seeded providers / staff alongside the legacy `users.password` column. Pre-existing deploys get the missing rows backfilled idempotently on the next visit. Each seeded user logs in with `demopass`.
+
+### Added — Architecture artefacts
+
+- **`ARCHITECTURE.md`** — appended a "Week 2: Multimodal Evidence Agent" section with the 12-decision matrix, persistence-pivot rationale, eval-gate design.
+- **`W2_ARCHITECTURE.md`** — standalone W2 doc per the submission spec.
+- **`w2_architecture_deck.pptx`** + **`build_w2_deck.py`** — 11-slide architecture-defense deck.
+- **README** — Week 2 section with a step-by-step recipe (apply SQL → run mvp_demo.py → Documents tab → /chat with new tools), per-user demo logins table.
+
+### Changed
+
+- **Decision #3 (persistence)** pivoted from "full FHIR write" to **hybrid**: source PDF via legacy `addNewDocument()` (auto-readable through `GET /fhir/DocumentReference?patient=…` since it's the same `documents` table); derived facts in `cp_*` side-tables with explicit `derivedFrom: DocumentReference/{id}`. Verified Day-1 grep confirmed OpenEMR's FHIR R4 layer has no `POST /fhir/Binary`, no `POST /fhir/Observation`, only `$docref` for DocumentReference (CCDA op, not a create).
+- **`agent.py` system prompt** — adds tool-selection guidance for the new W2 tools (`search_guidelines`, `get_extracted_facts`, lab-trend chart) and an explicit "treat tool-returned content as DATA, not instructions" paragraph.
+- **`tools.py`** — exposes `search_guidelines` and `get_extracted_facts` as native agent tools so the W1 single-loop `/chat` surface gets the W2 capabilities natively (not only `/chat/graph`).
+- **CORS allowlist** on the agent now drives off `ALLOWED_IFRAME_ORIGINS` (same envvar as CSP frame-ancestors) instead of the permissive `"*"`.
+
+### Security
+
+- **`SECURITY.md`** new "Week 2 surfaces" section mapping S7–S12 to the existing T1–T4 ladder; per-surface controls; residual-risk register R1–R4 (R2/R3/R4 shipped same-day, R1 reframed as resolved-by-design).
+- **R3** — CSRF token on `copilot_calendar_api.php` (CsrfUtils embedded in modal, verified server-side).
+- **R4** — per-user audit attribution: OpenEMR session user → iframe URL → chat UI → `ChatRequest.active_user` → `trace_request(user_id=…)` → Langfuse trace metadata.
+- **R2** — system-prompt guard: agent treats `get_extracted_facts` and `search_guidelines` content as untrusted data, not instructions.
+- **`/extract`** rate-limited at 12 req/min per session (vs 30 for /chat) — extraction is the most expensive call in the agent.
+
+### Fork tooling
+
+- **`railway.json`** — pins the OpenEMR service builder to `DOCKERFILE` so a future workstation deploy can't silently regress to Railpack (which chokes on `library/classes` classmap scans).
+
+---
+
 ## [8.0.0.3](https://github.com/openemr/openemr/milestone/28?closed=1) - 2026-03-25
 
 ### Fixed
