@@ -166,6 +166,13 @@ app.add_middleware(
 # Replace with Redis for multi-worker deployments
 _sessions: dict[str, list[dict]] = {}
 
+# Per-session AgentState carried across /chat/graph turns. Holds the
+# accumulated extracted_facts so follow-up turns can reason over previously
+# uploaded documents without re-extracting (Decision #12 — session-scoped
+# LangGraph state with extracted-fact cache; 30-min TTL aligned with W1).
+# Only the W2 graph path uses this; W1 /chat and /chat/stream don't.
+_graph_extracted_facts: dict[str, list[dict]] = {}
+
 # pid → FHIR UUID cache. The mapping is global (a given pid resolves to
 # the same UUID for the life of the patient_data row), so caching across
 # sessions is safe and saves a DB + FHIR lookup on every chat turn.
@@ -183,6 +190,12 @@ class ChatRequest(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=128)
     patient_id: str = Field(..., min_length=1, max_length=128)
     message: str = Field(..., min_length=1, max_length=4000)
+
+    # W2-only: optional uploads for the LangGraph intake_extractor to
+    # consume on this turn. Each entry is { document_id | file_path,
+    # doc_type } where doc_type is lab_pdf | intake_form | medication_list.
+    # Ignored by the W1 /chat and /chat/stream routes.
+    pending_doc_uploads: list[dict] = Field(default_factory=list, max_length=8)
 
 
 class ChatResponse(BaseModel):
@@ -374,16 +387,28 @@ async def chat_stream(request: Request, req: ChatRequest):
 async def chat_graph_stream(request: Request, req: ChatRequest):
     """Stream the agent response through the LangGraph state machine.
 
-    Today this is a thin wrapper around the W1 single-loop, mediated by
-    a LangGraph StateGraph with a single supervisor node. The point of
-    keeping it as a separate route is to validate the LangGraph
-    streaming bridge end-to-end before swapping the chat UI off the W1
-    /chat/stream path. As workers (intake_extractor, evidence_retriever,
-    critic) get added in copilot/agent/graph.py, behavior diverges
-    cleanly without disturbing the existing /chat surface.
+    Routes through supervisor → (intake_extractor | evidence_retriever)*
+    → final_answer with explicit handoff logging. Behavior diverges
+    from /chat/stream when:
+      - the request includes pending_doc_uploads (intake_extractor fires)
+      - the user message looks like a clinical/guideline question
+        (evidence_retriever fires; see graph._needs_evidence)
+    Otherwise the supervisor routes straight to final_answer and the
+    streamed reply is functionally equivalent to /chat/stream.
 
-    Same NDJSON event shape as /chat/stream so the chat UI can A/B
-    between them by URL only.
+    Per-session graph state (extracted_facts cache) lives in
+    _graph_extracted_facts so follow-up turns reason over previously
+    uploaded documents without re-extracting.
+
+    NDJSON event types yielded:
+      handoff             — supervisor routing decision
+      extraction_done     — intake_extractor finished a doc
+      retrieval_hit       — evidence_retriever returned top-k
+      tool_start          — W1 FHIR tool dispatch
+      tool_end            — W1 FHIR tool completion
+      delta               — streaming text delta
+      done                — final history attached for caller persistence
+      graph_summary       — handoff_log + accumulated counts
     """
     from graph import run_graph_stream
 
@@ -396,19 +421,38 @@ async def chat_graph_stream(request: Request, req: ChatRequest):
     history.append({"role": "user", "content": req.message})
     fhir_patient_id = await _resolve_fhir_id(req.patient_id)
 
+    # Pull prior extractions for this session — Decision #12 (session-scoped
+    # cache, 30-min TTL aligned with W1's _sessions). The W1 chat-history
+    # TTL applies here transitively since both stores are pruned together.
+    prior_facts = _graph_extracted_facts.get(req.session_id, [])
+
     async def event_stream():
         try:
+            new_facts: list[dict] = []
             async for event in run_graph_stream(
                 session_id=req.session_id,
                 patient_id=req.patient_id,
                 fhir_patient_id=fhir_patient_id,
                 messages=history,
+                pending_doc_uploads=req.pending_doc_uploads,
+                prior_extracted_facts=prior_facts,
             ):
+                if event.get("type") == "extraction_done":
+                    new_facts.append({
+                        "run_id": event.get("run_id"),
+                        "doc_type": event.get("doc_type"),
+                        "fact_count": event.get("fact_count"),
+                        "schema_valid": event.get("schema_valid"),
+                    })
                 if event.get("type") == "done":
                     final_history = event.pop("history", history)
                     _sessions[req.session_id] = final_history
                     event["history_length"] = len(final_history)
                 yield json.dumps(event) + "\n"
+            # Persist new extraction summaries into the session cache so
+            # follow-up turns get them as prior_extracted_facts.
+            if new_facts:
+                _graph_extracted_facts[req.session_id] = prior_facts + new_facts
         except Exception as exc:
             yield json.dumps({"type": "error", "detail": str(exc)}) + "\n"
 
@@ -521,6 +565,86 @@ async def extract_route(request: Request, req: ExtractRequest):
         "output_tokens": result.output_tokens,
         "validation_error": result.validation_error,
         "payload": result.payload,
+    }
+
+
+@app.get("/copilot/extractions/{patient_id}")
+async def list_extractions(patient_id: int, doc_type: str | None = None):
+    """Return derived facts + citations for a patient.
+
+    The bbox-overlay UI (copilot_doc_viewer.php) consumes this to render
+    the click-to-source layer. Each fact carries its document_id so the
+    PDF can be deep-linked, plus the page+bbox needed to highlight the
+    region.
+
+    Optional doc_type filter: lab_pdf | intake_form | medication_list.
+    """
+    pool = await get_db_pool()
+    if pool is None:
+        raise HTTPException(status_code=500, detail="DB pool unavailable")
+
+    where_extra = ""
+    params: list = [patient_id]
+    if doc_type:
+        where_extra = " AND f.doc_type = %s"
+        params.append(doc_type)
+
+    sql = (
+        "SELECT f.id, f.document_id, f.doc_type, f.fact_type, "
+        "       f.fact_json, f.confidence, f.source_quote, f.extraction_run_id, f.created_at, "
+        "       c.id, c.page, c.bbox_x, c.bbox_y, c.bbox_w, c.bbox_h, c.field_path, c.quote "
+        "FROM cp_extracted_facts f "
+        "LEFT JOIN cp_extraction_citations c ON c.fact_id = f.id "
+        "WHERE f.patient_id = %s" + where_extra + " "
+        "ORDER BY f.created_at DESC, f.id DESC, c.id ASC"
+    )
+
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(sql, params)
+                rows = await cur.fetchall()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    # Group rows back into one fact per id with a citations[] list.
+    facts: dict[int, dict] = {}
+    for row in rows:
+        (fact_id, document_id, dtype, fact_type, fact_json,
+         confidence, source_quote, run_id, created_at,
+         cit_id, page, bx, by, bw, bh, field_path, quote) = row
+        f = facts.setdefault(int(fact_id), {
+            "fact_id": int(fact_id),
+            "document_id": int(document_id) if document_id is not None else None,
+            "doc_type": dtype,
+            "fact_type": fact_type,
+            "fact_json": json.loads(fact_json) if isinstance(fact_json, str) else fact_json,
+            "confidence": float(confidence) if confidence is not None else None,
+            "source_quote": source_quote,
+            "extraction_run_id": run_id,
+            "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
+            "derived_from": (
+                f"DocumentReference/{document_id}" if document_id else None
+            ),
+            "citations": [],
+        })
+        if cit_id is not None:
+            f["citations"].append({
+                "citation_id": int(cit_id),
+                "page": int(page),
+                "bbox": {
+                    "x": float(bx), "y": float(by),
+                    "w": float(bw), "h": float(bh),
+                },
+                "field_path": field_path,
+                "quote": quote,
+            })
+
+    return {
+        "patient_id": patient_id,
+        "doc_type_filter": doc_type,
+        "count": len(facts),
+        "facts": list(facts.values()),
     }
 
 

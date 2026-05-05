@@ -38,15 +38,20 @@ Format:
   Use short human-readable labels — Vitals, Medications, Lab Results, Visit History, Conditions, Allergies — not raw tool names. Omit this line entirely when no tool was called."""
 
 
-def _system_blocks(patient_id: str) -> list[dict]:
+def _system_blocks(patient_id: str, *, extra_context: str = "") -> list[dict]:
     """Build the system prompt as cache-friendly blocks.
 
     The base instructions never change, so we mark them ephemeral-cached.
     The active patient_id varies per session and goes in a separate
     uncached block AFTER the cached one — keeping the cache hit hot
     across patients within the same process.
+
+    `extra_context`, when set, is appended as a third block (also
+    uncached). Used by the LangGraph supervisor in graph.py to inject
+    extracted-fact + retrieved-evidence context into the final-answer
+    node without modifying the cached base prompt.
     """
-    return [
+    blocks: list[dict] = [
         {
             "type": "text",
             "text": _SYSTEM_BASE,
@@ -57,6 +62,9 @@ def _system_blocks(patient_id: str) -> list[dict]:
             "text": f"Active patient ID: {patient_id}",
         },
     ]
+    if extra_context:
+        blocks.append({"type": "text", "text": extra_context})
+    return blocks
 
 
 def _cached_tools() -> list[dict]:
@@ -251,6 +259,7 @@ async def run_agent_stream(
     *,
     session_id: str = "",
     user_id: str = "anonymous",
+    extra_system_context: str = "",
 ) -> AsyncIterator[dict]:
     """Streaming variant of run_agent.
 
@@ -287,7 +296,7 @@ async def run_agent_stream(
                 async with client.messages.stream(
                     model=settings.model,
                     max_tokens=1024,
-                    system=_system_blocks(patient_id),
+                    system=_system_blocks(patient_id, extra_context=extra_system_context),
                     tools=_TOOLS_CACHED,
                     messages=working_messages,
                 ) as stream:
