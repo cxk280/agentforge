@@ -499,57 +499,60 @@ def slide_hybrid_rag(prs):
 def slide_eval_gate(prs):
     slide = prs.slides.add_slide(blank_layout(prs))
     fill_bg(slide, LIGHT)
-    slide_header(slide, "Eval Gate — 50 cases, per-rubric booleans, PR-blocking",
-                 "Hard gate: graders introduce a regression; CI must block the merge")
+    slide_header(slide, "Eval Gate — deterministic-first + adversarial + replay",
+                 "Reframed after final-submission grader feedback (2026-05-03): eval quality, not quantity")
 
-    # rubrics + floors (left)
-    add_rect(slide, Inches(0.4), Inches(1.25), Inches(7.5), Inches(3.5), WHITE)
-    add_text_box(slide, "Rubric categories  &  absolute floors",
-                 Inches(0.55), Inches(1.3), Inches(7.2), Inches(0.4),
+    # case mix (left)
+    add_rect(slide, Inches(0.4), Inches(1.25), Inches(6.4), Inches(3.6), WHITE)
+    add_text_box(slide, "Case mix  (50 total)",
+                 Inches(0.55), Inches(1.3), Inches(6.1), Inches(0.4),
                  font_size=14, bold=True, color=TEAL)
     add_table(slide,
-              ["Rubric", "What it checks", "Floor"],
+              ["Category", "Count", "Notes"],
               [
-                  ("schema_valid",         "Extraction returned valid Pydantic-shaped JSON",      "≥ 0.95"),
-                  ("citation_present",     "Every clinical claim carries a citation",             "≥ 0.95"),
-                  ("factually_consistent", "Each cited claim matches the source it points to",    "≥ 0.85"),
-                  ("safe_refusal",         "Refused unsafe / chart-falsification requests",       "= 1.00"),
-                  ("no_phi_in_logs",       "Static redact() pass over every Langfuse trace",      "= 1.00"),
+                  ("Goldens",          "~15", "Hand-authored, locked to seed snapshot"),
+                  ("Labeled",          "~10", "Open-ended; LLM-judge"),
+                  ("Adversarial",      "~10", "Corrupt PDFs, malformed FHIR, fuzzed inputs, prompt-inject in extracted text"),
+                  ("Replay",           "~10", "PHI-redacted production traces, grows weekly"),
+                  ("System metrics",   "n/a", "tool_call_accuracy + latency p50/p95 vs baseline"),
               ],
-              Inches(0.55), Inches(1.75), Inches(7.2), Inches(2.9),
+              Inches(0.55), Inches(1.75), Inches(6.1), Inches(3.0),
               header_size=11, body_size=10)
 
-    # gate logic (right)
-    add_rect(slide, Inches(8.05), Inches(1.25), Inches(4.85), Inches(3.5), NAVY)
-    add_text_box(slide, "Gate logic",
-                 Inches(8.2), Inches(1.3), Inches(4.6), Inches(0.4),
+    # rubrics — deterministic-first (right)
+    add_rect(slide, Inches(7.0), Inches(1.25), Inches(5.9), Inches(3.6), NAVY)
+    add_text_box(slide, "Rubrics — deterministic-first",
+                 Inches(7.15), Inches(1.3), Inches(5.6), Inches(0.4),
                  font_size=14, bold=True, color=TEAL)
     add_text_box(slide,
-                 "gate.py compares the current\n"
-                 "run vs baseline.json.\n\n"
-                 "FAIL CI if:\n"
-                 "  • any rubric drops > 5 pp\n"
-                 "    vs baseline, OR\n"
-                 "  • any rubric falls below\n"
-                 "    its absolute floor.\n\n"
-                 "Where it runs:\n"
-                 "  .github/workflows/\n"
-                 "  agent-evals.yml\n"
-                 "  required check on PR",
-                 Inches(8.2), Inches(1.75), Inches(4.6), Inches(2.95),
-                 font_size=12, color=WHITE)
+                 "schema_valid       — Pydantic re-validate\n"
+                 "                       (no judge)\n\n"
+                 "citation_present   — state-based regex match\n"
+                 "                       on emitted citation_ids\n"
+                 "                       (no judge)\n\n"
+                 "factually_consistent — exact-match against\n"
+                 "                       extracted facts /\n"
+                 "                       guideline chunk;\n"
+                 "                       judge only on residual\n\n"
+                 "safe_refusal       — refusal classifier first;\n"
+                 "                       judge only when uncertain\n\n"
+                 "no_phi_in_logs     — redact() over every trace\n"
+                 "                       (no judge)",
+                 Inches(7.15), Inches(1.75), Inches(5.6), Inches(3.05),
+                 font_size=10, color=WHITE)
 
-    # 25 → 50 + judge
-    add_rect(slide, Inches(0.4), Inches(4.9), Inches(12.5), Inches(2.2), WHITE)
-    add_text_box(slide, "What changed from Week 1",
-                 Inches(0.55), Inches(4.95), Inches(12.0), Inches(0.4),
+    # gate logic (bottom)
+    add_rect(slide, Inches(0.4), Inches(5.0), Inches(12.5), Inches(2.15), WHITE)
+    add_text_box(slide, "Regression gate — fails CI if any of:",
+                 Inches(0.55), Inches(5.05), Inches(12.0), Inches(0.4),
                  font_size=14, bold=True, color=TEAL)
     add_bullets(slide, [
-        ("Cases: 25 → 50  (added: extraction, evidence, citation, refusal, missing_data)", 0),
-        ("Scoring: 0–1 float → boolean per applicable rubric  — a case passes only if every applicable rubric is true", 0),
-        ("Judge model unchanged: Claude Haiku 4.5  —  prompt rewritten to emit boolean-per-rubric JSON", 0),
-        ("CI surface: pre-push smoke (5 cases) → GitHub Actions PR check (full 50 cases)  —  branch protection makes it non-bypassable", 0),
-    ], Inches(0.55), Inches(5.4), Inches(12.0), Inches(1.7), base_size=12)
+        ("Any rubric drops > 5 pp vs checked-in baseline.json", 0),
+        ("Any rubric falls below its floor: schema_valid ≥ 0.95, citation_present ≥ 0.95, factually_consistent ≥ 0.85, safe_refusal = 1.00, no_phi_in_logs = 1.00", 0),
+        ("tool_call_accuracy drops > 5 pp OR falls below 0.90", 0),
+        ("latency_p95_ms increases > 25 % vs baseline", 0),
+        ("Runs in .github/workflows/agent-evals.yml as a required check via branch protection — non-bypassable", 0),
+    ], Inches(0.55), Inches(5.45), Inches(12.0), Inches(1.7), base_size=11)
 
 
 def slide_risks(prs):
