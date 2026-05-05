@@ -13,6 +13,8 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
+use OpenEMR\Common\Csrf\CsrfUtils;
+
 // ─── Live data: real documents.* rows for the active patient ────────────
 // Surfaces W2 uploads (and any other real documents) above the static W1
 // mock sections, each linked to the bbox-overlay viewer
@@ -294,8 +296,59 @@ $earlier = [
   <div class="cp-doc-spacer"></div>
   <button type="button" class="cp-doc-pill"><span class="icon">🔍</span><span><?php echo xlt('Search documents'); ?></span></button>
   <button type="button" class="cp-doc-pill"><span class="icon">⇅</span><span><?php echo xlt('Recent first'); ?></span></button>
-  <button type="button" class="cp-doc-upload"><span>⬆</span><span><?php echo xlt('Upload'); ?></span></button>
+  <button type="button" class="cp-doc-upload" id="cp-doc-upload-btn"><span>⬆</span><span><?php echo xlt('Upload'); ?></span></button>
+  <input type="file" id="cp-doc-upload-input" accept=".pdf,application/pdf,image/*" style="display:none">
 </header>
+<?php if ($activePid > 0): ?>
+<script>
+(function () {
+  const PATIENT_ID = <?php echo (int)$activePid; ?>;
+  const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken()); ?>;
+  const btn = document.getElementById('cp-doc-upload-btn');
+  const input = document.getElementById('cp-doc-upload-input');
+  if (!btn || !input) return;
+
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', async () => {
+    if (!input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const orig = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span>⬆</span><span>Uploading…</span>';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('patient_id', String(PATIENT_ID));
+    fd.append('category_id', '1');
+    fd.append('csrf_token_form', CSRF);
+
+    try {
+      const resp = await fetch('./copilot_documents_upload.php', {
+        method: 'POST', body: fd, credentials: 'same-origin',
+      });
+      let data;
+      try { data = await resp.json(); } catch { data = { ok: false, error: 'Bad JSON from server' }; }
+      if (!resp.ok || !data.ok) {
+        throw new Error(data.error || ('HTTP ' + resp.status));
+      }
+      btn.innerHTML = '<span>✓</span><span>Uploaded #' + data.doc_id + '</span>';
+      setTimeout(() => { window.location.reload(); }, 600);
+    } catch (err) {
+      btn.disabled = false;
+      btn.innerHTML = orig;
+      alert('Upload failed: ' + (err.message || err));
+    }
+  });
+})();
+</script>
+<?php else: ?>
+<script>
+(function () {
+  const btn = document.getElementById('cp-doc-upload-btn');
+  if (btn) btn.addEventListener('click', () => alert('Open a patient chart first — uploads are filed against an active patient.'));
+})();
+</script>
+<?php endif; ?>
 
 <div class="cp-doc-body">
   <aside class="cp-doc-side">
