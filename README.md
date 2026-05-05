@@ -141,6 +141,9 @@ This is a one-week demo. Some honesty about scope:
   - Sign & lock encounter (Screen 23 → `form_encounter` update)
   - Invite / deactivate user (Screen 52 → `users`)
   - Add facility / add drug to inventory (Screens 54 / 60)
+  - **Calendar (W2):** create / edit / delete events backed by
+    `openemr_postcalendar_events`, filtered to the logged-in
+    user via `pc_aid`.
 - Audit log (Screen 55) reads ~80k real entries from the OpenEMR
   `log` table.
 - The Co-Pilot agent answers from real FHIR data for the active
@@ -156,6 +159,88 @@ This is a one-week demo. Some honesty about scope:
 
 A complete view-by-view inventory is in
 `/interface/main/copilot_mock_index.php` on the live demo.
+
+---
+
+## Week 2 — Multimodal Evidence Agent
+
+> Graders should be able to run the W2 core flow without guessing.
+> This section is the entry point.
+
+Week 2 extends the Week 1 agent in three directions: it can now
+**see** real clinical documents (lab PDFs, intake forms, external
+medication lists), **route** work across an inspectable supervisor +
+worker graph, and **prove** quality with a 50-case eval suite that
+gates every PR.
+
+### What's new in W2 vs the W1 baseline
+
+| Capability | Where |
+|---|---|
+| Document ingestion (lab + intake + medication-list PDFs → strict-schema JSON) | `copilot/agent/ingest/` |
+| Sample PDFs covering 3 lab + 2 intake + 2 med-list layouts | `copilot/agent/ingest/test_fixtures/samples/` |
+| Hybrid RAG over a curated guideline corpus (ADA / ACC-AHA / USPSTF / GINA / KDIGO) | `copilot/agent/rag/` + `copilot/guidelines/seed_corpus.json` |
+| LangGraph supervisor + intake_extractor + evidence_retriever + critic + final_answer | `copilot/agent/graph.py` |
+| New agent tools: `search_guidelines`, `get_extracted_facts` (visible to /chat directly) | `copilot/agent/tools.py` |
+| Click-to-source bbox-overlay PDF viewer | `interface/patient_file/documents/copilot_doc_viewer.php` |
+| Documents tab live data → bbox viewer link | `interface/patient_file/documents/copilot_documents.php` |
+| 50-case eval suite with deterministic-first rubrics + per-rubric booleans | `copilot/agent/evals/` |
+| `gate.py` + `.github/workflows/agent-evals.yml` PR-blocking eval gate | required check on `master` (enable via branch protection) |
+| Cost / latency report generator | `copilot/agent/cost_table.py` + `scripts/cost_latency_report.py` |
+| Lab-trend SVG sparkline endpoint | `GET /copilot/lab-trend/{patient_id}?test_name=…` |
+
+### W2 architecture documents
+
+- [`ARCHITECTURE.md`](ARCHITECTURE.md) — full architecture, W1 + W2 in one place
+- [`W2_ARCHITECTURE.md`](W2_ARCHITECTURE.md) — focused W2-only view (submission deliverable)
+- [`w2_architecture_deck.pptx`](w2_architecture_deck.pptx) — 11-slide architecture-defense deck
+
+### How to run the W2 flow end-to-end
+
+Prereqs: local dev stack up (`docker compose up --detach --wait` from
+`docker/development-easy-light/`), agent running on `:8400` with
+`ANTHROPIC_API_KEY` set, the W2 schema applied:
+
+```bash
+docker exec -i development-easy-light-mysql-1 mysql -uroot -proot openemr \
+    < sql/copilot_w2.sql
+```
+
+Then:
+
+```bash
+# 1. Generate a sample lab PDF (one of seven layouts):
+ls copilot/agent/ingest/test_fixtures/samples/
+
+# 2. Run extraction + retrieval end-to-end:
+python copilot/agent/scripts/mvp_demo.py \
+    --pdf copilot/agent/ingest/test_fixtures/samples/lab_quest_style.pdf \
+    --patient-id 1 \
+    --query "metformin contraindicated CKD"
+
+# 3. Open the Documents tab on the active patient — uploaded PDFs
+#    appear in the "LIVE — uploaded on this chart" section linked
+#    to the bbox viewer.
+
+# 4. Send a clinical question to /chat — search_guidelines and
+#    get_extracted_facts are now native agent tools, so the answer
+#    can quote both chart-native FHIR data and W2 extractions /
+#    guideline chunks with proper citations.
+```
+
+### W2 endpoints (agent)
+
+- `POST /extract` — run extraction on an uploaded PDF
+  (`{patient_id, doc_type, document_id|file_path}`)
+- `POST /search` — hybrid RAG over the guideline corpus
+  (`{query, top_k}`)
+- `POST /chat/graph` — multi-agent LangGraph path (parallel to W1's
+  `/chat/stream`); accepts `pending_doc_uploads` to drive
+  intake_extractor mid-conversation
+- `GET /copilot/extractions/{patient_id}[?doc_type=…]` — derived
+  facts + bbox citations consumed by the doc viewer
+- `GET /copilot/lab-trend/{patient_id}?test_name=…[&unit=…]` —
+  inline-SVG sparkline over time
 
 ---
 
