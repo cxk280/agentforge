@@ -14,10 +14,191 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-// Inbox data — mirrors the Figma mock exactly. Each entry now also
-// carries the detail-pane content so clicking a row in the inbox
-// reloads the page with ?selected=N and the right detail renders.
-$messages = [
+use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
+
+if (!AclMain::aclCheckCore('patients', 'notes')) {
+    http_response_code(403);
+    echo xlt("Not authorized");
+    exit;
+}
+
+// ─── Active user ────────────────────────────────────────────────────────
+$activeUserId = (int)($_SESSION['authUserID'] ?? 0);
+$activeUsername = '';
+$activeUserDisplay = '';
+if ($activeUserId) {
+    $r = sqlQuery(
+        "SELECT username, fname, lname FROM users WHERE id = ?",
+        [$activeUserId]
+    );
+    if ($r) {
+        $activeUsername = (string)($r['username'] ?? '');
+        $activeUserDisplay = trim(($r['fname'] ?? '') . ' ' . ($r['lname'] ?? ''))
+            ?: $activeUsername;
+    }
+}
+if ($activeUsername === '') {
+    http_response_code(401);
+    echo xlt('No active session user');
+    exit;
+}
+
+// ─── Tab + selection state ──────────────────────────────────────────────
+$tab = $_GET['tab'] ?? 'inbox';
+if (!in_array($tab, ['inbox', 'sent', 'archived', 'all'], true)) {
+    $tab = 'inbox';
+}
+$selectedEid = (int)($_GET['selected'] ?? 0);
+
+// Map tab → WHERE clause. Pnotes columns:
+//   pnotes.user        = sender username
+//   pnotes.assigned_to = recipient username
+//   pnotes.activity    = 1 active, 0 archived
+//   pnotes.deleted     = 1 hard-deleted (soft-delete flag, never shown)
+$whereByTab = [
+    'inbox'    => "p.assigned_to = ? AND p.deleted = 0 AND p.activity = 1",
+    'sent'     => "p.user        = ? AND p.deleted = 0",
+    'archived' => "p.assigned_to = ? AND p.deleted = 0 AND p.activity = 0",
+    'all'      => "(p.assigned_to = ? OR p.user = ?) AND p.deleted = 0",
+];
+$whereSql = $whereByTab[$tab];
+$whereParams = ($tab === 'all')
+    ? [$activeUsername, $activeUsername]
+    : [$activeUsername];
+
+// ─── Pull messages ──────────────────────────────────────────────────────
+//
+// Joining users twice — once for the sender display name, once for
+// recipient — keeps "Dr. Sarah Chen" rendering even when the canonical
+// pnotes row only carries the username. Patient join is optional;
+// non-patient messages have pid IS NULL or pid = 0.
+$rs = sqlStatement(
+    "SELECT p.id, p.date, p.body, p.title, p.user AS sender_un, p.assigned_to AS to_un,
+            p.activity, p.message_status, p.pid,
+            u_from.fname AS from_fname, u_from.lname AS from_lname, u_from.title AS from_title,
+            u_to.fname   AS to_fname,   u_to.lname   AS to_lname,
+            pat.fname    AS pat_fname,  pat.lname    AS pat_lname
+       FROM pnotes p
+  LEFT JOIN users u_from ON u_from.username = p.user
+  LEFT JOIN users u_to   ON u_to.username   = p.assigned_to
+  LEFT JOIN patient_data pat ON (pat.pid IS NOT NULL AND p.pid IS NOT NULL
+                                  AND p.pid != 0 AND pat.pid = p.pid)
+      WHERE $whereSql
+      ORDER BY p.date DESC, p.id DESC
+      LIMIT 100",
+    $whereParams
+);
+
+$messages = [];
+$now = time();
+while ($r = sqlFetchArray($rs)) {
+    $eid = (int)$r['id'];
+    $senderName = trim(($r['from_fname'] ?? '') . ' ' . ($r['from_lname'] ?? ''));
+    if ($senderName === '') {
+        $senderName = (string)($r['sender_un'] ?? 'Unknown');
+    }
+    if (!empty($r['from_title'])) {
+        $senderFull = $senderName . ' — ' . $r['from_title'];
+    } else {
+        $senderFull = $senderName;
+    }
+    $toName = trim(($r['to_fname'] ?? '') . ' ' . ($r['to_lname'] ?? ''));
+    if ($toName === '') {
+        $toName = (string)($r['to_un'] ?? '');
+    }
+
+    // Friendly relative time. "Today 9:14 AM", "Yesterday", "Mon", or
+    // a YYYY-MM-DD when more than a week old.
+    $dateStr = (string)($r['date'] ?? '');
+    $ts = $dateStr ? strtotime($dateStr) : 0;
+    $time = '';
+    $dateLabel = $dateStr;
+    if ($ts > 0) {
+        $delta = $now - $ts;
+        $hms = date('g:i A', $ts);
+        if (date('Y-m-d', $ts) === date('Y-m-d', $now)) {
+            $time = $hms;
+            $dateLabel = 'Today ' . $hms;
+        } elseif (date('Y-m-d', $ts) === date('Y-m-d', strtotime('-1 day', $now))) {
+            $time = 'Yesterday';
+            $dateLabel = 'Yesterday ' . $hms;
+        } elseif ($delta < 7 * 86400) {
+            $time = date('D', $ts);
+            $dateLabel = date('D ', $ts) . $hms;
+        } else {
+            $time = date('M j', $ts);
+            $dateLabel = date('M j Y, ', $ts) . $hms;
+        }
+    }
+
+    $title = (string)($r['title'] ?? '');
+    $body = (string)($r['body'] ?? '');
+    $patName = trim(($r['pat_fname'] ?? '') . ' ' . ($r['pat_lname'] ?? ''));
+
+    $isUrgent = (stripos($title, 'URGENT') !== false)
+                || (strtolower((string)$r['message_status']) === 'high');
+    $isUnread = (strtolower((string)$r['message_status']) !== 'read')
+                && ($r['sender_un'] !== $activeUsername);
+
+    $messages[] = [
+        'eid'         => $eid,
+        'sender'      => $senderName,
+        'sender_full' => $senderFull,
+        'sender_un'   => (string)$r['sender_un'],
+        'to_un'       => (string)$r['to_un'],
+        'time'        => $time,
+        'date_label'  => $dateLabel,
+        'to'          => $toName,
+        'subject'     => $title ?: '(no subject)',
+        'preview'     => trim(preg_replace('/\s+/', ' ', mb_substr($body, 0, 110)))
+                         . (mb_strlen($body) > 110 ? '…' : ''),
+        'unread'      => $isUnread,
+        'urgent'      => $isUrgent,
+        'body'        => $body,
+        'patient_id'  => (int)($r['pid'] ?? 0),
+        'patient_name' => $patName,
+        'archived'    => ((int)$r['activity'] === 0),
+    ];
+}
+
+// Pick the active message from ?selected=<eid>; fall back to first.
+$selectedIdx = 0;
+if ($selectedEid > 0) {
+    foreach ($messages as $i => $m) {
+        if ($m['eid'] === $selectedEid) {
+            $selectedIdx = $i;
+            break;
+        }
+    }
+}
+if ($selectedIdx >= count($messages)) {
+    $selectedIdx = 0;
+}
+
+// Mark the selected message as read on display (only when it's an
+// inbox message addressed to me — sent messages don't get "read"
+// flipped). Idempotent so refresh doesn't churn the row.
+if (!empty($messages) && $messages[$selectedIdx]['to_un'] === $activeUsername
+    && $messages[$selectedIdx]['unread']) {
+    sqlStatement(
+        "UPDATE pnotes SET message_status = 'Read' WHERE id = ?",
+        [$messages[$selectedIdx]['eid']]
+    );
+    $messages[$selectedIdx]['unread'] = false;
+}
+
+$selectedMsg = $messages[$selectedIdx] ?? null;
+
+// ─── Counts for badge + tab labels ──────────────────────────────────────
+$unreadCount = (int)(sqlQuery(
+    "SELECT COUNT(*) AS n FROM pnotes
+      WHERE assigned_to = ? AND deleted = 0 AND activity = 1
+        AND (message_status IS NULL OR message_status != 'Read')",
+    [$activeUsername]
+)['n'] ?? 0);
+
+$mockMessages = [
     [
         'sender'   => 'Dr. Sarah Chen',
         'sender_full' => 'Dr. Sarah Chen — Endocrinology',
@@ -127,19 +308,25 @@ $messages = [
         'closer'   => "Happy to discuss anytime if you want to talk through the imaging.\n\n— Raj",
     ],
 ];
+// $mockMessages is unused now that the live query above feeds $messages.
+// Kept for reference and so the empty-state can demonstrate what the
+// inbox looks like with rich content if seed data isn't present.
+unset($mockMessages);
 
-// Pick the active message from ?selected=N (default first).
-$selectedIdx = (int)($_GET['selected'] ?? 0);
-if ($selectedIdx < 0 || $selectedIdx >= count($messages)) {
-    $selectedIdx = 0;
-}
-foreach ($messages as $i => $_) {
+// Tag selection on each row so the existing render block ($m['selected'])
+// keeps working without changes.
+foreach ($messages as $i => $_unused) {
     $messages[$i]['selected'] = ($i === $selectedIdx);
 }
-$selectedMsg = $messages[$selectedIdx];
-$findings = $selectedMsg['findings'];
 
-$filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => false];
+// Tab labels — drives the four pills in the header. Active tab matches
+// the resolved $tab value above.
+$filterTabs = [
+    'inbox'    => 'Inbox',
+    'sent'     => 'Sent',
+    'archived' => 'Archived',
+    'all'      => 'All',
+];
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -421,19 +608,24 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
 <header class="cp-msg-header">
   <div class="cp-msg-title-block">
     <div class="cp-msg-title"><?php echo xlt('Messages'); ?></div>
-    <span class="cp-msg-count"><?php echo xlt('12 new'); ?></span>
+    <?php if ($unreadCount > 0): ?>
+      <span class="cp-msg-count"><?php echo (int)$unreadCount; ?> <?php echo xlt('new'); ?></span>
+    <?php endif; ?>
   </div>
   <div class="cp-msg-spacer"></div>
   <div class="cp-msg-filter" role="tablist">
-    <?php foreach ($filterTabs as $label => $active): ?>
-      <button class="cp-msg-filter-item<?php echo $active ? ' active' : ''; ?>" type="button" role="tab"<?php if ($active) {
-          echo ' aria-selected="true"';
-      } ?>>
+    <?php foreach ($filterTabs as $tabKey => $label):
+      $isActive = ($tabKey === $tab);
+    ?>
+      <a href="?tab=<?php echo urlencode($tabKey); ?>"
+         class="cp-msg-filter-item<?php echo $isActive ? ' active' : ''; ?>"
+         role="tab"<?php echo $isActive ? ' aria-selected="true"' : ''; ?>
+         style="text-decoration:none">
         <?php echo text($label); ?>
-      </button>
+      </a>
     <?php endforeach; ?>
   </div>
-  <button class="cp-msg-compose" type="button">
+  <button class="cp-msg-compose" type="button" id="cp-msg-compose-btn">
     <span class="cp-msg-compose-icon">✎</span>
     <span><?php echo xlt('Compose'); ?></span>
   </button>
@@ -442,9 +634,17 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
 <div class="cp-msg-panes">
 
   <aside class="cp-msg-inbox">
+    <?php if (empty($messages)): ?>
+      <div style="padding:32px 16px;text-align:center;color:#8A91A0;font-size:13px">
+        <?php echo xlt('No messages in this view.'); ?><br>
+        <span style="font-size:11px;color:#AAB1BD">
+          <?php echo text("Logged in as " . $activeUserDisplay . " (" . $activeUsername . ")"); ?>
+        </span>
+      </div>
+    <?php endif; ?>
     <?php foreach ($messages as $i => $m): ?>
       <a class="cp-msg-item<?php echo $m['selected'] ? ' selected' : ''; ?>"
-         href="?selected=<?php echo attr((string)$i); ?>"
+         href="?tab=<?php echo urlencode($tab); ?>&selected=<?php echo (int)$m['eid']; ?>"
          style="text-decoration:none; color:inherit; display:block;">
         <div class="cp-msg-item-top">
           <?php if ($m['unread']): ?>
@@ -464,6 +664,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     <?php endforeach; ?>
   </aside>
 
+  <?php if ($selectedMsg !== null): ?>
   <section class="cp-msg-detail">
     <header class="cp-msg-detail-head">
       <h2 class="cp-msg-detail-subject"><?php echo text($selectedMsg['subject']); ?></h2>
@@ -471,43 +672,262 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
         <div class="cp-msg-from-avatar" aria-hidden="true"></div>
         <div>
           <div class="cp-msg-from-name"><?php echo text($selectedMsg['sender_full']); ?></div>
-          <div class="cp-msg-from-meta"><?php echo xlt('To'); ?>: <?php echo text($selectedMsg['to']); ?> • <?php echo text($selectedMsg['date_label']); ?></div>
+          <div class="cp-msg-from-meta">
+            <?php echo xlt('To'); ?>: <?php echo text($selectedMsg['to']); ?>
+            • <?php echo text($selectedMsg['date_label']); ?>
+            <?php if (!empty($selectedMsg['patient_name'])): ?>
+              • <span style="color:#1f3a68;font-weight:600"><?php echo text($selectedMsg['patient_name']); ?></span>
+            <?php endif; ?>
+          </div>
         </div>
       </div>
     </header>
 
     <div class="cp-msg-detail-body">
-      <p class="cp-msg-para" style="white-space:pre-line;"><?php echo text($selectedMsg['lead']); ?></p>
-
-      <?php foreach ($findings as $f): ?>
-        <div class="cp-msg-finding">
-          <span class="cp-msg-finding-icon"><?php echo $f[0]; ?></span>
-          <div>
-            <div class="cp-msg-finding-title"><?php echo text($f[1]); ?></div>
-            <div class="cp-msg-finding-detail"><?php echo text($f[2]); ?></div>
-          </div>
-        </div>
-      <?php endforeach; ?>
-
-      <p class="cp-msg-para" style="white-space:pre-line;"><?php echo text($selectedMsg['closer']); ?></p>
+      <p class="cp-msg-para" style="white-space:pre-line;"><?php echo text($selectedMsg['body']); ?></p>
     </div>
 
     <div class="cp-msg-detail-actions">
-      <button class="cp-msg-btn cp-msg-btn--primary" type="button">
+      <button class="cp-msg-btn cp-msg-btn--primary" type="button"
+              id="cp-msg-reply-btn"
+              data-eid="<?php echo (int)$selectedMsg['eid']; ?>"
+              data-to-un="<?php echo attr($selectedMsg['sender_un']); ?>"
+              data-subject="Re: <?php echo attr($selectedMsg['subject']); ?>">
         <span><?php echo xlt('↩ Reply'); ?></span>
       </button>
-      <button class="cp-msg-btn" type="button">
-        <span><?php echo xlt('↪ Forward'); ?></span>
-      </button>
-      <button class="cp-msg-btn cp-msg-btn--muted" type="button">
-        <span><?php echo xlt('Archive'); ?></span>
+      <?php if ($tab !== 'archived'): ?>
+        <button class="cp-msg-btn cp-msg-btn--muted" type="button"
+                id="cp-msg-archive-btn"
+                data-eid="<?php echo (int)$selectedMsg['eid']; ?>">
+          <span><?php echo xlt('Archive'); ?></span>
+        </button>
+      <?php else: ?>
+        <button class="cp-msg-btn" type="button"
+                id="cp-msg-restore-btn"
+                data-eid="<?php echo (int)$selectedMsg['eid']; ?>">
+          <span><?php echo xlt('Restore'); ?></span>
+        </button>
+      <?php endif; ?>
+      <button class="cp-msg-btn cp-msg-btn--muted" type="button"
+              id="cp-msg-delete-btn"
+              data-eid="<?php echo (int)$selectedMsg['eid']; ?>"
+              style="color:#B7432A">
+        <span><?php echo xlt('Delete'); ?></span>
       </button>
       <div class="cp-msg-actions-spacer"></div>
-      <a class="cp-msg-link-chart" href="#"><?php echo xlt('Open in patient chart →'); ?></a>
+      <?php if ($selectedMsg['patient_id'] > 0): ?>
+        <a class="cp-msg-link-chart"
+           href="/interface/patient_file/summary/demographics.php?set_pid=<?php echo (int)$selectedMsg['patient_id']; ?>">
+          <?php echo xlt('Open in patient chart →'); ?>
+        </a>
+      <?php endif; ?>
     </div>
   </section>
+  <?php endif; ?>
 
 </div>
+
+<!-- Compose / reply modal -->
+<div id="cp-msg-modal-bg"
+     style="position:fixed;inset:0;background:rgba(13,27,42,.35);display:none;
+            align-items:center;justify-content:center;z-index:60">
+  <form id="cp-msg-modal" autocomplete="off"
+        style="background:#FFFFFF;border-radius:14px;width:520px;max-width:92vw;
+               box-shadow:0 16px 48px rgba(13,27,42,.25);padding:22px 24px">
+    <h2 id="cp-msg-modal-title" style="margin:0 0 12px;font-size:17px;font-weight:700">
+      <?php echo xlt('Compose message'); ?>
+    </h2>
+    <div id="cp-msg-modal-error"
+         style="display:none;background:#FBEFEB;border:1px solid #ECC8BE;color:#B7432A;
+                padding:8px 10px;border-radius:8px;font-size:12px;margin:0 0 12px"></div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;color:#4F5662;text-transform:uppercase">
+        <?php echo xlt('To'); ?>
+      </label>
+      <select id="cp-msg-to" required
+              style="width:100%;border:1px solid #E4E5E8;border-radius:8px;
+                     padding:8px 10px;font-size:13px;font-family:inherit;margin-top:4px">
+        <option value="">— <?php echo xlt('Select recipient'); ?> —</option>
+        <?php
+        $u = sqlStatement(
+            "SELECT username, fname, lname, title FROM users
+              WHERE active = 1 AND username IS NOT NULL AND username != ''
+                AND username != ?
+              ORDER BY lname, fname",
+            [$activeUsername]
+        );
+        while ($ur = sqlFetchArray($u)):
+            $disp = trim(($ur['fname'] ?? '') . ' ' . ($ur['lname'] ?? ''));
+            if ($disp === '') {
+                $disp = $ur['username'];
+            }
+            if (!empty($ur['title'])) {
+                $disp .= ' (' . $ur['title'] . ')';
+            }
+        ?>
+          <option value="<?php echo attr($ur['username']); ?>"><?php echo text($disp); ?></option>
+        <?php endwhile; ?>
+      </select>
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;color:#4F5662;text-transform:uppercase">
+        <?php echo xlt('Subject'); ?>
+      </label>
+      <input id="cp-msg-subject" type="text" required maxlength="200"
+             style="width:100%;border:1px solid #E4E5E8;border-radius:8px;
+                    padding:8px 10px;font-size:13px;font-family:inherit;margin-top:4px">
+    </div>
+    <div style="margin-bottom:12px">
+      <label style="font-size:11px;font-weight:600;color:#4F5662;text-transform:uppercase">
+        <?php echo xlt('Patient (optional PID)'); ?>
+      </label>
+      <input id="cp-msg-pid" type="number" min="0"
+             style="width:100%;border:1px solid #E4E5E8;border-radius:8px;
+                    padding:8px 10px;font-size:13px;font-family:inherit;margin-top:4px">
+    </div>
+    <div style="margin-bottom:14px">
+      <label style="font-size:11px;font-weight:600;color:#4F5662;text-transform:uppercase">
+        <?php echo xlt('Message'); ?>
+      </label>
+      <textarea id="cp-msg-body" required rows="6" maxlength="6000"
+                style="width:100%;border:1px solid #E4E5E8;border-radius:8px;
+                       padding:8px 10px;font-size:13px;font-family:inherit;margin-top:4px;
+                       resize:vertical"></textarea>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span style="flex:1"></span>
+      <button type="button" id="cp-msg-cancel"
+              style="border:1px solid #E4E5E8;background:#FFFFFF;color:#0D1B2A;
+                     border-radius:999px;padding:8px 16px;font-size:13px;cursor:pointer">
+        <?php echo xlt('Cancel'); ?>
+      </button>
+      <button type="submit"
+              style="background:#008C8C;color:#FFFFFF;border:none;
+                     border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;
+                     cursor:pointer">
+        <?php echo xlt('Send'); ?>
+      </button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function () {
+  const API = './copilot_messages_api.php';
+  const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken()); ?>;
+  const ACTIVE_USERNAME = <?php echo json_encode($activeUsername); ?>;
+  const modalBg = document.getElementById('cp-msg-modal-bg');
+  const form    = document.getElementById('cp-msg-modal');
+  const titleEl = document.getElementById('cp-msg-modal-title');
+  const toIn    = document.getElementById('cp-msg-to');
+  const subIn   = document.getElementById('cp-msg-subject');
+  const pidIn   = document.getElementById('cp-msg-pid');
+  const bodyIn  = document.getElementById('cp-msg-body');
+  const errEl   = document.getElementById('cp-msg-modal-error');
+
+  function showError(msg) {
+    errEl.textContent = msg; errEl.style.display = 'block';
+  }
+  function clearError() {
+    errEl.textContent = ''; errEl.style.display = 'none';
+  }
+
+  function openCompose({ replyTo = null, replySubject = null, replyBody = null } = {}) {
+    clearError();
+    titleEl.textContent = replyTo ? 'Reply' : 'Compose message';
+    toIn.value     = replyTo || '';
+    subIn.value    = replySubject || '';
+    pidIn.value    = '';
+    bodyIn.value   = replyBody || '';
+    modalBg.style.display = 'flex';
+    setTimeout(() => (replyTo ? bodyIn : toIn).focus(), 50);
+  }
+  function closeCompose() { modalBg.style.display = 'none'; }
+
+  async function callApi(payload) {
+    const fd = new FormData();
+    Object.entries(payload).forEach(([k, v]) => fd.append(k, v ?? ''));
+    fd.set('csrf_token_form', CSRF);
+    const resp = await fetch(API, { method: 'POST', body: fd, credentials: 'same-origin' });
+    let body;
+    try { body = await resp.json(); } catch { body = { ok: false, error: 'Bad JSON' }; }
+    if (!resp.ok || !body.ok) throw new Error(body.error || ('HTTP ' + resp.status));
+    return body;
+  }
+
+  document.getElementById('cp-msg-compose-btn').addEventListener('click', () => openCompose());
+  document.getElementById('cp-msg-cancel').addEventListener('click', closeCompose);
+  modalBg.addEventListener('click', evt => { if (evt.target === modalBg) closeCompose(); });
+  document.addEventListener('keydown', evt => {
+    if (evt.key === 'Escape' && modalBg.style.display === 'flex') closeCompose();
+  });
+
+  const replyBtn = document.getElementById('cp-msg-reply-btn');
+  if (replyBtn) {
+    replyBtn.addEventListener('click', () => {
+      const toUn = replyBtn.dataset.toUn;
+      // Don't reply to yourself (sent items have sender = self).
+      if (toUn === ACTIVE_USERNAME) {
+        openCompose();
+        return;
+      }
+      openCompose({
+        replyTo:      toUn,
+        replySubject: replyBtn.dataset.subject,
+      });
+    });
+  }
+  const archiveBtn = document.getElementById('cp-msg-archive-btn');
+  if (archiveBtn) {
+    archiveBtn.addEventListener('click', async () => {
+      try {
+        await callApi({ action: 'archive', eid: archiveBtn.dataset.eid });
+        window.location.search = '?tab=<?php echo urlencode($tab); ?>';
+      } catch (err) { alert('Archive failed: ' + err.message); }
+    });
+  }
+  const restoreBtn = document.getElementById('cp-msg-restore-btn');
+  if (restoreBtn) {
+    restoreBtn.addEventListener('click', async () => {
+      try {
+        await callApi({ action: 'restore', eid: restoreBtn.dataset.eid });
+        window.location.search = '?tab=<?php echo urlencode($tab); ?>';
+      } catch (err) { alert('Restore failed: ' + err.message); }
+    });
+  }
+  const deleteBtn = document.getElementById('cp-msg-delete-btn');
+  if (deleteBtn) {
+    deleteBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this message? Cannot be undone.')) return;
+      try {
+        await callApi({ action: 'delete', eid: deleteBtn.dataset.eid });
+        window.location.search = '?tab=<?php echo urlencode($tab); ?>';
+      } catch (err) { alert('Delete failed: ' + err.message); }
+    });
+  }
+
+  form.addEventListener('submit', async evt => {
+    evt.preventDefault();
+    clearError();
+    if (!toIn.value || !subIn.value || !bodyIn.value) {
+      showError('To, Subject, and Message are all required.');
+      return;
+    }
+    try {
+      await callApi({
+        action: 'send',
+        to_username: toIn.value,
+        subject:     subIn.value,
+        body:        bodyIn.value,
+        patient_id:  pidIn.value,
+      });
+      closeCompose();
+      // Land in Sent so the new message is visible.
+      window.location.search = '?tab=sent';
+    } catch (err) { showError(err.message || String(err)); }
+  });
+})();
+</script>
 
 </body>
 </html>

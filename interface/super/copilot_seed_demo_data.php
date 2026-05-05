@@ -78,6 +78,79 @@ if ($backfilled > 0) {
     echo "Each seeded user now logs in with password 'demopass'.\n\n";
 }
 
+// ── ALWAYS-RUN: idempotent pnotes seed for the Messages demo ───────────
+//
+// Has to run outside the marker gate so existing deploys (where the
+// main seed already fired) get the new messages on the next visit. The
+// loop dedups by (user, assigned_to, subject) so re-runs are no-ops.
+// References usernames that may not yet exist on a brand-new DB; the
+// gated body below creates them, and the live Messages query uses a
+// LEFT JOIN so unresolved usernames just render as the bare string
+// until users land.
+$pnotesAlwaysRun = [
+    ['apark',   'erivera', 1,   false, 1,    'Re: Ted Shaw — diabetes follow-up',
+     "Eduardo,\n\nReviewed Ted's chart ahead of the follow-up visit. A1C trending up (8.2% on 04/28). I'd suggest we add an SGLT2i given his CKD3a — empagliflozin 10mg daily is reasonable.\n\nLet me know if you'd like to discuss before Wednesday.\n\n— Allison"],
+    ['llee',    'erivera', 3,   false, 5,    'Pulmonary follow-up — Farrah Rolle',
+     "Eduardo, saw Farrah today — asthma well-controlled on her current ICS-formoterol regimen. No changes needed. Will see her again in 6 months unless symptoms recur.\n\n— Lin"],
+    ['mnunez',  'erivera', 5,   true,  null, 'URGENT: Lab callback — Ted Shaw',
+     "LabCorp called: Ted's potassium came back at 5.6. Lab tech wants verbal acknowledgment before they release the result. Please call back at (512) 555-0142 ext 4521 ASAP.\n\n— Maria"],
+    ['admin',   'erivera', 22,  false, null, 'Reminder: Q3 chart review due',
+     "Friendly reminder — your Q3 sample-of-10 chart review is due by end of next week. Pull from any 10 patients you saw 04/01–06/30.\n\nThanks,\nAdmin"],
+    ['kkim',    'erivera', 50,  false, 1,    'Cardiology consult — Ted Shaw scheduled',
+     "Got Ted on the books for 05/22 at 10:00. I'll review his BP trend + CKD context before the visit; let me know if there's anything specific you'd like me to focus on.\n\n— Karen"],
+    ['erivera', 'apark',   2,   false, 1,    'Thanks — appreciate the SGLT2 input',
+     "Allison, agreed on adding empagliflozin. I'll start him at 10mg and re-check labs in 4 weeks. Will loop you back if anything funky.\n\n— Eduardo"],
+    ['jpatel',  'apark',   7,   false, null, 'Endo group meeting — agenda',
+     "Allison, attaching the agenda for Friday's endo group meeting. Want to make sure we have time to discuss the new ADA guidance on SGLT2 first-line use.\n\n— James"],
+    ['mnunez',  'apark',   26,  false, 8,    'Patient form question — Nora Cohen',
+     "Quick one — Nora dropped off a new intake form, but the family-history section is blank. Should I send it back for her to complete or just file what we have?\n\n— Maria"],
+    ['apark',   'jpatel',  6,   false, null, 'Re: Endo group meeting — agenda',
+     "James, agenda looks good. Adding a 5-minute slot at the end for the new SGLT2 guidance discussion.\n\n— Allison"],
+    ['admin',   'jpatel',  30,  false, null, 'Welcome to AgentForge!',
+     "Hi James — welcome aboard. Your account is set up. Let me know if you have any questions getting started.\n\n— Admin"],
+    ['erivera', 'llee',    4,   false, 5,    'Re: Pulmonary follow-up — Farrah Rolle',
+     "Lin, thanks for the update. Will note that in her chart for the next visit.\n\n— Eduardo"],
+    ['erivera', 'kkim',    49,  false, 1,    'Re: Cardiology consult — Ted Shaw',
+     "Karen, please focus on whether his HTN regimen is appropriate given the recent BP creep + CKD3a. Considering uptitrating lisinopril vs adding amlodipine.\n\n— Eduardo"],
+    ['erivera', 'mnunez',  4,   false, null, 'Re: URGENT lab callback — Ted Shaw',
+     "Maria, I called LabCorp back and acknowledged. Ted is aware. Thanks for the quick relay.\n\n— Eduardo"],
+    ['apark',   'mnunez',  25,  false, 8,    'Re: Nora Cohen intake form',
+     "Maria, please have her redo the family-history page — it's important for the upcoming preventive workup.\n\n— Allison"],
+    ['erivera', 'schoi',   8,   false, 1,    'Pre-visit prep — Ted Shaw 05/22',
+     "Sandra, please pull recent vitals + lab trend chart for Ted before his 05/22 follow-up. Particularly interested in BP readings from the past 6 months.\n\n— Eduardo"],
+    ['admin',   'schoi',   100, false, null, 'Quarterly compliance training',
+     "Sandra — quarterly HIPAA training assignment is in your portal. Due end of month.\n\n— Admin"],
+    ['admin',   'bhudson', 12,  false, null, 'BCBS denial follow-up needed',
+     "Brian, BCBS is bouncing the 99396 claims with modifier-25 issues. Can you take the lead on the appeal batch?\n\n— Admin"],
+    ['erivera', 'bhudson', 70,  false, 4,    'Self-pay arrangement — Eduardo Perez',
+     "Brian, Eduardo Perez asked about a self-pay arrangement. He's between insurers right now. Can you call him with options?\n\n— Eduardo"],
+];
+$pnInserted = 0;
+foreach ($pnotesAlwaysRun as [$fromUn, $toUn, $hoursAgo, $urgent, $pid, $subject, $body]) {
+    $exists = sqlQuery(
+        "SELECT id FROM pnotes
+          WHERE user = ? AND assigned_to = ? AND title = ? AND deleted = 0
+          LIMIT 1",
+        [$fromUn, $toUn, $subject]
+    );
+    if ($exists) {
+        continue;
+    }
+    $when = date('Y-m-d H:i:s', strtotime("-{$hoursAgo} hours"));
+    $status = $urgent ? 'High' : 'New';
+    sqlInsert(
+        "INSERT INTO pnotes
+            (date, body, pid, user, groupname, activity, authorized,
+             title, assigned_to, deleted, message_status)
+         VALUES (?, ?, ?, ?, 'Default', 1, 1, ?, ?, 0, ?)",
+        [$when, $body, $pid, $fromUn, $subject, $toUn, $status]
+    );
+    $pnInserted++;
+}
+if ($pnInserted > 0) {
+    echo "pnotes seed: inserted {$pnInserted} row(s) — Messages demo inboxes populated.\n\n";
+}
+
 $marker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_seed_v1'");
 if (!empty($marker['gl_value'])) {
     echo "Already seeded (gl_name='copilot_seed_v1' = {$marker['gl_value']}). Skipping main seed.\n";
@@ -87,7 +160,7 @@ if (!empty($marker['gl_value'])) {
 
 echo "AgentForge demo seed — starting at " . date('Y-m-d H:i:s') . "\n\n";
 
-$inserted = ['users' => 0, 'facility' => 0, 'pharmacies' => 0, 'drugs' => 0, 'onotes' => 0, 'documents' => 0, 'immunizations' => 0];
+$inserted = ['users' => 0, 'facility' => 0, 'pharmacies' => 0, 'drugs' => 0, 'onotes' => 0, 'documents' => 0, 'immunizations' => 0, 'pnotes' => 0];
 
 // ── USERS ─────────────────────────────────────────────────────────────
 // Add 6 provider/staff users alongside admin/davis/hamming.
@@ -207,6 +280,12 @@ foreach ($onotes as $i => [$user, $group, $body, $activity]) {
     );
     $inserted['onotes']++;
 }
+
+// ── PNOTES (Messages) ──────────────────────────────────────────────────
+// The pnotes inbox seed lives in the always-run block at the top of
+// this file, so existing deploys (with the marker already set) also
+// get the messages on next visit. The marker-gated body intentionally
+// does not duplicate the inserts — see $pnotesAlwaysRun.
 
 // ── DOCUMENTS ──────────────────────────────────────────────────────────
 $docs = [
