@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "version": 1,
+    "captured_at": "2026-05-05",
+    "captured_against": "dev",
+    "note": "Seed baseline. Replace with the first green eval-run summary against the dev agent — gate.py runs in bootstrap mode (no fail) until this file holds non-zero values."
+  },
+  "n_cases": 0,
+  "rubric_pass_rate": {},
+  "tool_call_accuracy": null,
+  "latency_p50_ms": 0,
+  "latency_p95_ms": 0
+}

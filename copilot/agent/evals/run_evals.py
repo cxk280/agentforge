@@ -40,6 +40,7 @@ from anthropic import Anthropic
 from langfuse import Langfuse
 
 from redaction import redact
+from rubrics import run_all as run_rubrics, case_passed, applicable_rubrics
 
 DATASET_NAME = "copilot-golden-v1"
 JUDGE_MODEL = "claude-haiku-4-5-20251001"
@@ -68,6 +69,11 @@ class CaseResult:
     reply: str
     judge_reason: str
     error: str | None = None
+    # W2: per-rubric booleans (deterministic-first), filled in alongside
+    # the existing float score so gate.py can target individual rubrics.
+    rubric_results: dict[str, dict] | None = None
+    tool_calls_observed: list[str] | None = None
+    tool_calls_expected: list[str] | None = None
 
 
 def load_cases() -> tuple[dict, list[dict]]:
@@ -209,6 +215,10 @@ def run() -> int:
     ap.add_argument("--endpoint", default=os.environ.get("EVAL_AGENT_ENDPOINT", DEFAULT_AGENT_ENDPOINT))
     ap.add_argument("--no-langfuse", action="store_true", help="Skip Langfuse upload")
     ap.add_argument("--threshold", type=float, default=0.7, help="Per-case pass threshold (0..1)")
+    # W2 additions:
+    ap.add_argument("--json-out", help="Write the per-case + summary JSON here for gate.py")
+    ap.add_argument("--no-fail", action="store_true",
+                    help="Always exit 0 — let gate.py decide pass/fail (used in CI)")
     args = ap.parse_args()
 
     if not os.environ.get("ANTHROPIC_API_KEY"):
@@ -233,6 +243,13 @@ def run() -> int:
     results: list[CaseResult] = []
     run_name = f"eval-run-{int(time.time())}"
 
+    # W2: thin adapter so rubrics.factually_consistent / safe_refusal can
+    # fall through to the existing Haiku judge when deterministic checks
+    # don't apply.
+    def _rubric_judge(rubric: str, case: dict, reply: str) -> tuple[bool, str]:
+        score, reason = judge_reply(anthropic, case, reply)
+        return (score >= args.threshold, reason)
+
     for i, case in enumerate(cases, 1):
         print(f"[{i}/{len(cases)}] {case['id']:<40s}", end=" ", flush=True)
         try:
@@ -240,10 +257,14 @@ def run() -> int:
             mode = case.get("mode", "labeled")
             if mode == "strict":
                 score, reason = grade_strict(case, reply)
-                passed = score == 1.0
             else:
                 score, reason = judge_reply(anthropic, case, reply)
-                passed = score >= args.threshold
+            # W2: also compute the per-rubric booleans for the gate.
+            rubric_results = run_rubrics(case, reply, judge=_rubric_judge)
+            rubrics_passed = case_passed(rubric_results)
+            # Backward compat: legacy `passed` field is the rubrics view
+            # so the gate JSON and the printed summary agree.
+            passed = rubrics_passed
             results.append(CaseResult(
                 case_id=case["id"],
                 category=case["category"],
@@ -252,9 +273,21 @@ def run() -> int:
                 latency_ms=latency,
                 reply=reply,
                 judge_reason=reason,
+                rubric_results={
+                    name: {
+                        "passed": r.passed,
+                        "method": r.method,
+                        "reason": r.reason,
+                    } for name, r in rubric_results.items()
+                },
+                tool_calls_expected=(case.get("expected") or {}).get("tool_calls_expected"),
             ))
             mode_tag = "[strict]" if case.get("mode") == "strict" else "[labeled]"
-            print(f"{'✓' if passed else '✗'} {mode_tag} score={score:.2f} ({latency}ms)")
+            rubric_summary = " ".join(
+                f"{n[:4]}={'✓' if r.passed else '✗'}{r.method[0]}"
+                for n, r in rubric_results.items()
+            )
+            print(f"{'✓' if passed else '✗'} {mode_tag} score={score:.2f} ({latency}ms)  {rubric_summary}")
         except Exception as exc:
             results.append(CaseResult(
                 case_id=case["id"],
@@ -323,6 +356,35 @@ def run() -> int:
             if not r.passed:
                 print(f"  ✗ {r.case_id} (score {r.score:.2f}) — {r.error or r.judge_reason}")
 
+    # W2: emit the gate-friendly JSON if requested.
+    if args.json_out:
+        try:
+            from gate import summarize
+        except ImportError:
+            sys.path.insert(0, str(HERE))
+            from gate import summarize
+        per_case = [{
+            "case_id": r.case_id,
+            "category": r.category,
+            "passed": r.passed,
+            "score": r.score,
+            "latency_ms": r.latency_ms,
+            "rubrics": {
+                rname: rval["passed"]
+                for rname, rval in (r.rubric_results or {}).items()
+            },
+            "tool_calls_observed": r.tool_calls_observed,
+            "tool_calls_expected": r.tool_calls_expected,
+            "error": r.error,
+        } for r in results]
+        summary = summarize(per_case)
+        summary["per_case"] = per_case
+        from pathlib import Path as _Path
+        _Path(args.json_out).write_text(json.dumps(summary, indent=2))
+        print(f"\n• Wrote gate-friendly JSON → {args.json_out}")
+
+    if args.no_fail:
+        return 0
     return 0 if total_passed == len(results) else 1
 
 

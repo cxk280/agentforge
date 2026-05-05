@@ -1,0 +1,91 @@
+name: agent-evals
+
+# PR-blocking eval gate. Spec hard requirement (W2 page 5):
+# "During grading, we will introduce a small regression and confirm
+#  your CI gate fails. If the eval gate does not block the regression,
+#  the Week 2 build does not pass."
+#
+# Mark this workflow as a required check on `master` via Branch
+# protection so a failing run blocks merge. The job runs the full eval
+# suite against the deployed dev agent (DEV_AGENT_URL secret), then
+# gate.py compares the result against copilot/agent/evals/baseline.json.
+
+on:
+  pull_request:
+    paths:
+      - "copilot/agent/**"
+      - "copilot/guidelines/**"
+      - "sql/copilot_w2.sql"
+      - ".github/workflows/agent-evals.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: agent-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  evals:
+    name: 50-case eval gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      EVAL_AGENT_ENDPOINT: ${{ secrets.DEV_AGENT_URL && format('{0}/chat', secrets.DEV_AGENT_URL) || 'http://localhost:8400/chat' }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+      LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+      LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+      COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install eval deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r copilot/agent/evals/requirements.txt
+          pip install -r copilot/agent/requirements.txt
+
+      - name: Sanity-check secrets
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::ANTHROPIC_API_KEY is not set in repo secrets"
+            exit 1
+          fi
+          if [ -z "${{ secrets.DEV_AGENT_URL }}" ]; then
+            echo "::error::DEV_AGENT_URL is not set in repo secrets — eval target must be the deployed dev agent"
+            exit 1
+          fi
+
+      - name: Run eval suite
+        working-directory: copilot/agent/evals
+        run: |
+          python run_evals.py \
+            --endpoint "$EVAL_AGENT_ENDPOINT" \
+            --json-out /tmp/eval-current.json \
+            --no-langfuse \
+            --no-fail   # gate.py is authoritative for the pass/fail decision
+
+      - name: Run regression gate
+        run: |
+          python copilot/agent/evals/gate.py \
+            --current /tmp/eval-current.json \
+            --baseline copilot/agent/evals/baseline.json
+
+      - name: Upload eval artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results-${{ github.run_id }}
+          path: |
+            /tmp/eval-current.json
+            copilot/agent/evals/baseline.json
+          retention-days: 30
