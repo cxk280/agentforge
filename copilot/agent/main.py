@@ -155,9 +155,22 @@ async def _security_headers(request: Request, call_next):
     return response
 
 
+# Same allowlist that drives the CSP frame-ancestors directive — partial
+# mitigation for residual risk R1 in SECURITY.md (no per-patient care-
+# relationship check on /copilot/extractions and /copilot/lab-trend).
+# Cross-origin browser hits from anywhere outside the OpenEMR iframe
+# now get rejected at the CORS layer; same-origin / direct-curl still
+# work for ops + eval-harness use.
+_CORS_ORIGINS = [
+    o for o in os.environ.get(
+        "ALLOWED_IFRAME_ORIGINS", _DEFAULT_IFRAME_ORIGINS,
+    ).split() if o
+] or ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten to OpenEMR origin in production
+    allow_origins=_CORS_ORIGINS,
+    allow_credentials=True,
     allow_methods=["POST", "GET", "DELETE"],
     allow_headers=["*"],
 )
@@ -196,6 +209,13 @@ class ChatRequest(BaseModel):
     # doc_type } where doc_type is lab_pdf | intake_form | medication_list.
     # Ignored by the W1 /chat and /chat/stream routes.
     pending_doc_uploads: list[dict] = Field(default_factory=list, max_length=8)
+
+    # W2: active OpenEMR user. Closes residual risk R4 in SECURITY.md —
+    # without this, every Langfuse trace lands as actor "anonymous"
+    # which makes per-user audit attribution impossible. Passed through
+    # to run_agent_stream → trace_request as user_id. When the OpenEMR
+    # side hasn't been updated yet to pass it, falls back to anonymous.
+    active_user: str | None = Field(default=None, max_length=128)
 
 
 class ChatResponse(BaseModel):
@@ -306,6 +326,7 @@ async def chat(request: Request, req: ChatRequest):
             fhir_patient_id,
             history,
             session_id=req.session_id,
+            user_id=req.active_user or "anonymous",
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -361,6 +382,7 @@ async def chat_stream(request: Request, req: ChatRequest):
                 fhir_patient_id,
                 history,
                 session_id=req.session_id,
+                user_id=req.active_user or "anonymous",
             ):
                 if event.get("type") == "done":
                     final_history = event.pop("history", history)
@@ -434,6 +456,7 @@ async def chat_graph_stream(request: Request, req: ChatRequest):
                 patient_id=req.patient_id,
                 fhir_patient_id=fhir_patient_id,
                 messages=history,
+                active_user=req.active_user,
                 pending_doc_uploads=req.pending_doc_uploads,
                 prior_extracted_facts=prior_facts,
             ):

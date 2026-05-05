@@ -29,6 +29,7 @@
 require_once(__DIR__ . "/../../globals.php");
 
 use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -46,6 +47,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 if (!AclMain::aclCheckCore('patients', 'appt')) {
     _emit(['ok' => false, 'error' => 'Not authorized'], 403);
+}
+
+// CSRF — closes residual risk R3 from SECURITY.md. The modal in
+// copilot_calendar.php embeds the CsrfUtils-collected token; without
+// matching `csrf_token_form` on the POST we refuse the write.
+$_csrf = $_POST['csrf_token_form'] ?? '';
+if (!is_string($_csrf) || !CsrfUtils::verifyCsrfToken($_csrf)) {
+    _emit(['ok' => false, 'error' => 'Invalid CSRF token'], 403);
 }
 
 $activeUserId = (int)($_SESSION['authUserID'] ?? 0);

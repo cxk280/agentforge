@@ -60,6 +60,7 @@ class AgentState(TypedDict, total=False):
     session_id: str
     patient_id: str
     fhir_patient_id: str
+    active_user: str             # OpenEMR user identity (for trace attribution)
     messages: list[dict[str, Any]]
 
     # --- Worker inputs ---
@@ -301,6 +302,7 @@ async def final_answer_node(state: AgentState) -> AgentState:
         state["fhir_patient_id"],
         state.get("messages", []),
         session_id=state.get("session_id", ""),
+        user_id=state.get("active_user") or "anonymous",
         extra_system_context=extra,
     ):
         events.append(event)
@@ -533,6 +535,7 @@ async def run_graph_stream(
     patient_id: str,
     fhir_patient_id: str,
     messages: list[dict[str, Any]],
+    active_user: str | None = None,
     pending_doc_uploads: list[DocUpload] | None = None,
     prior_extracted_facts: list[dict[str, Any]] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
@@ -552,6 +555,7 @@ async def run_graph_stream(
         "session_id": session_id,
         "patient_id": patient_id,
         "fhir_patient_id": fhir_patient_id,
+        "active_user": active_user or "anonymous",
         "messages": list(messages),
         "pending_doc_uploads": list(pending_doc_uploads or []),
         "extracted_facts": list(prior_extracted_facts or []),

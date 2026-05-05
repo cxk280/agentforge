@@ -34,8 +34,27 @@ $backend_url = $GLOBALS['copilot_backend_url']
     ?? (getenv('COPILOT_BACKEND_URL') ?: 'http://localhost:8400');
 $backend_url = rtrim($backend_url, '/');
 
-// Build the iframe src — pass pid so the UI can resolve the FHIR UUID
-$iframe_src  = htmlspecialchars($backend_url . '/?pid=' . $pid . '&backend=' . urlencode($backend_url));
+// Active OpenEMR user — passed through to the chat UI so /chat POSTs
+// can attribute Langfuse traces per clinician (closes residual risk
+// R4 in SECURITY.md). We pass the username (stable, human-readable
+// identifier), not authUserID, so the trace dashboard reads cleanly.
+$activeUser = '';
+$_uid = (int)($_SESSION['authUserID'] ?? 0);
+if ($_uid > 0) {
+    $r = sqlQuery("SELECT username FROM users WHERE id = ?", [$_uid]);
+    if ($r) {
+        $activeUser = (string)($r['username'] ?? '');
+    }
+}
+
+// Build the iframe src — pass pid so the UI can resolve the FHIR UUID,
+// plus active_user so the chat UI can attribute /chat POSTs.
+$iframe_src = htmlspecialchars(
+    $backend_url
+    . '/?pid=' . $pid
+    . '&backend=' . urlencode($backend_url)
+    . ($activeUser !== '' ? '&user=' . urlencode($activeUser) : '')
+);
 ?>
 <!DOCTYPE html>
 <html lang="en">

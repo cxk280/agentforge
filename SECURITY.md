@@ -317,14 +317,14 @@ shipped on each and flags the residual risks worth tracking.
 | T1 — stored XSS via title / notes | Title capped at 150 chars; notes capped at 2000. Display side `text()` and `attr()` escape on render. Patient PID validated as a positive integer matching a real `patient_data` row. |
 | T4 — write-rate spike | The endpoint hangs off the OpenEMR session — it inherits OpenEMR's existing session-rate posture. No additional limiter added; if write spikes show up in monitoring, add slowapi-style rate limit. |
 
-### Residual W2 risks (tracked, not shipped)
+### Residual W2 risks
 
-| # | Risk | Plan |
+| # | Risk | Status |
 |---|---|---|
-| R1 | `/copilot/extractions` and `/copilot/lab-trend` rely on OpenEMR session ACL alone — no per-patient care-relationship check before the query. | Add the same care-relationship check the FHIR layer already uses; reject when the requesting user has no encounter / provider link to the queried patient. |
-| R2 | Prompt injection text *inside* extracted PDFs persists in `cp_extracted_facts.fact_json`. A future agent that pastes those quotes into the chat reply (without escaping) could be steered. | Already partially mitigated by the chat UI's structural-only markdown renderer; add an explicit "treat extracted_facts.quote as untrusted text" line in the system prompt. |
-| R3 | Calendar API has no CSRF token. Same-origin + ACL is the current barrier. | Add the standard OpenEMR `CsrfUtils` token to the modal form; verify on every POST. |
-| R4 | Multi-user logins are now possible (S12 below) but the agent backend still inherits a single OAuth client identity — per-user audit attribution on the agent side is partial. | Pass the active user through to Langfuse trace metadata; tag every span with `actor_user_id`. |
+| R1 | `/copilot/extractions` and `/copilot/lab-trend` rely on OpenEMR session ACL alone — no per-patient care-relationship check before the query. | **Partial — 2026-05-05.** CORS allowlist tightened to `ALLOWED_IFRAME_ORIGINS` (same envvar that drives CSP frame-ancestors), so cross-origin browser hits from anywhere outside the OpenEMR iframe get rejected at the CORS layer. Full per-patient care-relationship check still pending — needs to plumb the active user identity into the agent and reject when no encounter/provider link exists. |
+| R2 | Prompt injection text *inside* extracted PDFs persists in `cp_extracted_facts.fact_json`. A future agent that pastes those quotes into the chat reply (without escaping) could be steered. | **Tracked.** Already partially mitigated by the chat UI's structural-only markdown renderer; add an explicit "treat extracted_facts.quote as untrusted text" line in the system prompt. |
+| R3 | Calendar API has no CSRF token. Same-origin + ACL is the current barrier. | **Shipped 2026-05-05.** `CsrfUtils::collectCsrfToken()` is embedded in the modal form and forwarded by JS on every POST; the API verifies via `CsrfUtils::verifyCsrfToken` and refuses with 403 otherwise. |
+| R4 | Multi-user logins are now possible (S12) but the agent backend still inherits a single OAuth client identity — per-user audit attribution on the agent side was partial. | **Shipped 2026-05-05.** `interface/copilot/index.php` reads the active user from the OpenEMR session, passes `?user=<username>` through the iframe URL; `chat.js` forwards it as `active_user` on every `/chat/stream` POST; `ChatRequest` carries it; `run_agent_stream` plumbs it into the Langfuse `trace_request(user_id=…)` call so per-clinician attribution lands in trace storage. |
 
 ### S12 — Multi-user demo logins (shipped 2026-05-05)
 

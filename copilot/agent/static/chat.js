@@ -2,6 +2,9 @@
 const params     = new URLSearchParams(location.search);
 const PID        = params.get('pid') || '';
 const SESSION_ID = 'sess-' + Math.random().toString(36).slice(2);
+// Active OpenEMR user (when iframe-injected by interface/copilot/index.php).
+// Surfaced to the agent so Langfuse traces attribute per-clinician (R4).
+const ACTIVE_USER = params.get('user') || '';
 
 const BACKEND = params.get('backend') || (location.origin.includes('8300')
   ? 'http://localhost:8400'
@@ -329,6 +332,7 @@ async function send(text) {
         session_id: SESSION_ID,
         patient_id: FHIR_ID,
         message,
+        active_user: ACTIVE_USER || null,
       }),
     });
 

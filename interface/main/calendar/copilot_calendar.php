@@ -17,6 +17,7 @@
 require_once(__DIR__ . "/../../globals.php");
 
 use OpenEMR\Common\Acl\AclMain;
+use OpenEMR\Common\Csrf\CsrfUtils;
 
 if (!AclMain::aclCheckCore('patients', 'appt')) {
     http_response_code(403);
@@ -571,6 +572,8 @@ function _cp_cal_min(string $hhmm): int
     <div class="cp-cal-warn" id="cp-cal-warn"></div>
     <input type="hidden" name="eid" id="cp-cal-eid" value="">
     <input type="hidden" name="force" id="cp-cal-force" value="">
+    <input type="hidden" name="csrf_token_form"
+           value="<?php echo attr(CsrfUtils::collectCsrfToken()); ?>">
     <div class="cp-cal-row">
       <div class="cp-cal-field">
         <label for="cp-cal-titlein"><?php echo xlt('Title'); ?></label>
@@ -632,6 +635,7 @@ function _cp_cal_min(string $hhmm): int
 (function () {
   const API = './copilot_calendar_api.php';
   const events = <?php echo json_encode($allEvents, JSON_UNESCAPED_SLASHES); ?>;
+  const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken()); ?>;
   const modalBg = document.getElementById('cp-cal-modal-bg');
   const form = document.getElementById('cp-cal-modal');
   const eidIn = document.getElementById('cp-cal-eid');
@@ -739,6 +743,7 @@ function _cp_cal_min(string $hhmm): int
   async function postJson(payload) {
     const fd = new FormData();
     Object.entries(payload).forEach(([k, v]) => fd.append(k, v ?? ''));
+    fd.set('csrf_token_form', CSRF);
     const resp = await fetch(API, { method: 'POST', body: fd, credentials: 'same-origin' });
     let body;
     try { body = await resp.json(); } catch { body = { ok: false, error: 'Bad JSON from server' }; }
