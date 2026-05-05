@@ -212,6 +212,88 @@ async def get_conditions(patient_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Week 2 tools — guideline retrieval + extracted-fact read
+# ---------------------------------------------------------------------------
+
+async def search_guidelines(patient_id: str, query: str, top_k: int = 5) -> dict:
+    """W2: hybrid BM25 + (optional) Cohere Rerank over the clinical-guideline
+    corpus. Returns up to top_k snippets with source metadata so the
+    agent can quote them with the citation contract intact.
+
+    The patient_id arg is enforced by the agent loop but not used for
+    the corpus query — guideline retrieval is patient-agnostic.
+    """
+    try:
+        from rag.retriever import search as rag_search
+    except ImportError:
+        return {
+            "patient_id": patient_id,
+            "query": query,
+            "results": [],
+            "error": "RAG retriever module not available",
+        }
+    top_k = max(1, min(int(top_k or 5), 20))
+    return {
+        "patient_id": patient_id,
+        "query": query,
+        "results": rag_search(query, top_k=top_k),
+    }
+
+
+async def get_extracted_facts(patient_id: str, doc_type: str | None = None) -> dict:
+    """W2: structured facts extracted from uploaded documents for this
+    patient (cp_extracted_facts joined with cp_extraction_citations).
+
+    Each fact carries a derivedFrom: DocumentReference/{id} field so
+    citations on the agent's reply round-trip through the bbox viewer.
+    """
+    try:
+        from fhir_client import get_db_pool
+    except ImportError:
+        return {"patient_id": patient_id, "facts": [], "error": "DB pool unavailable"}
+    pool = await get_db_pool()
+    if pool is None:
+        return {"patient_id": patient_id, "facts": [],
+                "error": "DB not configured (no DB_HOST)"}
+
+    where_extra = ""
+    params: list = [int(patient_id) if patient_id.isdigit() else 0]
+    if doc_type:
+        where_extra = " AND doc_type = %s"
+        params.append(doc_type)
+
+    facts: list[dict] = []
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT id, document_id, doc_type, fact_type, fact_json, "
+                    "       confidence, source_quote, extraction_run_id "
+                    "FROM cp_extracted_facts "
+                    "WHERE patient_id = %s" + where_extra + " "
+                    "ORDER BY created_at DESC, id DESC LIMIT 200",
+                    params,
+                )
+                rows = await cur.fetchall()
+        import json as _json
+        for r in rows:
+            facts.append({
+                "fact_id": int(r[0]),
+                "document_id": int(r[1]) if r[1] is not None else None,
+                "doc_type": r[2],
+                "fact_type": r[3],
+                "fact_json": _json.loads(r[4]) if isinstance(r[4], str) else r[4],
+                "confidence": float(r[5]) if r[5] is not None else None,
+                "source_quote": r[6],
+                "extraction_run_id": r[7],
+                "derived_from": (f"DocumentReference/{int(r[1])}" if r[1] else None),
+            })
+    except Exception as exc:
+        return {"patient_id": patient_id, "facts": [], "error": str(exc)[:200]}
+    return {"patient_id": patient_id, "doc_type_filter": doc_type, "facts": facts}
+
+
+# ---------------------------------------------------------------------------
 # Private helpers
 # ---------------------------------------------------------------------------
 
@@ -395,6 +477,50 @@ TOOL_SCHEMAS = [
             "required": ["patient_id"],
         },
     },
+    {
+        "name": "search_guidelines",
+        "description": (
+            "W2: hybrid BM25 + Cohere-rerank over a curated clinical-guideline "
+            "corpus (ADA Standards of Care, ACC/AHA hypertension, USPSTF, "
+            "GINA asthma, KDIGO CKD). Use when the user's question turns on "
+            "what guidelines say (e.g. \"what's the A1c target?\", \"is "
+            "metformin appropriate at this eGFR?\"). Returns up to top_k "
+            "evidence chunks; cite source_id + page in the reply."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": "string", "description": "OpenEMR patient ID (pid)"},
+                "query": {"type": "string", "description": "Concise clinical query, e.g. 'metformin contraindicated CKD' or 'aspirin primary prevention adults 60+'."},
+                "top_k": {"type": "integer", "description": "Max results (default 5, max 20).", "default": 5},
+            },
+            "required": ["patient_id", "query"],
+        },
+    },
+    {
+        "name": "get_extracted_facts",
+        "description": (
+            "W2: structured facts extracted from uploaded clinical documents "
+            "(lab PDFs, intake forms, medication lists) for this patient. "
+            "Each fact carries a derivedFrom: DocumentReference/{id} link "
+            "so citations on your reply round-trip through the bbox viewer. "
+            "Use when the user references something on a recently-uploaded "
+            "document, OR to cross-check chart-native data (FHIR) against "
+            "what the patient brought in."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "patient_id": {"type": "string", "description": "OpenEMR patient ID (pid)"},
+                "doc_type": {
+                    "type": "string",
+                    "description": "Optional filter: lab_pdf | intake_form | medication_list.",
+                    "enum": ["lab_pdf", "intake_form", "medication_list"],
+                },
+            },
+            "required": ["patient_id"],
+        },
+    },
 ]
 
 # Dispatch map: tool name → async callable
@@ -405,4 +531,6 @@ TOOL_DISPATCH: dict[str, callable] = {
     "get_vitals": get_vitals,
     "get_visit_history": get_visit_history,
     "get_conditions": get_conditions,
+    "search_guidelines": search_guidelines,
+    "get_extracted_facts": get_extracted_facts,
 }
