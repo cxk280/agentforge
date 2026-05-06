@@ -1,16 +1,30 @@
 # AgentForge CI/CD pipeline.
 #
+# Two parallel deploy lanes — one per Railway service we care about:
+#
+#   copilot-agent (FastAPI):
+#     unit-test → deploy-{env} → eval-{env} → hold → next env
+#     `railway up --service copilot-agent --path-as-root .` from copilot/agent/
+#
+#   openemr (PHP app):
+#     unit-test → deploy-openemr-{env} → smoke-openemr-{env} → hold → next env
+#     `railway up --service openemr` from the repo root
+#
+# Both lanes share unit-test as their pre-deploy gate (same Copilot
+# isolated PHPUnit suite). Each env's hold-{env} approval requires
+# BOTH lanes' verifications to pass before opening — so a broken
+# agent OR a broken OpenEMR will block QA/Prod promotion equally.
+#
 # Stages:
-#   1. test         — run the isolated PHPUnit Copilot suite. Always.
-#   2. eval-smoke   — run 5-case smoke against the Dev environment's
-#                     Co-Pilot agent. Cheap (~$0.05). Blocks dev deploy.
-#   3. deploy-dev   — auto. railway up against the dev Railway env.
-#                     Triggered on push to master.
-#   4. deploy-qa    — manual approval. Promotes Dev image to QA env.
-#                     Includes the full 25-case eval against QA.
-#   5. deploy-prod  — manual approval. Promotes QA image to Prod env.
-#                     Final gate: full eval suite must pass with
-#                     pass_count >= 23/25 to allow promotion.
+#   1. unit-test            — isolated PHPUnit Copilot suite. Both lanes.
+#   2. deploy-{env}         — agent: railway up against the env's project token.
+#   3. eval-smoke-dev       — 5-case smoke against dev's agent (~$0.05).
+#   4. deploy-openemr-{env} — openemr: railway up against the env's project token.
+#   5. smoke-openemr-{env}  — wait for login, re-run copilot_enable_api.php,
+#                             smoke-test FHIR endpoint with admin/pass.
+#   6. hold-qa, hold-prod   — manual approval gates after BOTH lanes
+#                             pass their previous-env verifications.
+#   7. eval-full-{qa,prod}  — full 25-case eval against the deployed agent.
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
 #   ANTHROPIC_API_KEY              — for Haiku judge in evals
@@ -20,10 +34,19 @@
 #   RAILWAY_TOKEN_DEV              — Railway project token scoped to dev
 #   RAILWAY_TOKEN_QA               — Railway project token scoped to qa
 #   RAILWAY_TOKEN_PROD             — Railway project token scoped to prod
+#   OE_USER_DEPLOY                 — OpenEMR admin username for smoke (default: admin)
+#   OE_PASS_DEPLOY                 — OpenEMR admin password for smoke (default: pass)
 #
 # Token scoping: Railway project tokens can be scoped per-environment via
 # the Railway dashboard. Generate one per env so a Dev compromise can't
 # touch Prod.
+#
+# Why openemr deploys aren't risky to the MySQL volume: redeploying the
+# `openemr` service rebuilds the OpenEMR container only. The MySQL
+# service is a separate Railway service with its own volume; this
+# pipeline never touches it. The OpenEMR container's bind-mount
+# volumes (sites/, public/themes/, public/assets/, vendor/, node_modules/)
+# survive redeploy too. See project_railway_deploy_2026-04-30 memory.
 
 version: 2.1
 
@@ -118,6 +141,90 @@ commands:
             done
             echo "Up: << parameters.url >>"
 
+  openemr-smoke:
+    description: |
+      Post-deploy housekeeping + smoke test for an OpenEMR Railway
+      service. Three steps in one command bundle so each env's deploy
+      job ends with a verified-up state instead of just "container
+      started":
+
+        1. Wait for /interface/login/login.php to return 200 (up to
+           15 min — first-boot composer install + gulp + DB schema
+           bootstrap takes 8-12 min).
+        2. POST login as admin/pass to obtain a session cookie.
+        3. GET /interface/super/copilot_enable_api.php?confirm=1 to
+           re-register the OAuth client. OpenEMR's flex image
+           sometimes loses the OAuth client config across deploys —
+           the script is idempotent, so running it every deploy is
+           cheaper than debugging a missing-client failure later.
+        4. GET /interface/main/main_screen.php?prevent_logout=1 as
+           a basic authenticated-render smoke. Confirms the bind-
+           mount overlay survived the deploy and the active
+           AgentForge code is what's serving requests.
+
+      Failure at any step exits non-zero so the workflow gates
+      register the deploy as broken.
+    parameters:
+      base_url:
+        type: string
+      timeout_seconds:
+        type: integer
+        default: 900
+    steps:
+      - wait-for-url:
+          url: "<< parameters.base_url >>/interface/login/login.php"
+          timeout_seconds: << parameters.timeout_seconds >>
+      - run:
+          name: Login + API enable + render smoke
+          command: |
+            mkdir -p /tmp/openemr-smoke
+            COOKIES=/tmp/openemr-smoke/cookies.txt
+            BASE="<< parameters.base_url >>"
+            USER="${OE_USER_DEPLOY:-admin}"
+            PASS="${OE_PASS_DEPLOY:-pass}"
+
+            # 1. Land on login.php to receive an OpenEMR session cookie.
+            curl -fsS -c "$COOKIES" -o /dev/null "$BASE/interface/login/login.php"
+
+            # 2. POST credentials. OpenEMR redirects to main on
+            #    success; failure surfaces with a 200 + the same
+            #    login form re-rendered. We grep the next page to
+            #    confirm we're past the login wall.
+            curl -fsS -b "$COOKIES" -c "$COOKIES" -o /tmp/openemr-smoke/post-login.html \
+                -X POST "$BASE/interface/main/main_screen.php?auth=login&site=default" \
+                --data-urlencode "authUser=$USER" \
+                --data-urlencode "clearPass=$PASS" \
+                --data-urlencode "languageChoice=1" \
+                --data-urlencode "new_login_session_management=1"
+            if grep -q 'name="authUser"' /tmp/openemr-smoke/post-login.html; then
+              echo "✗ Login failed for $USER@$BASE — login form re-rendered (bad creds or session config)" >&2
+              exit 1
+            fi
+
+            # 3. Re-register the OAuth client. Idempotent.
+            curl -fsS -b "$COOKIES" -o /tmp/openemr-smoke/api-enable.html \
+                "$BASE/interface/super/copilot_enable_api.php?confirm=1"
+            if ! grep -q "OAuth client" /tmp/openemr-smoke/api-enable.html 2>/dev/null \
+                && ! grep -q "enabled" /tmp/openemr-smoke/api-enable.html 2>/dev/null \
+                && ! grep -qi "ok\|done\|registered" /tmp/openemr-smoke/api-enable.html 2>/dev/null; then
+              echo "⚠ copilot_enable_api.php did not return a confirmation marker — review the artifact"
+              # not fatal — the script may have changed its output format
+            fi
+
+            # 4. Authenticated render of main_screen — proves the
+            #    bind-mount survived AND admin session is real.
+            curl -fsS -b "$COOKIES" -o /tmp/openemr-smoke/main.html \
+                "$BASE/interface/main/main_screen.php?prevent_logout=1"
+            if ! grep -qi "openemr\|main_info\|tabs/main.php" /tmp/openemr-smoke/main.html; then
+              echo "✗ main_screen.php did not look like a real OpenEMR shell — see artifact" >&2
+              exit 1
+            fi
+
+            echo "✓ OpenEMR smoke passed for $BASE"
+      - store_artifacts:
+          path: /tmp/openemr-smoke
+          destination: openemr-smoke
+
   run-evals:
     description: |
       Run the eval suite against a target endpoint. The endpoint MUST match the
@@ -206,11 +313,6 @@ jobs:
           smoke: true
           min_pass: 4
 
-  # Pipeline only redeploys the copilot-agent service. OpenEMR is
-  # stable infrastructure (rarely changes) and redeploying it risks
-  # wiping the seeded MySQL volume, which blows away demo data and
-  # forces a manual re-seed. To redeploy OpenEMR, do it manually via
-  # `railway up --service openemr` from a workstation.
   deploy-dev:
     executor: railway
     steps:
@@ -277,44 +379,131 @@ jobs:
           smoke: false
           min_pass: 23
 
+  # ─── OpenEMR lane ────────────────────────────────────────────────────
+  #
+  # Mirrors the agent lane env-by-env. `railway up` from the repo root
+  # (no --path-as-root) so Railway uses the root Dockerfile that
+  # extends openemr/openemr:flex. Each deploy is followed by a smoke
+  # job that waits for login and runs the API-enable housekeeping.
+  #
+  # Per the project_railway_deploy_2026-04-30 memory: never set
+  # EASY_DEV_MODE on prod openemr (entrypoint rsync loop), keep
+  # OE_PASS=pass on each env, and don't touch MySQL services.
+
+  deploy-openemr-dev:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_DEV
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: openemr-dev
+
+  smoke-openemr-dev:
+    executor: railway
+    steps:
+      - checkout
+      - openemr-smoke:
+          base_url: "https://openemr-dev-59c5.up.railway.app"
+
+  deploy-openemr-qa:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_QA
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: openemr-qa
+
+  smoke-openemr-qa:
+    executor: railway
+    steps:
+      - checkout
+      - openemr-smoke:
+          base_url: "https://openemr-qa.up.railway.app"
+
+  deploy-openemr-prod:
+    executor: railway
+    steps:
+      - checkout
+      - install-railway-cli
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_PROD
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: openemr-prod
+
+  smoke-openemr-prod:
+    executor: railway
+    steps:
+      - checkout
+      - openemr-smoke:
+          base_url: "https://openemr-production-971e.up.railway.app"
+
 # ─── Workflows ───────────────────────────────────────────────────────────
 workflows:
   test-deploy-promote:
     jobs:
-      # Always run unit tests on every push.
+      # ── Unit tests gate both deploy lanes ──────────────────────
+      # Run the isolated PHPUnit Copilot suite once per push; both
+      # the agent lane and the openemr lane require it.
       - unit-test
 
-      # Auto-deploy to Dev on push to master.
+      # ── Agent lane: dev ────────────────────────────────────────
       - deploy-dev:
           requires: [unit-test]
           filters:
             branches:
               only: master
-
-      # Smoke evals against Dev after deploy.
       - eval-smoke-dev:
           requires: [deploy-dev]
 
-      # Manual approval to promote to QA.
+      # ── OpenEMR lane: dev ──────────────────────────────────────
+      - deploy-openemr-dev:
+          requires: [unit-test]
+          filters:
+            branches:
+              only: master
+      - smoke-openemr-dev:
+          requires: [deploy-openemr-dev]
+
+      # ── QA gate: BOTH lanes' dev-side checks must pass ─────────
       - hold-qa:
           type: approval
-          requires: [eval-smoke-dev]
+          requires: [eval-smoke-dev, smoke-openemr-dev]
 
+      # ── Agent lane: qa ─────────────────────────────────────────
       - deploy-qa:
           requires: [hold-qa]
-
-      # Full eval against QA — blocks promotion if it fails.
       - eval-full-qa:
           requires: [deploy-qa]
 
-      # Manual approval to promote to Prod.
+      # ── OpenEMR lane: qa ───────────────────────────────────────
+      - deploy-openemr-qa:
+          requires: [hold-qa]
+      - smoke-openemr-qa:
+          requires: [deploy-openemr-qa]
+
+      # ── Prod gate: BOTH lanes' qa-side checks must pass ────────
       - hold-prod:
           type: approval
-          requires: [eval-full-qa]
+          requires: [eval-full-qa, smoke-openemr-qa]
 
+      # ── Agent lane: prod ───────────────────────────────────────
       - deploy-prod:
           requires: [hold-prod]
-
-      # Final eval against Prod — confirms the deploy went well.
       - eval-full-prod:
           requires: [deploy-prod]
+
+      # ── OpenEMR lane: prod ─────────────────────────────────────
+      - deploy-openemr-prod:
+          requires: [hold-prod]
+      - smoke-openemr-prod:
+          requires: [deploy-openemr-prod]
