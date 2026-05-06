@@ -29,16 +29,25 @@ function patient_data_view_model(pname,pid,pubpid,str_dob,provider,insurance,all
     self.provider=ko.observable(provider || '');
     self.insurance=ko.observable(insurance || '');
     self.allergies=ko.observableArray(allergies || []);
+    // Patient-picture URL.
+    //
+    // Stock OpenEMR points this at `controller.php?document&retrieve
+    // &document_id=-1&context=patient_picture`, which dispatches into
+    // `Controller` → `C_Document` → `CategoryTree` → `Tree::load_tree()`
+    // — the same "Undefined array key -1" infinite loop that already
+    // bit the upload + viewer paths (see `copilot_documents_upload.php`
+    // and `copilot_documents_serve.php`). The body iframe never
+    // resolves the request, so the patient demographics view sticks
+    // on "infinite loading" with the headers visible. The `onError`
+    // handler on the <img> can't help because the request never errors,
+    // it just hangs.
+    //
+    // The AgentForge demo dataset has no real patient pictures, and
+    // the stock controller couldn't serve them anyway. Always emit the
+    // default-avatar PNG directly — same image OpenEMR's onError
+    // fallback uses, just without the broken intermediate request.
     self.patient_picture=ko.computed(function(){
-      return webroot_url + '/controller.php' +
-             '?document&retrieve' +
-             '&patient_id=' + encodeURIComponent(pid) +
-             '&document_id=-1' +
-             '&as_file=false' +
-             '&original_file=true' +
-             '&disable_exit=false' +
-             '&show_original=true' +
-             '&context=patient_picture';
+      return webroot_url + '/public/images/patient-picture-default.png';
     }, self);
 
     self.encounterArray=ko.observableArray();
