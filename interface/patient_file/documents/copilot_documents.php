@@ -517,21 +517,23 @@ $earlier = [
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
-                // Flip the live button into the persistent "complete"
-                // shape — same look the server-rendered done variant
-                // uses. The DB cp_extraction_runs row is the source of
-                // truth; this is just keeping the in-memory render in
-                // sync until the next page load reads it back.
-                btn.classList.add('cp-extract-done');
-                btn.removeAttribute('data-docid');
-                btn.removeAttribute('data-doctype');
-                btn.disabled = true;
-                btn.textContent = '';
-                btn.appendChild(document.createTextNode('✓ Extraction complete'));
+                // Match the upload-button UX: briefly flash a success
+                // count, then reload. The reloaded page reads the new
+                // `cp_extraction_runs` row via the LEFT JOIN at the
+                // top of this file and renders the persistent
+                // "Extraction complete" disabled button — same
+                // mechanism that survives navigating away and back.
+                //
+                // (We previously tried a JS-only DOM mutation here
+                // — class swap + textContent + inline styles — and
+                // it tested green in headless, but in the real
+                // browser the visible button stayed on "Extracting…"
+                // until the user manually refreshed. The reload-after
+                // pattern is what the upload button already does, so
+                // reusing it gives identical UX with no surprises.)
+                btn.textContent = `✓ ${data.fact_count} facts extracted`;
                 btn.style.background = '#2d7a4f';
-                btn.style.cursor = 'default';
-                btn.style.opacity = '.95';
-                btn.title = `Extraction complete (${data.fact_count} facts)`;
+                setTimeout(() => { window.location.reload(); }, 700);
               } catch (err) {
                 btn.disabled = false;
                 btn.textContent = orig;
