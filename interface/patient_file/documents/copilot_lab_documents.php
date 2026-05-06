@@ -48,154 +48,16 @@ sqlStatement(
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci"
 );
 
-// Seed extra inbox-flavored documents ONCE: a mix of matched-to-various-
-// patients lab/imaging/discharge PDFs and a handful of unmatched faxes
-// (foreign_id = NULL) so the inbox UI has something to triage.
-$seedMarker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'cp_lab_inbox_seed_v1'");
-if (empty($seedMarker['gl_value'])) {
-    // Map category name → id (only the labels we want to use). Create
-    // missing ones under the root "Categories" node so foreign keys are
-    // valid even on an unconfigured demo DB.
-    $catRoot = sqlQuery("SELECT id FROM categories WHERE parent = 0 LIMIT 1");
-    $rootId = (int)($catRoot['id'] ?? 1);
-    $wantCats = ['Lab Report', 'Imaging', 'Discharge', 'Other'];
-    $catIdByName = [];
-    foreach ($wantCats as $cn) {
-        $row = sqlQuery("SELECT id FROM categories WHERE name = ? LIMIT 1", [$cn]);
-        if ($row && !empty($row['id'])) {
-            $catIdByName[$cn] = (int)$row['id'];
-            continue;
-        }
-        // Create category. categories.id has no auto_increment in OpenEMR
-        // legacy schema, so allocate manually like the canonical seed.
-        $next = sqlQuery("SELECT COALESCE(MAX(id), 0) + 1 AS n FROM categories");
-        $newId = (int)($next['n'] ?? 1);
-        $rRow = sqlQuery("SELECT COALESCE(MAX(rght), 0) + 1 AS r FROM categories");
-        $newRght = (int)($rRow['r'] ?? 1);
-        try {
-            sqlStatement(
-                "INSERT INTO categories (id, name, value, parent, lft, rght, aco_spec, codes)
-                 VALUES (?, ?, '', ?, 0, ?, 'patients|docs', '')",
-                [$newId, $cn, $rootId, $newRght]
-            );
-            $catIdByName[$cn] = $newId;
-        } catch (\Throwable $e) {
-            // Category likely already exists from a concurrent request — re-fetch.
-            $row = sqlQuery("SELECT id FROM categories WHERE name = ? LIMIT 1", [$cn]);
-            if ($row) {
-                $catIdByName[$cn] = (int)$row['id'];
-            }
-        }
-    }
-
-    // Pick available real patient pids so seeded matched docs reference
-    // valid foreign keys.
-    $patientPids = [];
-    $rs = sqlStatement("SELECT pid FROM patient_data ORDER BY pid LIMIT 14");
-    while ($r = sqlFetchArray($rs)) {
-        $patientPids[] = (int)$r['pid'];
-    }
-    $pickPid = static function (int $idx) use ($patientPids): ?int {
-        if (!$patientPids) {
-            return null;
-        }
-        return $patientPids[$idx % count($patientPids)];
-    };
-
-    // [filename, category, mime, size_bytes, days_ago, patient_idx_or_null]
-    // patient_idx = null  → UNMATCHED (foreign_id stays NULL)
-    $today = new \DateTimeImmutable('today');
-    $ago = static fn (int $n): string => $today->modify("-{$n} days")->format('Y-m-d');
-    $inboxSeed = [
-        ['Quest_TSH_Foster_E.pdf',         'Lab Report', 'application/pdf', 142000,  2, 1],
-        ['Quest_Lipid_Martinez_L.pdf',     'Lab Report', 'application/pdf', 168000,  2, 2],
-        ['LabCorp_CBC_unknown_001.pdf',    'Lab Report', 'application/pdf', 1200000, 2, null],
-        ['RFM_MRI_Park_A.pdf',             'Imaging',    'application/pdf', 4200000, 3, 3],
-        ['StDavids_Discharge_Hayes_R.pdf', 'Discharge',  'application/pdf', 320000,  3, 4],
-        ['Fax_unknown_002.pdf',            'Other',      'application/pdf', 84000,   3, null],
-        ['Quest_BMP_Brown_J.pdf',          'Lab Report', 'application/pdf', 188000,  4, 5],
-        ['Imaging_CT_Webb_M.pdf',          'Imaging',    'application/pdf', 5100000, 4, 6],
-        ['LabCorp_HbA1c_unknown_003.pdf',  'Lab Report', 'application/pdf', 124000,  5, null],
-        ['Quest_TSH_Tan_M.pdf',            'Lab Report', 'application/pdf', 138000,  5, 7],
-        ['StDavids_Discharge_Cohen_N.pdf', 'Discharge',  'application/pdf', 264000,  6, 8],
-        ['Fax_unknown_004.pdf',            'Other',      'application/pdf', 96000,   6, null],
-    ];
-
-    foreach ($inboxSeed as [$name, $cat, $mime, $size, $daysAgo, $pidx]) {
-        // Skip if a row with this exact filename already exists — the
-        // canonical AgentForge demo seed and this one share a table.
-        $exists = sqlQuery("SELECT id FROM documents WHERE name = ? LIMIT 1", [$name]);
-        if ($exists) {
-            continue;
-        }
-        $next = sqlQuery("SELECT COALESCE(MAX(id), 0) + 1 AS n FROM documents");
-        $newId = (int)($next['n'] ?? 1);
-        $foreignPid = $pidx === null ? null : $pickPid($pidx);
-        try {
-            sqlStatement(
-                "INSERT INTO documents
-                    (id, type, name, mimetype, size, docdate, date, foreign_id, owner, list_id, deleted)
-                 VALUES (?, 'file_url', ?, ?, ?, ?, NOW(), ?, 1, 0, 0)",
-                [$newId, $name, $mime, $size, $ago($daysAgo), $foreignPid]
-            );
-            // Attach a category if we have one.
-            if (isset($catIdByName[$cat])) {
-                try {
-                    sqlStatement(
-                        "INSERT INTO categories_to_documents (category_id, document_id) VALUES (?, ?)",
-                        [$catIdByName[$cat], $newId]
-                    );
-                } catch (\Throwable $e) {
-                    // PK collision — fine.
-                }
-            }
-        } catch (\Throwable $e) {
-            // Skip silently.
-        }
-    }
-    sqlStatement(
-        "INSERT INTO globals (gl_name, gl_index, gl_value) VALUES ('cp_lab_inbox_seed_v1', 0, ?)",
-        [date('c')]
-    );
-}
-
-// Make sure pre-existing canonical demo docs (which have NULL category)
-// get a Lab Report tag the first time we see them, so the filters work.
-// This is one-shot, marker-guarded — does not mutate already-tagged rows.
-$catLabelMarker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'cp_lab_inbox_label_v1'");
-if (empty($catLabelMarker['gl_value'])) {
-    $labRow = sqlQuery("SELECT id FROM categories WHERE name = 'Lab Report' LIMIT 1");
-    $imgRow = sqlQuery("SELECT id FROM categories WHERE name = 'Imaging' LIMIT 1");
-    if ($labRow) {
-        $labId = (int)$labRow['id'];
-        $imgId = $imgRow ? (int)$imgRow['id'] : $labId;
-        $rs = sqlStatement(
-            "SELECT d.id, d.name FROM documents d
-        LEFT JOIN categories_to_documents c2d ON c2d.document_id = d.id
-             WHERE c2d.category_id IS NULL"
-        );
-        while ($r = sqlFetchArray($rs)) {
-            $isImg = (stripos((string)$r['name'], 'X-ray') !== false)
-                  || (stripos((string)$r['name'], 'Mammogram') !== false)
-                  || (stripos((string)$r['name'], 'MRI') !== false)
-                  || (stripos((string)$r['name'], 'CT ') !== false)
-                  || (stripos((string)$r['name'], 'Echo') !== false);
-            $catId = $isImg ? $imgId : $labId;
-            try {
-                sqlStatement(
-                    "INSERT INTO categories_to_documents (category_id, document_id) VALUES (?, ?)",
-                    [$catId, (int)$r['id']]
-                );
-            } catch (\Throwable $e) {
-                // PK collision — already linked.
-            }
-        }
-    }
-    sqlStatement(
-        "INSERT INTO globals (gl_name, gl_index, gl_value) VALUES ('cp_lab_inbox_label_v1', 0, ?)",
-        [date('c')]
-    );
-}
+// (Removed 2026-05-05 per user direction: do not seed any lab
+// documents — they should only appear when uploaded by a human.
+// Earlier this file ran a marker-guarded fixture seed that inserted
+// ~11 fake inbox PDFs *and* a categorization back-fill on the
+// canonical demo docs. Both blocks are gone. The four document
+// categories the inbox UI filters by — 'Lab Report', 'Imaging',
+// 'Discharge', 'Other' — are now expected to exist already (they
+// ship with stock OpenEMR's Documents module). If they don't, the
+// inbox filter chips will simply show empty until a human uploads a
+// doc in each category, which matches the user's intended workflow.)
 
 // ──────────────────────────────────────────────────────────────────────
 // 2. POST handlers (POST/redirect/GET). CSRF skipped — internal mock page.

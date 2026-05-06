@@ -209,27 +209,13 @@ foreach ($onotes as $i => [$user, $group, $body, $activity]) {
 }
 
 // ── DOCUMENTS ──────────────────────────────────────────────────────────
-$docs = [
-    ['HbA1c — Quest Diagnostics',     '2026-04-12', 'application/pdf', 124000],
-    ['BMP Panel — Quest',             '2026-04-12', 'application/pdf', 218000],
-    ['Foot X-ray — Riverside Imaging','2026-04-08', 'application/pdf', 1430000],
-    ['Lipid Panel — LabCorp',         '2026-02-18', 'application/pdf', 156000],
-    ['Mammogram — Solis Imaging',     '2025-11-22', 'application/pdf', 982000],
-    ['EKG — In-clinic',               '2025-11-18', 'application/pdf', 88000],
-    ['CMP Panel — Quest',             '2025-08-10', 'application/pdf', 174000],
-];
-foreach ($docs as [$name, $date, $mime, $size]) {
-    $exists = sqlQuery("SELECT id FROM documents WHERE name = ?", [$name]);
-    if ($exists) { continue; }
-    // documents.id has no auto-increment — assign next free id
-    $next = sqlQuery("SELECT COALESCE(MAX(id), 0) + 1 AS n FROM documents");
-    $newId = (int)($next['n'] ?? 1);
-    sqlStatement(
-        "INSERT INTO documents (id, type, name, mimetype, size, docdate, date, foreign_id, owner, list_id) VALUES (?, 'file_url', ?, ?, ?, ?, NOW(), 1, 1, 0)",
-        [$newId, $name, $mime, $size, $date]
-    );
-    $inserted['documents']++;
-}
+// (Removed 2026-05-05 per user direction: do not seed any lab
+// documents — they should only appear when uploaded by a human.
+// Earlier this seeder inserted 7 PDF placeholder rows for Ted Shaw
+// (HbA1c / BMP / X-ray / Lipid / Mammogram / EKG / CMP). Those rows
+// had no on-disk file (`url` NULL), so they were demo clutter, not
+// usable artifacts. The Documents tab will be empty until a clinician
+// uploads via the Upload button.)
 
 // ── IMMUNIZATIONS ──────────────────────────────────────────────────────
 $imms = [
