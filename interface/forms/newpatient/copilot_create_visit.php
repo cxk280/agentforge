@@ -25,12 +25,14 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+
+use OpenEMR\Common\Session\SessionWrapperFactory;
 require_once(__DIR__ . "/../../main/copilot_helpers.php");
 
 // ---------------------------------------------------------------------
 // Patient context
 // ---------------------------------------------------------------------
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 $currentUserId = (int)($_SESSION['authUserID'] ?? 0);
 
 $patient = sqlQuery(

@@ -14,7 +14,9 @@
 
 require_once(__DIR__ . "/../../globals.php");
 
-$pid = (int)($_SESSION['pid'] ?? 1);
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 
 $status_tabs = [
     ['Active',   true],

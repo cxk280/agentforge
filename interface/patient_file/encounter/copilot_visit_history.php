@@ -18,10 +18,12 @@
  */
 
 require_once(__DIR__ . "/../../globals.php");
+
+use OpenEMR\Common\Session\SessionWrapperFactory;
 require_once(__DIR__ . "/../../main/copilot_helpers.php");
 
 // Patient context comes from session; default to Margaret Chen (pid=1) for dev.
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 
 /* ---------------------------------------------------------------------------
  * Filter / search / pagination state — read GET, validate, build WHERE.

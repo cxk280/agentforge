@@ -15,10 +15,12 @@
  */
 
 require_once(__DIR__ . "/../globals.php");
+
+use OpenEMR\Common\Session\SessionWrapperFactory;
 require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 // Patient context comes from session; default to pid=1 if missing.
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 
 // -----------------------------------------------------------------------------
 // Filter / view GET params

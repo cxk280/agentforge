@@ -29,9 +29,11 @@ declare(strict_types=1);
 
 require_once(__DIR__ . "/../globals.php");
 
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
 // Patient context — Margaret Chen seeded as pid=1 in dev; production uses
 // the session-scoped patient.
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 
 // ----- Time-range filter --------------------------------------------------
 $timeRanges = [

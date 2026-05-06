@@ -32,6 +32,8 @@
  */
 
 require_once(__DIR__ . "/../globals.php");
+
+use OpenEMR\Common\Session\SessionWrapperFactory;
 require_once(__DIR__ . "/copilot_helpers.php");
 
 use OpenEMR\Common\Logging\EventAuditLogger;
@@ -39,7 +41,7 @@ use OpenEMR\Common\Logging\EventAuditLogger;
 // CSRF skipped — internal mock page (per brief).
 
 // Patient context.
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 
 // Output types — 12 archetypes per brief. Each maps to a ?type= slug, an icon,
 // a label, and (for non-demographics) an external print route we link to in

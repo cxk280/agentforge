@@ -18,10 +18,12 @@
 
 require_once(__DIR__ . "/../globals.php");
 
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
 // CRUD: send prescription. Inserts into prescriptions table.
 $flash = null;
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['action'] ?? '') === 'send_rx') {
-    $pid = (int)($_SESSION['pid'] ?? 1);
+    $pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
     $providerId = (int)($_SESSION['authUserID'] ?? 1);
     // Map drug name to drug_id (best effort)
     $drugName = $_POST['drug'] ?? '';

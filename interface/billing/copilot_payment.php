@@ -18,11 +18,13 @@ declare(strict_types=1);
 
 require_once(__DIR__ . "/../globals.php");
 
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
 // Patient context from session; default to pid=1 in dev. cp_helpers not
 // strictly needed here but kept for symmetry with other Co-Pilot pages.
 require_once(__DIR__ . "/../main/copilot_helpers.php");
 
-$pid = (int)($_SESSION['pid'] ?? 1);
+$pid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 1);
 $userId = (int)($_SESSION['authUserID'] ?? 1);
 
 // --------------------------------------------------------------------
