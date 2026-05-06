@@ -55,7 +55,7 @@ x-langfuse-shared-env: &langfuse-shared-env
 services:
   langfuse-web:
     image: langfuse/langfuse:3
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     depends_on:
       postgres: { condition: service_healthy }
       clickhouse: { condition: service_healthy }
@@ -81,7 +81,7 @@ services:
 
   langfuse-worker:
     image: langfuse/langfuse-worker:3
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     depends_on:
       postgres: { condition: service_healthy }
       clickhouse: { condition: service_healthy }
@@ -92,7 +92,7 @@ services:
 
   postgres:
     image: postgres:15
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
       interval: 5s
@@ -107,7 +107,7 @@ services:
 
   clickhouse:
     image: clickhouse/clickhouse-server:24.10
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     user: "101:101"
     # `start_period` must be long enough for the entrypoint's user-bootstrap
     # routine to finish before the healthcheck runs. The bootstrap briefly
@@ -131,7 +131,7 @@ services:
 
   minio:
     image: minio/minio
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     entrypoint: sh
     command: -c 'mkdir -p /data/langfuse && minio server --address ":9000" --console-address ":9001" /data'
     healthcheck:
@@ -149,7 +149,7 @@ services:
 
   redis:
     image: redis:7
-    restart: always
+    restart: "no"   # set to "no" 2026-05-05 — never auto-start; spin up only when actively debugging Langfuse via `docker compose up langfuse-web`
     command: --requirepass myredissecret
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "myredissecret", "ping"]
