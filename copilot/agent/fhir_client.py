@@ -80,10 +80,26 @@ async def get_db_pool() -> aiomysql.Pool | None:
             maxsize=10,
             connect_timeout=5,
             # Recycle connections every 5 min so we don't keep stale ones
-            # past MariaDB/MySQL's wait_timeout (usually 8h, but Railway's
+            # past MySQL's wait_timeout (usually 8h, but Railway's
             # managed MySQL has been observed to drop idle connections
             # earlier).
             pool_recycle=300,
+            # autocommit=True is load-bearing. Without it, aiomysql holds
+            # each connection in an implicit transaction; under MySQL
+            # InnoDB's default REPEATABLE READ isolation the first query
+            # on the connection pins a snapshot view, and any rows
+            # inserted by OTHER connections after that point are
+            # invisible until the connection is committed/rolled back
+            # OR returned to the pool with autocommit on.
+            #
+            # Symptom this caused (caught in prod 2026-05-05 demo): user
+            # uploads a document via OpenEMR's PHP — different DB
+            # connection. Agent's `resolve_document_owner` runs the
+            # SELECT on a long-held pool connection whose snapshot
+            # predates the upload, returns None, raises
+            # "OpenEMR document_id N not found" — even though the row
+            # is in the DB and visible to other sessions.
+            autocommit=True,
         )
     return _db_pool
 
