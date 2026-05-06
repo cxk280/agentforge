@@ -51,19 +51,29 @@ if ($activePid <= 0 && isset($_GET['pid'])) {
 }
 $liveDocs = [];
 if ($activePid > 0) {
+    // Left-join cp_extraction_runs to surface whether each document
+    // already has a successful extraction. The Extract button uses
+    // this flag to render in its terminal "Extraction complete"
+    // state across page navigations — no JS-side cache needed because
+    // the DB is the persistent source of truth.
     $rs = sqlStatement(
-        "SELECT id, name, mimetype, date FROM documents
-          WHERE foreign_id = ? AND deleted = 0
-          ORDER BY date DESC, id DESC
+        "SELECT d.id, d.name, d.mimetype, d.date,
+                MAX(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) AS has_extracted
+           FROM documents d
+           LEFT JOIN cp_extraction_runs r ON r.document_id = d.id
+          WHERE d.foreign_id = ? AND d.deleted = 0
+          GROUP BY d.id, d.name, d.mimetype, d.date
+          ORDER BY d.date DESC, d.id DESC
           LIMIT 12",
         [$activePid]
     );
     while ($r = sqlFetchArray($rs)) {
         $liveDocs[] = [
-            'id'   => (int)$r['id'],
-            'name' => (string)($r['name'] ?? "Document #{$r['id']}"),
-            'mime' => (string)($r['mimetype'] ?? 'application/octet-stream'),
-            'date' => $r['date'] ? substr($r['date'], 0, 10) : '',
+            'id'            => (int)$r['id'],
+            'name'          => (string)($r['name'] ?? "Document #{$r['id']}"),
+            'mime'          => (string)($r['mimetype'] ?? 'application/octet-stream'),
+            'date'          => $r['date'] ? substr($r['date'], 0, 10) : '',
+            'has_extracted' => (int)($r['has_extracted'] ?? 0) === 1,
         ];
     }
 }
@@ -441,15 +451,34 @@ $earlier = [
               <div class="cp-earl-date"><?php echo text($d['date']); ?></div>
             </a>
             <?php if ($isPdf): ?>
-              <button type="button" class="cp-extract-btn"
-                      data-docid="<?php echo (int)$d['id']; ?>"
-                      data-doctype="<?php echo attr($guessType); ?>"
-                      style="background:#008C8C;color:#FFFFFF;border:none;
-                             border-radius:999px;padding:6px 12px;font-size:11px;
-                             font-weight:600;cursor:pointer">
-                <?php echo xlt('Extract'); ?>
-              </button>
+              <?php if (!empty($d['has_extracted'])): ?>
+                <button type="button" class="cp-extract-btn cp-extract-done" disabled
+                        title="<?php echo xla('Extraction already complete for this document.'); ?>"
+                        style="background:#2d7a4f;color:#FFFFFF;border:none;
+                               border-radius:999px;padding:6px 12px;font-size:11px;
+                               font-weight:600;cursor:default;opacity:.95">
+                  ✓ <?php echo xlt('Extraction complete'); ?>
+                </button>
+              <?php else: ?>
+                <button type="button" class="cp-extract-btn"
+                        data-docid="<?php echo (int)$d['id']; ?>"
+                        data-doctype="<?php echo attr($guessType); ?>"
+                        style="background:#008C8C;color:#FFFFFF;border:none;
+                               border-radius:999px;padding:6px 12px;font-size:11px;
+                               font-weight:600;cursor:pointer">
+                  <?php echo xlt('Extract'); ?>
+                </button>
+              <?php endif; ?>
             <?php endif; ?>
+            <button type="button" class="cp-doc-delete-btn"
+                    data-docid="<?php echo (int)$d['id']; ?>"
+                    data-name="<?php echo attr($d['name']); ?>"
+                    title="<?php echo xla('Delete this document and any extracted facts derived from it. Cannot be undone.'); ?>"
+                    style="background:#FFFFFF;color:#a01d1d;border:1px solid #d6a3a3;
+                           border-radius:999px;padding:6px 12px;font-size:11px;
+                           font-weight:600;cursor:pointer">
+              <?php echo xlt('Delete'); ?>
+            </button>
           </div>
         <?php endforeach; ?>
       </div>
@@ -457,7 +486,14 @@ $earlier = [
         (function () {
           const BACKEND = <?php echo json_encode($copilotBackend); ?>;
           const PATIENT_ID = <?php echo (int)$activePid; ?>;
-          document.querySelectorAll('.cp-extract-btn').forEach(btn => {
+          // CSRF token is also emitted in the upload-button IIFE above
+          // (line ~344). That one's locally-scoped to its IIFE so we
+          // can't reach into it; just emit a fresh one here for our
+          // own POSTs.
+          const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken(session: $_cpSession)); ?>;
+
+          // ── Extract ──────────────────────────────────────────────
+          document.querySelectorAll('.cp-extract-btn:not(.cp-extract-done)').forEach(btn => {
             btn.addEventListener('click', async () => {
               const docId = parseInt(btn.dataset.docid, 10);
               // doc_type comes from the server-side filename guess (see
@@ -481,13 +517,62 @@ $earlier = [
                 });
                 const data = await resp.json();
                 if (!resp.ok) throw new Error(data.detail || ('HTTP ' + resp.status));
-                btn.textContent = `✓ ${data.fact_count} facts`;
+                // Flip the live button into the persistent "complete"
+                // shape — same look the server-rendered done variant
+                // uses. The DB cp_extraction_runs row is the source of
+                // truth; this is just keeping the in-memory render in
+                // sync until the next page load reads it back.
+                btn.classList.add('cp-extract-done');
+                btn.removeAttribute('data-docid');
+                btn.removeAttribute('data-doctype');
+                btn.disabled = true;
+                btn.textContent = '';
+                btn.appendChild(document.createTextNode('✓ Extraction complete'));
                 btn.style.background = '#2d7a4f';
-                setTimeout(() => { window.location.reload(); }, 800);
+                btn.style.cursor = 'default';
+                btn.style.opacity = '.95';
+                btn.title = `Extraction complete (${data.fact_count} facts)`;
               } catch (err) {
                 btn.disabled = false;
                 btn.textContent = orig;
                 alert('Extraction failed: ' + (err.message || err));
+              }
+            });
+          });
+
+          // ── Delete ───────────────────────────────────────────────
+          document.querySelectorAll('.cp-doc-delete-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+              const docId = parseInt(btn.dataset.docid, 10);
+              const name = btn.dataset.name || `Document #${docId}`;
+              if (!confirm(`Delete "${name}" and any extracted facts derived from it?\n\nThis cannot be undone.`)) {
+                return;
+              }
+              const orig = btn.textContent;
+              btn.disabled = true; btn.textContent = 'Deleting…';
+              try {
+                const fd = new FormData();
+                fd.append('docref', String(docId));
+                fd.append('csrf_token_form', CSRF);
+                const resp = await fetch('./copilot_documents_delete.php', {
+                  method: 'POST', body: fd, credentials: 'same-origin',
+                });
+                let data;
+                try { data = await resp.json(); } catch { data = { ok: false, error: 'Bad JSON from server' }; }
+                if (!resp.ok || !data.ok) {
+                  throw new Error(data.error || ('HTTP ' + resp.status));
+                }
+                // Remove the row from the UI; reload to refresh the
+                // empty-state messaging if this was the last LIVE doc.
+                const row = btn.closest('.cp-earl-row');
+                if (row) row.remove();
+                if (!document.querySelector('.cp-earlier-card .cp-earl-row')) {
+                  window.location.reload();
+                }
+              } catch (err) {
+                btn.disabled = false;
+                btn.textContent = orig;
+                alert('Delete failed: ' + (err.message || err));
               }
             });
           });
