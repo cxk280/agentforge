@@ -549,10 +549,10 @@ async def extract_route(request: Request, req: ExtractRequest):
     """Run vision extraction on a clinical PDF and persist derived facts."""
     from ingest.attach_and_extract import attach_and_extract
 
-    if (req.document_id is None) == (req.file_path is None):
+    if req.document_id is None and req.file_path is None:
         raise HTTPException(
             status_code=400,
-            detail="Provide exactly one of document_id or file_path.",
+            detail="Provide at least one of document_id or file_path.",
         )
 
     if req.file_path is not None and os.environ.get("DISABLE_FILE_PATH_EXTRACT", "0") == "1":

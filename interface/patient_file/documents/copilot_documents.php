@@ -14,13 +14,41 @@
 require_once(__DIR__ . "/../../globals.php");
 
 use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
+
+$_cpSession = SessionWrapperFactory::getInstance()->getActiveSession();
 
 // ─── Live data: real documents.* rows for the active patient ────────────
 // Surfaces W2 uploads (and any other real documents) above the static W1
 // mock sections, each linked to the bbox-overlay viewer
 // (copilot_doc_viewer.php). When the agent's /extract has been run on a
 // document, its citations are visible there.
-$activePid = (int)($_SESSION['pid'] ?? 0);
+//
+// pid resolution: prefer the OpenEMR session, then ?pid=… on the URL
+// (covers direct navigation outside OpenEMR's frame chrome — e.g. the
+// headless verifier and the demo recording).
+// Read the active patient via OpenEMR's session wrapper. Modern
+// OpenEMR uses Symfony's namespaced session — `$_SESSION['pid']` is
+// always null because the real pid lives at `$_SESSION['OpenEMR']['pid']`.
+// Going through SessionWrapperFactory keeps this code working
+// regardless of whether the session storage is the namespaced bag,
+// the raw $_SESSION fallback, or any future replacement.
+$_cpDocSession = SessionWrapperFactory::getInstance()->getActiveSession();
+$activePid = (int)($_cpDocSession->get('pid') ?? 0);
+if ($activePid <= 0 && isset($_GET['pid'])) {
+    $candidate = (int)$_GET['pid'];
+    if ($candidate > 0) {
+        // Confirm it's a real patient before trusting the URL param.
+        $exists = sqlQuery("SELECT pid FROM patient_data WHERE pid = ?", [$candidate]);
+        if ($exists) {
+            $activePid = $candidate;
+            // Use OpenEMR's standard pid-setter so the namespaced
+            // session writes through correctly (and any side-effects
+            // like clearing the encounter on a pid change still fire).
+            setpid($candidate);
+        }
+    }
+}
 $liveDocs = [];
 if ($activePid > 0) {
     $rs = sqlStatement(
@@ -303,7 +331,7 @@ $earlier = [
 <script>
 (function () {
   const PATIENT_ID = <?php echo (int)$activePid; ?>;
-  const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken()); ?>;
+  const CSRF = <?php echo json_encode(CsrfUtils::collectCsrfToken(session: $_cpSession)); ?>;
   const btn = document.getElementById('cp-doc-upload-btn');
   const input = document.getElementById('cp-doc-upload-input');
   if (!btn || !input) return;
@@ -413,16 +441,9 @@ $earlier = [
               <div class="cp-earl-date"><?php echo text($d['date']); ?></div>
             </a>
             <?php if ($isPdf): ?>
-              <select class="cp-extract-type"
-                      data-docid="<?php echo (int)$d['id']; ?>"
-                      style="border:1px solid #E4E5E8;border-radius:6px;
-                             padding:4px 8px;font-size:11px;background:#FFFFFF">
-                <option value="lab_pdf"          <?php echo $guessType === 'lab_pdf' ? 'selected' : ''; ?>>lab_pdf</option>
-                <option value="intake_form"      <?php echo $guessType === 'intake_form' ? 'selected' : ''; ?>>intake_form</option>
-                <option value="medication_list"  <?php echo $guessType === 'medication_list' ? 'selected' : ''; ?>>medication_list</option>
-              </select>
               <button type="button" class="cp-extract-btn"
                       data-docid="<?php echo (int)$d['id']; ?>"
+                      data-doctype="<?php echo attr($guessType); ?>"
                       style="background:#008C8C;color:#FFFFFF;border:none;
                              border-radius:999px;padding:6px 12px;font-size:11px;
                              font-weight:600;cursor:pointer">
@@ -439,8 +460,13 @@ $earlier = [
           document.querySelectorAll('.cp-extract-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
               const docId = parseInt(btn.dataset.docid, 10);
-              const sel = document.querySelector('.cp-extract-type[data-docid="' + docId + '"]');
-              const docType = sel ? sel.value : 'lab_pdf';
+              // doc_type comes from the server-side filename guess (see
+              // $guessType in copilot_documents.php). The user-facing
+              // dropdown that used to override it was removed — the
+              // filename heuristic is reliable for the demo's naming
+              // conventions, and showing a raw enum picker next to a
+              // friendly Extract button looked like leaked dev plumbing.
+              const docType = btn.dataset.doctype || 'lab_pdf';
               const orig = btn.textContent;
               btn.disabled = true; btn.textContent = 'Extracting…';
               try {

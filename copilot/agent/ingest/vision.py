@@ -43,7 +43,15 @@ _SYSTEM_PROMPT = (
     "  the schema allows null) or skip the row (when it's a list item).\n"
     "- Every populated field MUST carry a `source_citation` whose `quote` is the "
     "  exact substring you read from the document. The `bbox` is a normalized "
-    "  page-relative rectangle (x, y, w, h all in 0..1) that contains that quote.\n"
+    "  page-relative rectangle (x, y, w, h all in 0..1) that tightly contains "
+    "  that quote — origin top-left, (x, y) is the rectangle's top-left corner.\n"
+    "- `bbox` must wrap the exact glyphs of the quote, not the surrounding row "
+    "  or column or label. A short numeric value gets a small rectangle; a "
+    "  multi-word phrase gets a wider one; a multi-line note gets a taller one. "
+    "  Pick `w` and `h` from what you actually see in the rendered page — DO "
+    "  NOT use a single fixed height for every citation, even on a dense "
+    "  monospace report. Adjacent rows in a table must NOT have overlapping "
+    "  bboxes; their bottom edges (y + h) must clear the next row's top (y).\n"
     "- For each value, set `confidence` honestly: <0.5 if the text is illegible, "
     "  partially obscured, ambiguous, or you had to infer it from context.\n"
     "- Do not output Markdown, prose, or commentary. The only acceptable output "
@@ -92,11 +100,18 @@ async def extract_from_pdf(
     pdf_path: str | Path,
     doc_type: str,
     model: str,
-    max_tokens: int = 4096,
+    max_tokens: int = 16384,
 ) -> ExtractionResult:
     """Run one PDF → schema-valid JSON extraction.
 
     Raises ValueError if doc_type is unknown. Anthropic API errors propagate.
+
+    `max_tokens` defaults to 16384 (Sonnet 4.6 happily handles 32K). At
+    the prior 4096 cap the model truncated mid-response on dense
+    documents — e.g. a CMP-14 with 16 line items + per-cell citations
+    + bbox coordinates routinely exceeds 4096 output tokens, so the
+    response would close cleanly with `schema_valid=true` but a 0-row
+    `lab_results` array. Generous cap; small PDFs use much less.
     """
     schema_cls = schema_for(doc_type)
     tool_def = _build_tool_definition(doc_type)

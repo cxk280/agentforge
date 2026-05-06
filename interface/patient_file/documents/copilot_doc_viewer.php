@@ -39,6 +39,7 @@ require_once(__DIR__ . "/../../globals.php");
 
 use OpenEMR\Common\Acl\AclMain;
 use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
 
 // ─── Auth ────────────────────────────────────────────────────────────────
 if (!AclMain::aclCheckCore('patients', 'docs')) {
@@ -50,7 +51,9 @@ if (!AclMain::aclCheckCore('patients', 'docs')) {
 // ─── Resolve doc_id, cross-check patient ─────────────────────────────────
 $docId = isset($_GET['docref']) ? (int)$_GET['docref'] : 0;
 $bboxId = isset($_GET['bbox']) ? (int)$_GET['bbox'] : 0;
-$activePid = (int)($_SESSION['pid'] ?? 0);
+// OpenEMR uses Symfony's namespaced session — `$_SESSION['pid']` is
+// always null. Read via SessionWrapper instead.
+$activePid = (int)(SessionWrapperFactory::getInstance()->getActiveSession()->get('pid') ?? 0);
 
 if ($docId <= 0) {
     http_response_code(400);
@@ -78,19 +81,24 @@ $docDate  = $row['date'] ? substr($row['date'], 0, 10) : '';
 $mimeType = $row['mimetype'] ?: 'application/pdf';
 $ownerPid = (int)$row['foreign_id'];
 
-// PDF source — re-use OpenEMR's existing authenticated download route.
-// `controller.php?document&retrieve` already enforces ACL and serves
-// the file through the OpenEMR session, so we don't need a parallel
-// download path on the agent side.
-$pdfUrl = "/controller.php?document&retrieve"
-    . "&patient_id="   . $ownerPid
-    . "&document_id="  . $docId
-    . "&as_file=false"
-    . "&original_file=true";
+// PDF source — stream via the W2 fast-path endpoint
+// (`copilot_documents_serve.php`) rather than OpenEMR's stock
+// `controller.php?document&retrieve`. The stock controller wraps the
+// download in `C_Document` → `CategoryTree` → `Tree::load_tree()`,
+// which on the AgentForge demo dataset hits an infinite
+// "Undefined array key -1" loop and never returns — same bug already
+// worked around in `copilot_documents_upload.php`. The serve endpoint
+// re-implements the auth + lookup directly and streams `readfile()`.
+$pdfUrl = "/interface/patient_file/documents/copilot_documents_serve.php?docref=" . $docId;
 
-$copilotBackend = $GLOBALS['copilot_backend_url']
-    ?? getenv('COPILOT_BACKEND_URL')
-    ?? 'http://localhost:8400';
+// `getenv()` returns `false` (not null) when the var is unset, so a `??`
+// chain would short-circuit on it and leave $copilotBackend === false —
+// which then renders as "" in the JSON below and breaks the cross-origin
+// fetch (it falls back to the page origin on :8300). Use `?:` so the
+// fallback fires for any falsy value.
+$copilotBackend = ($GLOBALS['copilot_backend_url'] ?? null)
+    ?: getenv('COPILOT_BACKEND_URL')
+    ?: 'http://localhost:8400';
 
 ?><!DOCTYPE html>
 <html lang="en">
@@ -359,16 +367,108 @@ $copilotBackend = $GLOBALS['copilot_backend_url']
 
       await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
 
-      // Draw bboxes that point at this page.
+      // ── Text-layer snap ─────────────────────────────────────────────
+      //
+      // Sonnet 4.6 returns bboxes whose absolute y is reliably off by
+      // ~1-2 lines vs where pdf.js actually renders the text — its
+      // internal page-render at API time uses different font metrics
+      // than pdf.js, so the normalized 0..1 coords don't survive the
+      // round trip. Relative ordering between bboxes is fine, just
+      // the absolute position is shifted. To fix this we ask pdf.js
+      // for its text layer (which IS authoritative — it's the same
+      // engine drawing the canvas), build a list of actual text rows
+      // with their viewport y, and snap each bbox to the row whose
+      // concatenated text is the best match for the citation's quote.
+      const textContent = await page.getTextContent();
+      const rawTextItems = textContent.items.map((item) => {
+        const tx = pdfjsLib.Util.transform(viewport.transform, item.transform);
+        const yBaseline = tx[5];
+        const yTop = yBaseline - (item.height || tx[3]);
+        return {
+          str: item.str,
+          xLeft: tx[4],
+          yTop,
+          yBaseline,
+          width: item.width || (tx[0] * (item.str?.length || 0) * 0.6),
+        };
+      }).filter(t => t.str && t.str.trim().length > 0);
+      // Group items by row (cluster by yBaseline within ±3 px).
+      const rows = [];
+      for (const it of rawTextItems) {
+        let row = rows.find(r => Math.abs(r.yBaseline - it.yBaseline) < 3);
+        if (!row) {
+          row = { yBaseline: it.yBaseline, yTop: it.yTop, items: [] };
+          rows.push(row);
+        }
+        row.items.push(it);
+        row.yTop = Math.min(row.yTop, it.yTop);
+      }
+      rows.sort((a, b) => a.yTop - b.yTop);
+      for (const r of rows) {
+        // height = baseline - top, padded slightly so the box fully
+        // wraps ascenders/descenders.
+        r.height = Math.max(12, r.yBaseline - r.yTop) + 4;
+        r.text = r.items.sort((a, b) => a.xLeft - b.xLeft).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim();
+      }
+
+      function snapToRow(modelNormY, modelNormH, quote) {
+        // Strategy: find the row whose text contains the most distinctive
+        // chunk of the quote. Fall back to spatial nearest if no row
+        // has enough overlap.
+        const q = (quote || '').replace(/\s+/g, ' ').trim();
+        if (!q) return null;
+        // Try the longest contiguous substring of the quote that
+        // appears in any row's text. Walk rows; pick the one whose
+        // text contains the largest prefix or middle chunk of q.
+        let best = null;
+        for (const r of rows) {
+          // distinctive tokens: numbers + words >= 3 chars
+          const tokens = q.match(/[\w.\-/+%>=<]{2,}/g) || [];
+          if (tokens.length === 0) continue;
+          let hits = 0;
+          for (const tok of tokens) if (r.text.includes(tok)) hits++;
+          const score = hits / tokens.length;
+          if (best === null || score > best.score) best = { row: r, score };
+        }
+        if (best && best.score >= 0.6) return best.row;
+        // Fallback: spatial nearest by yTop.
+        const targetY = modelNormY * viewport.height;
+        let nearest = rows[0]; let nearestDist = Infinity;
+        for (const r of rows) {
+          const d = Math.abs(r.yTop - targetY);
+          if (d < nearestDist) { nearest = r; nearestDist = d; }
+        }
+        return nearest;
+      }
+
+      // Draw bboxes — snap each to the matched text row.
       const items = factsByPage.get(pageNum) || [];
-      for (const { fact, citation } of items) {
-        const b = citation.bbox || {};
+      // De-dupe overlap height: after snapping, sort by row.yTop and
+      // shrink each box's height to (next.yTop - this.yTop - 2px).
+      const placed = items.map((it) => {
+        const b = it.citation.bbox || {};
+        const row = snapToRow(b.y || 0, b.h || 0, it.fact.source_quote || '');
+        return { ...it, row, modelB: b };
+      }).filter(p => p.row);
+      placed.sort((a, b) => a.row.yTop - b.row.yTop);
+      for (let i = 0; i < placed.length; i++) {
+        const { fact, citation, row, modelB } = placed[i];
+        const next = placed[i + 1];
+        const baseH = row.height;
+        // Cap height to clear the next snapped row's top.
+        const gapH = next ? Math.max(0, next.row.yTop - row.yTop - 2) : baseH;
+        const renderedH = Math.min(baseH, gapH || baseH);
+        // Width: keep model's width (approximate row coverage).
+        // The x stays from the model — a value-only bbox should still
+        // appear narrow even though we snapped y to a row.
+        const left = (modelB.x || 0) * viewport.width;
+        const width = (modelB.w || 0) * viewport.width;
         const box = document.createElement('div');
         box.className = 'cp-dv-bbox';
-        box.style.left   = (b.x * viewport.width)  + 'px';
-        box.style.top    = (b.y * viewport.height) + 'px';
-        box.style.width  = (b.w * viewport.width)  + 'px';
-        box.style.height = (b.h * viewport.height) + 'px';
+        box.style.left   = left + 'px';
+        box.style.top    = row.yTop + 'px';
+        box.style.width  = (width > 0 ? width : viewport.width * 0.9) + 'px';
+        box.style.height = renderedH + 'px';
         box.title = `${fact.fact_type}: ${fact.source_quote || ''}`;
         box.addEventListener('click', () => selectCitation(citation.citation_id, true));
         overlay.appendChild(box);

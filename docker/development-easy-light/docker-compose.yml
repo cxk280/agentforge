@@ -82,6 +82,15 @@ services:
       OPENEMR_SETTING_rest_portal_api: 1
       OPENEMR_SETTING_portal_onsite_two_enable: 1
       OPENEMR_SETTING_ccda_alt_service_enable: 3
+      # Shared secret read by `copilot_documents_serve.php` to allow the
+      # AgentForge agent (running outside this container) to fetch
+      # uploaded PDF bytes via HTTP without an OpenEMR session. Must
+      # match `COPILOT_INTERNAL_TOKEN` in the agent's env. Set per env
+      # in Railway (dev/qa/prod each get their own token); locally it
+      # comes from the dev shell's environment, with the value below
+      # as a fallback for clones that haven't exported the var. Do not
+      # commit the real token — `${COPILOT_INTERNAL_TOKEN:-}` is fine.
+      COPILOT_INTERNAL_TOKEN: ${COPILOT_INTERNAL_TOKEN:-}
     depends_on:
       mysql:
         condition: service_healthy

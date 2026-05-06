@@ -56,11 +56,36 @@ async def start_run(
     doc_type: str,
     model: str,
 ) -> None:
-    """Insert a row in cp_extraction_runs with status='in_progress'."""
+    """Insert a row in cp_extraction_runs with status='in_progress'.
+
+    Also clears any prior facts/citations for the same document_id so a
+    re-extract supersedes the old result instead of appending. The bbox
+    viewer doesn't filter by run_id (it shows every fact tied to the
+    document), so without this every Extract click would stack a fresh
+    set of overlapping rectangles on top of the previous ones.
+    Document_id=0 is the "anonymous file_path mode" sentinel — never
+    clear there, since runs against arbitrary local files are
+    unrelated to each other.
+    """
     if pool is None:
         return
     async with pool.acquire() as conn:
         async with conn.cursor() as cur:
+            if document_id and document_id > 0:
+                # Citations FK to facts; delete those first.
+                await cur.execute(
+                    """
+                    DELETE FROM cp_extraction_citations
+                    WHERE fact_id IN (
+                        SELECT id FROM cp_extracted_facts WHERE document_id = %s
+                    )
+                    """,
+                    (document_id,),
+                )
+                await cur.execute(
+                    "DELETE FROM cp_extracted_facts WHERE document_id = %s",
+                    (document_id,),
+                )
             await cur.execute(
                 """
                 INSERT INTO cp_extraction_runs
