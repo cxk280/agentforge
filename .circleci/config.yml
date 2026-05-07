@@ -157,13 +157,20 @@ commands:
            sometimes loses the OAuth client config across deploys —
            the script is idempotent, so running it every deploy is
            cheaper than debugging a missing-client failure later.
-        4. GET /interface/main/main_screen.php?prevent_logout=1 as
-           a basic authenticated-render smoke. Confirms the bind-
-           mount overlay survived the deploy and the active
-           AgentForge code is what's serving requests.
+           This step doubles as the authenticated-render check: a
+           successful response (with "REGISTERED" or "REFRESHED"
+           text) proves both that the admin session is real AND
+           that the AgentForge fork is what's serving requests
+           (this script is fork-only).
 
       Failure at any step exits non-zero so the workflow gates
       register the deploy as broken.
+
+      Past life: there was a step 4 that GET'd main_screen.php to
+      confirm an OpenEMR shell rendered. That endpoint now CSRF-403s
+      on pure GETs after PR #11379 (2026-04-01) wired
+      CsrfUtils::checkCsrfInput() into the non-new-login else branch,
+      and step 3 already covers the same ground.
     parameters:
       base_url:
         type: string
@@ -209,15 +216,6 @@ commands:
                 && ! grep -qi "ok\|done\|registered" /tmp/openemr-smoke/api-enable.html 2>/dev/null; then
               echo "⚠ copilot_enable_api.php did not return a confirmation marker — review the artifact"
               # not fatal — the script may have changed its output format
-            fi
-
-            # 4. Authenticated render of main_screen — proves the
-            #    bind-mount survived AND admin session is real.
-            curl -fsS -b "$COOKIES" -o /tmp/openemr-smoke/main.html \
-                "$BASE/interface/main/main_screen.php?prevent_logout=1"
-            if ! grep -qi "openemr\|main_info\|tabs/main.php" /tmp/openemr-smoke/main.html; then
-              echo "✗ main_screen.php did not look like a real OpenEMR shell — see artifact" >&2
-              exit 1
             fi
 
             echo "✓ OpenEMR smoke passed for $BASE"
