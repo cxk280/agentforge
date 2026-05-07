@@ -29,6 +29,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         calendar: resolve(__dirname, 'src/pages/calendar/index.tsx'),
+        messages: resolve(__dirname, 'src/pages/messages/index.tsx'),
       },
     },
   },

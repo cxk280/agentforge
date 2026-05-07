@@ -1,0 +1,316 @@
+/*
+ * Messages — page-specific styles. Values verified against Figma node 27:2
+ * (Screen 7 — Messages) on 2026-05-07.
+ *
+ * Layout: 64px page header on top, 420px inbox sidebar on the left, message
+ * detail pane filling the rest. Body bg / Inter / scaffold live in the PHP
+ * wrapper (copilot_messages.php).
+ */
+
+/* ── Page header (full width — 64px tall, white, 1px bottom border) ── */
+.header {
+  width: 100%;
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.titleBlock { display: flex; align-items: center; gap: 12px; }
+.title { font-size: 18px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.newBadge {
+  background: #008C8C;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.filters {
+  display: inline-flex;
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 4px;
+}
+.filterItem {
+  padding: 4px 14px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+.filterItemActive {
+  background: #FFFFFF;
+  color: #008C8C;
+}
+
+.compose {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+.compose:hover { background: #006F6F; }
+.composeIcon { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── Body: inbox sidebar + detail pane ── */
+.body {
+  display: flex;
+  align-items: stretch;
+  height: calc(100% - 64px);
+  width: 100%;
+  background: #F5F6F7;
+}
+
+/* ── Inbox (420px wide, scrolls within itself) ── */
+.inbox {
+  width: 420px;
+  flex-shrink: 0;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  overflow-y: auto;
+}
+.item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 18px;
+  border-bottom: 0.5px solid #E4E5E8;
+  background: #FFFFFF;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: inherit;
+}
+.item:hover { background: #FAFBFC; }
+.itemSelected,
+.itemSelected:hover { background: rgba(0, 140, 140, 0.06); }
+
+.itemRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.itemDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #008C8C;
+  flex-shrink: 0;
+}
+.itemDotPlaceholder {
+  width: 0;          /* read items: no dot, no offset */
+  height: 7px;
+  flex-shrink: 0;
+}
+.itemSender {
+  font-size: 13px;
+  color: #0D1B2A;
+  font-weight: 400;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.itemSenderUnread { font-weight: 600; }
+.itemTime {
+  margin-left: auto;
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.itemSubject {
+  font-size: 13px;
+  font-weight: 500;
+  color: #0D1B2A;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.itemSubjectUnread { font-weight: 600; }
+.itemPreviewRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.itemPreview {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.urgentBadge {
+  background: rgba(217, 56, 56, 0.15);
+  color: #D93838;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* ── Detail pane (fills rest) ── */
+.detail {
+  flex: 1;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+.detailHeader {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.detailSubject {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+  margin: 0;
+}
+.detailFromRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.detailAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #5FD0D0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+}
+.detailFromText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.detailFromName { font-size: 13px; font-weight: 500; color: #0D1B2A; line-height: 1; }
+.detailFromMeta { font-size: 11px; font-weight: 400; color: #8A91A1; line-height: 1; }
+
+.detailBody {
+  background: #FFFFFF;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+.detailPara {
+  font-size: 14px;
+  font-weight: 400;
+  color: #0D1B2A;
+  line-height: 22px;
+  white-space: pre-line;
+  margin: 0;
+  max-width: 960px;
+}
+.findingCard {
+  background: #F5F6F7;
+  border-radius: 8px;
+  padding: 0 16px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.findingEmoji { font-size: 18px; line-height: 1; }
+.findingText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.findingTitle { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1; }
+.findingSubtitle { font-size: 12px; font-weight: 400; color: #8A91A1; line-height: 1; }
+
+.actions {
+  background: #FFFFFF;
+  border-top: 1px solid #E4E5E8;
+  height: 72px;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.actionPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.actionPrimary:hover { background: #006F6F; }
+.actionGhost {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.actionGhost:hover { background: #F5F6F7; }
+.actionGhostMuted { color: #4F5763; }
+.actionLink {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.actionLink:hover { text-decoration: underline; }
