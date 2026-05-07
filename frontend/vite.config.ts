@@ -28,9 +28,14 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        calendar: resolve(__dirname, 'src/pages/calendar/index.tsx'),
-        messages: resolve(__dirname, 'src/pages/messages/index.tsx'),
-        header:   resolve(__dirname, 'src/pages/header/index.tsx'),
+        calendar:      resolve(__dirname, 'src/pages/calendar/index.tsx'),
+        messages:      resolve(__dirname, 'src/pages/messages/index.tsx'),
+        header:        resolve(__dirname, 'src/pages/header/index.tsx'),
+        reports:       resolve(__dirname, 'src/pages/reports/index.tsx'),
+        admin:         resolve(__dirname, 'src/pages/admin/index.tsx'),
+        finder:        resolve(__dirname, 'src/pages/finder/index.tsx'),
+        office_notes:  resolve(__dirname, 'src/pages/office_notes/index.tsx'),
+        print_preview: resolve(__dirname, 'src/pages/print_preview/index.tsx'),
       },
     },
   },

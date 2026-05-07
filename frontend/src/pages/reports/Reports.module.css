@@ -1,0 +1,126 @@
+/*
+ * Reports — page-specific styles. Values verified against Figma node 29:2
+ * (Screen 8 — Reports) on 2026-05-07. The existing PHP mock had a couple of
+ * minor drifts from Figma (icon-bg blue used #4885D9 instead of the Figma
+ * #4785D9 / rgba(71,133,217,…); section-label letter-spacing was 0.6px
+ * instead of the Figma 0.8px) and those have been corrected here.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_reports.php — this
+ * file owns only Reports-component styles.
+ */
+
+/* ── Page header (full width — matches the Figma intent and the user's
+ *    standing rule that headers span full width edge to edge) ── */
+.header {
+  width: 100%;
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.title { font-size: 18px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.spacer { flex: 1; }
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-size: 13px;
+  color: #8A91A1;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+.search:hover { background: #ECEEF0; }
+
+/* ── Content ── */
+.content {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.section { display: flex; flex-direction: column; gap: 12px; }
+
+.secHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1;
+}
+.secDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.secLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.8px;
+}
+
+/* Card grid — Figma uses a horizontal flex row of fixed-width 270px cards
+ * with a 12px gap. Using grid auto-flow keeps that layout but lets cards
+ * wrap on narrower viewports without stretching. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 270px);
+  gap: 12px;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.12s, box-shadow 0.12s, transform 0.05s;
+  width: 270px;
+}
+.card:hover {
+  border-color: #008C8C;
+  box-shadow: 0 1px 2px rgba(13, 27, 42, 0.04), 0 4px 12px rgba(13, 27, 42, 0.06);
+}
+.card:active { transform: translateY(1px); }
+
+.icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+.iconSpacer {
+  height: 4px;
+  flex: 0 0 auto;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.cardDesc {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 18px;
+  margin: 0;
+}

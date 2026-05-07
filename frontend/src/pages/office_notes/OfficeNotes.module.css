@@ -1,0 +1,276 @@
+/*
+ * Office Notes — page-specific styles. Values verified against Figma node
+ * 98:2 (Screen 49 — Office Notes) on 2026-05-07. The original PHP mock at
+ * copilot_office_notes.php.bak shipped with a 5-column grid + sticky-note
+ * cards; this React port is a 1:1 visual port with no behavioural drift.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_office_notes.php —
+ * this file owns only OfficeNotes-component styles.
+ */
+
+/* ── Page header (full width — matches Figma intent and the user's standing
+ *    rule that headers always span full viewport width). ── */
+.head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  width: 100%;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.bullet { color: #8A91A1; font-size: 16px; line-height: 1; }
+.meta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btnGhost {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 7px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+
+.btnPrimary {
+  background: #008C8C;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.helpPill {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 12px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+.helpPill[disabled] { cursor: not-allowed; opacity: 0.65; }
+
+/* ── Filter bar ── */
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+}
+.pill {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  height: 28px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pill:hover { background: #F5F6F7; }
+.pillActive {
+  background: #E6F5F5;
+  border-color: #008C8C;
+  color: #008C8C;
+}
+.pillActive:hover { background: #E6F5F5; }
+.ct {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 9px;
+  height: 18px;
+  min-width: 22px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.ctActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+.sort {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+}
+
+/* ── Board grid ── */
+.board {
+  padding: 16px 24px 32px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 18px;
+}
+.empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: #8A91A1;
+  font-size: 13px;
+  padding: 40px 0;
+}
+
+/* ── Sticky-note card ── */
+.note {
+  border-radius: 12px;
+  padding: 16px;
+  min-height: 336px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.tone_yellow { background: #FFF3BB; }
+.tone_blue   { background: #DEEDFB; }
+.tone_green  { background: #DFF6EA; }
+.tone_pink   { background: #FFE1ED; }
+.tone_violet { background: #EAE4FB; }
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.icon {
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.cat {
+  font-size: 10px;
+  font-weight: 700;
+  color: #4F5763;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  margin-top: 4px;
+}
+.pinnedPill {
+  margin-left: auto;
+  background: #FFF4EA;
+  color: #FA8C33;
+  border-radius: 9px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: none;
+}
+
+.body {
+  font-size: 12px;
+  color: #181D26;
+  line-height: 1.45;
+  flex: 1;
+  white-space: pre-wrap;
+}
+
+.divider {
+  height: 1px;
+  background: rgba(138, 145, 161, 0.5);
+  margin: 12px 0;
+}
+
+.authorRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.av {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 9px;
+  font-weight: 700;
+}
+.av_teal   { background: #008C8C; }
+.av_blue   { background: #4785D9; }
+.av_purple { background: #8561C7; }
+.av_orange { background: #FA8C33; }
+.av_green  { background: #33A666; }
+.av_pink   { background: #D9668C; }
+.av_mint   { background: #33A68C; }
+
+.who {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.name {
+  font-size: 11px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.when {
+  font-size: 10px;
+  color: #4F5763;
+  line-height: 1;
+}
+
+.foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.comments {
+  font-size: 11px;
+  color: #4F5763;
+}
+.replyToggle {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: #008C8C;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  line-height: 1;
+}
+.replyToggle:hover { text-decoration: underline; }

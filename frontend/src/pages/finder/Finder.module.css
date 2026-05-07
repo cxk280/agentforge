@@ -1,0 +1,230 @@
+/*
+ * Finder — page-specific styles. Values verified against Figma node 31:2
+ * (Screen 10 — Patient Finder) on 2026-05-07. Mirrors the values from the
+ * original PHP mock at copilot_finder.php; the React port preserves spacing,
+ * colors, and dimensions exactly.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_finder.php — this
+ * file owns only Finder-component styles.
+ */
+
+/* ── Page header (full width — matches the standing header rule) ── */
+.header {
+  width: 100%;
+  height: 64px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 8px 18px;
+  height: 40px;
+  min-width: 200px;
+}
+.searchIcon {
+  font-size: 14px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.searchInput {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  color: #0D1B2A;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1;
+  outline: none;
+  padding: 0;
+  min-width: 60px;
+}
+/* The thin teal "caret" line shown next to the search text in the Figma
+ * mock — preserved for visual fidelity with the static frame. */
+.searchCaret {
+  width: 1px;
+  height: 16px;
+  background: #008C8C;
+  flex-shrink: 0;
+}
+
+.newBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  line-height: 1;
+}
+.newBtn:hover { background: #006F6F; }
+.newPlus {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Filter row ── */
+.filters {
+  width: 100%;
+  height: 52px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+}
+.filterLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #8A91A1;
+  margin-right: 4px;
+  line-height: 1;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.chip:hover { background: #ECEFF1; }
+.chipActive {
+  background: rgba(0, 140, 140, 0.10);
+  border-color: #008C8C;
+  color: #008C8C;
+}
+.chipActive:hover { background: rgba(0, 140, 140, 0.16); }
+.chipX {
+  font-size: 12px;
+  font-weight: 700;
+  color: #008C8C;
+  line-height: 1;
+}
+.resultsCount {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+/* ── Results table ── */
+.tableWrap { padding: 20px 24px; }
+.table {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  width: 100%;
+}
+.thead {
+  display: grid;
+  grid-template-columns: 280px 120px 180px 180px 200px 140px 1fr;
+  height: 44px;
+  background: #F5F6F7;
+  align-items: center;
+  padding: 0 18px;
+}
+.th {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+.row {
+  display: grid;
+  grid-template-columns: 280px 120px 180px 180px 200px 140px 1fr;
+  height: 84px;
+  align-items: center;
+  padding: 0 18px;
+  border-top: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  cursor: pointer;
+  /* Reset button-like reset baselines for div-as-button */
+  text-align: left;
+}
+.row:hover { background: #FAFBFB; }
+.row:focus-visible { outline: 2px solid #008C8C; outline-offset: -2px; }
+.rowSelected { background: rgba(0, 140, 140, 0.04); }
+.rowSelected:hover { background: rgba(0, 140, 140, 0.06); }
+
+.cellName {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+
+.mrn   { font-size: 12px; font-weight: 500; color: #4F5763; }
+.dob   { font-size: 12px; color: #0D1B2A; }
+.prov  { font-size: 12px; color: #0D1B2A; }
+.ins   { font-size: 12px; color: #0D1B2A; }
+.visit { font-size: 12px; color: #0D1B2A; }
+.visitToday { color: #008C8C; font-weight: 600; }
+
+.flags {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.flag {
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.flagWarn { background: rgba(217, 56, 56, 0.12); color: #D93838; }
+.flagCond { background: rgba(0, 140, 140, 0.12);  color: #008C8C; }
+.flagRx   { background: rgba(0, 140, 140, 0.12);  color: #008C8C; }

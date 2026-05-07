@@ -1,0 +1,489 @@
+/*
+ * PrintPreview — page-specific styles. Values verified against Figma node
+ * 110:2 (Screen 61 — Print Preview) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_print_preview.php —
+ * this file owns only PrintPreview-component styles.
+ */
+
+/* ── Page header (full width — matches the user's standing rule that
+ *    headers span full width edge to edge) ── */
+.head {
+  width: 100%;
+  height: 52px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.headInfo { display: flex; align-items: center; gap: 10px; }
+.headTitle {
+  font-size: 18px; font-weight: 600;
+  color: #181D26; line-height: 1;
+}
+.headBullet {
+  font-size: 16px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.headMeta {
+  font-size: 13px; color: #4F5763;
+  line-height: 1;
+}
+.headSpacer { flex: 1; }
+
+/* Printer dropdown pill */
+.printerSel {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+}
+.printerSelIcon { font-size: 12px; line-height: 1; }
+.printerSelInput {
+  appearance: none;
+  background: transparent;
+  border: 0; outline: none;
+  font: inherit; color: inherit;
+  padding: 0 16px 0 0;
+  cursor: pointer;
+}
+.printerSelCar {
+  pointer-events: none;
+  position: absolute;
+  right: 12px;
+  font-size: 11px;
+  color: #4F5763;
+}
+
+/* Header buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  height: 32px; padding: 0 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+  line-height: 1;
+}
+.btnGhost {
+  background: #FFFFFF;
+  border-color: #E4E5E8;
+  color: #4F5763;
+  font-weight: 500;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  font-weight: 600;
+  border-color: #008C8C;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.helpPill {
+  background: #F5F6F7;
+  border: 0;
+  border-radius: 12px;
+  height: 24px;
+  padding: 0 12px;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+  display: inline-flex; align-items: center;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.helpPill:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* ── Body grid: sidebar | settings | preview stage ── */
+.body {
+  display: grid;
+  grid-template-columns: 232px 260px 1fr;
+  min-height: calc(100vh - 53px);
+  background: #FFFFFF;
+}
+
+/* Output type sidebar */
+.sidebar {
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 8px 8px 16px;
+}
+.sidebarLabel {
+  font-size: 11px; font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  padding: 8px 8px 4px;
+}
+.cat {
+  display: flex; align-items: center; gap: 10px;
+  height: 36px;
+  padding: 0 10px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  line-height: 1;
+}
+.cat:hover { background: #F5F6F7; }
+.catActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+.catIcon {
+  font-size: 14px;
+  line-height: 1;
+  flex: 0 0 16px;
+  text-align: center;
+}
+
+/* Settings panel column */
+.settingsWrap { padding: 16px 12px; }
+.settings {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 15px 18px;
+}
+.settingsLabel {
+  font-size: 11px; font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  margin-bottom: 18px;
+}
+.fieldLabel {
+  font-size: 11px; font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.fieldLabelSpacer { margin-top: 16px; }
+.includeLabel {
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-top: 24px;
+  margin-bottom: 10px;
+}
+
+.select, .input {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  height: 32px;
+  padding: 0 10px;
+  font-size: 12px; font-weight: 500;
+  color: #181D26;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.select select {
+  appearance: none;
+  border: 0; outline: none;
+  background: transparent;
+  font: inherit; color: inherit;
+  flex: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.selectCar {
+  pointer-events: none;
+  color: #8A91A1;
+  font-size: 11px;
+}
+.input input {
+  border: 0; outline: none;
+  background: transparent;
+  font: inherit; color: inherit;
+  flex: 1;
+  padding: 0;
+  width: 100%;
+}
+.input input::-webkit-outer-spin-button,
+.input input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.input input { -moz-appearance: textfield; }
+.inputStep {
+  color: #8A91A1;
+  font-size: 13px;
+}
+
+/* Orientation toggle */
+.orient {
+  background: #F5F6F7;
+  border-radius: 8px;
+  height: 32px;
+  padding: 2px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+}
+.orientBtn {
+  height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-family: inherit;
+  line-height: 1;
+}
+.orientBtnActive {
+  background: #FFFFFF;
+  border-color: #E4E5E8;
+  color: #181D26;
+}
+
+/* INCLUDE checkbox list */
+.includeList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.check {
+  display: flex; align-items: center; gap: 10px;
+  height: 30px;
+  cursor: pointer;
+}
+.check input[type=checkbox] {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+.checkBox {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  font-size: 11px;
+  color: #FFFFFF;
+  font-weight: 700;
+  line-height: 1;
+}
+.checkOn .checkBox {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.checkLabel {
+  font-size: 12px;
+  color: #181D26;
+  line-height: 1;
+}
+
+/* Preview stage */
+.stage {
+  background: #EDEDF0;
+  padding: 12px;
+  overflow-y: auto;
+}
+.scaleLabel {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+  padding: 4px 0 16px;
+}
+.paperWrap {
+  display: flex;
+  justify-content: center;
+}
+.paper {
+  background: #FFFFFF;
+  border: 1px solid #CCCCD1;
+  border-radius: 2px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+  width: 800px;
+  min-height: 648px;
+  padding: 31px 33px;
+  color: #181D26;
+  position: relative;
+}
+.paperLandscape {
+  width: 1000px;
+  min-height: 540px;
+}
+
+.paperHead {
+  display: flex;
+  gap: 17px;
+  align-items: flex-start;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #181D26;
+}
+.paperLogo {
+  width: 40px; height: 40px;
+  background: #008C8C;
+  border-radius: 6px;
+  flex: 0 0 40px;
+}
+.paperBrand { padding-top: 4px; }
+.paperBrandTitle {
+  font-size: 14px; font-weight: 700;
+  color: #181D26;
+  margin: 0 0 4px;
+  line-height: 1;
+}
+.paperBrandClinic {
+  font-size: 9px; font-weight: 600;
+  color: #4F5763;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.paperHeadMeta {
+  margin-left: auto;
+  text-align: left;
+  padding-top: 6px;
+}
+.paperHeadMetaL1 {
+  font-size: 9px;
+  color: #4F5763;
+  line-height: 1.5;
+}
+.paperHeadMetaL2 {
+  font-size: 9px;
+  color: #8A91A1;
+  line-height: 1.5;
+}
+
+.paperTitle {
+  font-size: 12px; font-weight: 700;
+  color: #181D26;
+  margin: 16px 0 0;
+  line-height: 1;
+}
+
+.paperGrid {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 0 0;
+  margin-top: 18px;
+}
+.paperLcol { }
+.paperRcol { padding-left: 0; }
+
+.paperSection {
+  font-size: 9px; font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.paperSectionSpacer { margin-top: 22px; }
+
+.kv {
+  display: grid;
+  grid-template-columns: 108px 1fr;
+  column-gap: 0;
+  row-gap: 4px;
+  margin-bottom: 4px;
+}
+.kvK {
+  font-size: 9px; font-weight: 500;
+  color: #4F5763;
+  line-height: 1.4;
+}
+.kvV {
+  font-size: 10px;
+  color: #181D26;
+  line-height: 1.3;
+}
+
+.bullets {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.bullets li {
+  font-size: 9px;
+  color: #181D26;
+  line-height: 1.7;
+}
+.bulletsAllergies li { color: #D93838; }
+
+.paperFooter {
+  margin-top: 38px;
+  padding-top: 12px;
+  border-top: 1px solid #4F5763;
+}
+.paperSignoff {
+  display: grid;
+  grid-template-columns: 60px 1fr 50px 1fr;
+  align-items: center;
+  gap: 0 8px;
+  font-size: 9px;
+  color: #4F5763;
+  margin-bottom: 18px;
+}
+.paperSignoffLine {
+  border-bottom: 1px solid #181D26;
+  height: 1em;
+}
+.paperSignoffLbl { font-weight: 500; }
+.paperSignoffLblRight {
+  text-align: right;
+  padding-right: 8px;
+}
+.paperPagefooter {
+  font-size: 8px;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+.comingSoon {
+  margin-top: 90px;
+  text-align: center;
+  color: #4F5763;
+}
+.comingSoon h2 {
+  font-size: 18px; font-weight: 700;
+  color: #181D26;
+  margin: 0 0 8px;
+}
+.comingSoon p {
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+.comingSoonBack {
+  display: inline-block;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 16px;
+  padding: 8px 16px;
+  font-size: 12px; font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.comingSoonBack:hover { background: #006F6F; }
