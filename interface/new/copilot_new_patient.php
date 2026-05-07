@@ -1,415 +1,109 @@
 <?php
 
 /**
- * New / Search Patient — implements Screen 22 of the AgentForge mockups.
+ * New / Search Patient landing page — Figma "Screen 22 — New / Search Patient".
  *
- * Two-column iframe content: LEFT pane is "Find existing patient" with
- * search input, status tab pills, and a RECENT-patients list keyed by
- * colored avatar bubbles. RIGHT pane is "Create new patient" — Identity,
- * Contact, Insurance, Provider sections — with Save-as-draft / Create
- * patient CTAs.
+ * Thin manifest-loading wrapper that hands the page body off to the React
+ * bundle built from /frontend/src/pages/new_patient/. The PHP outer shell
+ * at /interface/main/tabs/main.php still owns the navy top nav, left sidebar,
+ * and patient header2 banner; this file only renders inside the
+ * #maimain iframe.
  *
- * The chrome (top nav, search bar, avatar) is rendered by the parent
- * shell. This page renders only the body.
+ * Boot context (CSRF token, current user id, current patient id, API base)
+ * is passed to React via data-* attributes on the #cp-root mount node and
+ * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
+ *
+ * The original DB-backed PHP mock is preserved at copilot_new_patient.php.bak
+ * so a side-by-side screenshot diff remains possible.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
  * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+declare(strict_types=1);
+
 require_once(__DIR__ . "/../globals.php");
 
-// Handle POST: create a new patient row.
-$createdPid = null;
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && !empty($_POST['create_patient'] ?? '')) {
-    $fn  = trim($_POST['fname'] ?? '');
-    $ln  = trim($_POST['lname'] ?? '');
-    $dob = trim($_POST['DOB'] ?? '');
-    $sex = trim($_POST['sex'] ?? 'Female');
-    $phone = trim($_POST['phone_home'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $street = trim($_POST['street'] ?? '');
-    if ($fn !== '' && $ln !== '') {
-        $nextPid = (int)(sqlQuery("SELECT COALESCE(MAX(pid), 0) + 1 AS n FROM patient_data")['n'] ?? 1);
-        sqlStatement(
-            "INSERT INTO patient_data (pid, fname, lname, DOB, sex, phone_home, email, street, country_code, date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'US', NOW())",
-            [$nextPid, $fn, $ln, $dob ?: null, $sex, $phone, $email, $street]
-        );
-        $createdPid = $nextPid;
-    }
-}
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
 
-$status_tabs = [
-    ['All',         true],
-    ['Active',      false],
-    ['Last 7 days', false],
-    ['Inactive',    false],
-];
+// ---------------------------------------------------------------------------
+// Resolve built React assets via the Vite manifest.
+//
+// Vite emits hashed filenames + a manifest.json mapping logical entry paths
+// (relative to /frontend) to the built file + its imported CSS. We read it
+// at request time so a fresh build is picked up without restarting Apache.
+//
+// If the manifest is missing (e.g. /frontend has not been built yet), fall
+// through to a clear in-page error rather than silently rendering nothing.
+// ---------------------------------------------------------------------------
 
-// Live "recent patients" list — patient_data ordered by date desc.
-$tonePool = ['teal', 'blue', 'purple', 'orange', 'green', 'pink', 'mint', 'violet'];
-$recent = [];
-$rows = sqlStatement("SELECT pid, fname, lname, DOB, date FROM patient_data ORDER BY date DESC, pid DESC LIMIT 5");
-$idx = 0;
-while ($r = sqlFetchArray($rows)) {
-    $name = trim(($r['fname'] ?? '') . ' ' . ($r['lname'] ?? '')) ?: '(unnamed)';
-    $mrn  = '#' . str_pad((string)$r['pid'], 6, '0', STR_PAD_LEFT);
-    $dob  = $r['DOB'] ? date('m/d/Y', strtotime($r['DOB'])) : '—';
-    $when = $r['date'] ? date('M j', strtotime($r['date'])) : 'Today';
-    $diff = $r['date'] ? (time() - strtotime($r['date'])) : 0;
-    if ($diff < 86400) { $when = 'Today'; }
-    elseif ($diff < 86400 * 2) { $when = 'Yesterday'; }
-    $recent[] = ['name' => $name, 'mrn' => $mrn, 'dob' => $dob, 'when' => $when, 'tone' => $tonePool[$idx % count($tonePool)]];
-    $idx++;
-}
+$fileroot     = $GLOBALS['fileroot'] ?? __DIR__ . '/../..';
+$webroot      = $GLOBALS['webroot'] ?? '';
+$manifestPath = $fileroot . '/public/build/.vite/manifest.json';
+$manifest     = is_file($manifestPath)
+    ? (json_decode((string)file_get_contents($manifestPath), true) ?: [])
+    : [];
+$entry        = $manifest['src/pages/new_patient/index.tsx'] ?? null;
+// Apache serves the repo root as DocumentRoot, so /public is part of the URL.
+$jsHref       = is_array($entry) && isset($entry['file']) ? '/public/build/' . $entry['file'] : null;
+$cssHrefs     = is_array($entry) && isset($entry['css']) && is_array($entry['css']) ? $entry['css'] : [];
 
+$session     = SessionWrapperFactory::getInstance()->getActiveSession();
+$authUserId  = (string)($_SESSION['authUserID'] ?? '');
+$patientId   = (string)($_SESSION['pid'] ?? '');
+$csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title><?php echo xlt('New / Search Patient'); ?></title>
+<title><?php echo xlt('New Patient'); ?></title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/copilot-tokens.css">
+<?php foreach ($cssHrefs as $h): ?>
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/build/<?php echo attr((string)$h); ?>">
+<?php endforeach; ?>
 <style>
   *, *::before, *::after { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; height: 100%; }
   body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F6F7;
-    color: #0D1B2A;
+    font-family: var(--cp-font);
+    background: var(--cp-bg);
+    color: var(--cp-navy);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
   }
-  button { font-family: inherit; cursor: pointer; }
-  input, select { font-family: inherit; }
-
-  /* Page header */
-  .cp-np-head {
-    background: #FFFFFF;
-    border-bottom: 1px solid #E4E5E8;
-    height: 60px;
-    padding: 0 24px;
-    display: flex; align-items: center; gap: 12px;
-  }
-  .cp-np-title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
-  .cp-np-bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
-  .cp-np-meta { color: #8A91A1; font-size: 12px; line-height: 1; }
-  .cp-np-spacer { flex: 1; }
-  .cp-np-help {
-    background: #FFFFFF;
-    border: 1px solid #E4E5E8;
-    border-radius: 999px;
-    padding: 7px 14px;
-    font-size: 12px; font-weight: 500;
-    color: #0D1B2A;
-    line-height: 1;
-  }
-  .cp-np-help:hover { background: #F5F6F7; }
-
-  /* Layout */
-  .cp-np-body {
-    padding: 20px 24px 32px;
-    display: grid;
-    grid-template-columns: 360px 1fr;
-    gap: 16px;
-  }
-
-  /* Panel */
-  .cp-panel {
-    background: #FFFFFF;
-    border: 1px solid #E4E5E8;
-    border-radius: 12px;
-    padding: 20px 20px 24px;
-  }
-  .cp-panel-lbl {
-    font-size: 11px; font-weight: 600;
-    color: #8A91A1;
-    letter-spacing: 0.6px;
-    line-height: 1;
-    margin-bottom: 12px;
-  }
-
-  /* Find existing — search */
-  .cp-search-wrap {
-    background: #F5F6F7;
-    border: 1px solid #E4E5E8;
-    border-radius: 8px;
-    height: 38px;
-    display: flex; align-items: center;
-    padding: 0 12px;
-    margin-bottom: 12px;
-  }
-  .cp-search-wrap .ic { color: #8A91A1; font-size: 13px; margin-right: 8px; }
-  .cp-search-wrap input {
-    border: none; background: transparent; outline: none;
-    flex: 1; min-width: 0;
-    font-size: 13px; color: #0D1B2A;
-  }
-  .cp-search-wrap input::placeholder { color: #8A91A1; }
-
-  /* Status tabs */
-  .cp-tabs { display: flex; gap: 6px; margin-bottom: 18px; }
-  .cp-tabs button {
-    border-radius: 999px;
-    padding: 5px 12px;
-    font-size: 11px; font-weight: 500;
-    line-height: 1;
-    background: #FFFFFF;
+  button { font-family: inherit; }
+  #cp-root { height: 100%; }
+  /* Visible-by-default error if the React bundle fails to load. Hidden by
+   * the React tree on first render. */
+  .cp-boot-error {
+    display: none;
+    padding: 24px;
     color: #4F5763;
-    border: 1px solid #E4E5E8;
+    font-size: 13px;
   }
-  .cp-tabs button.active {
-    background: #FFFFFF;
-    color: #008C8C;
-    border-color: #008C8C;
-  }
-
-  /* Section sub-label */
-  .cp-recent-lbl {
-    font-size: 10px; font-weight: 600;
-    color: #8A91A1;
-    letter-spacing: 0.6px;
-    line-height: 1;
-    margin: 4px 0 10px;
-  }
-
-  /* Recent list */
-  .cp-rec-list { display: flex; flex-direction: column; gap: 4px; }
-  .cp-rec-row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px 6px;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-  .cp-rec-row:hover { background: #F5F6F7; }
-  .cp-rec-avatar {
-    width: 32px; height: 32px; border-radius: 50%;
-    flex: 0 0 auto;
-  }
-  .cp-rec-avatar.teal   { background: #008C8C; }
-  .cp-rec-avatar.blue   { background: #4785D9; }
-  .cp-rec-avatar.purple { background: #8561C7; }
-  .cp-rec-avatar.orange { background: #FA8C33; }
-  .cp-rec-avatar.green  { background: #33A666; }
-  .cp-rec-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-  .cp-rec-name { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
-  .cp-rec-sub  { font-size: 11px; color: #8A91A1; line-height: 1.2; }
-  .cp-rec-when { font-size: 11px; color: #8A91A1; flex: 0 0 auto; }
-
-  /* Form section */
-  .cp-form-section { margin-bottom: 22px; }
-  .cp-form-section h3 {
-    font-size: 14px; font-weight: 700;
-    color: #0D1B2A;
-    margin: 0 0 12px;
-    line-height: 1;
-  }
-  .cp-form-grid {
-    display: grid; gap: 12px 14px;
-  }
-  .cp-form-grid.two   { grid-template-columns: 1fr 1fr; }
-  .cp-form-grid.three { grid-template-columns: 1fr 1fr 1fr; }
-  .cp-form-grid.full  { grid-template-columns: 1fr; }
-
-  .cp-field { display: flex; flex-direction: column; gap: 5px; }
-  .cp-field label {
-    font-size: 11px; font-weight: 500; color: #4F5763;
-    line-height: 1;
-  }
-  .cp-input {
-    background: #FFFFFF;
-    border: 1px solid #E4E5E8;
-    border-radius: 8px;
-    height: 38px;
-    padding: 0 12px;
-    font-size: 13px; color: #0D1B2A;
-    outline: none;
-  }
-  .cp-input:focus { border-color: #008C8C; }
-  .cp-select {
-    appearance: none; -webkit-appearance: none;
-    background-image:
-      linear-gradient(45deg, transparent 50%, #8A91A1 50%),
-      linear-gradient(135deg, #8A91A1 50%, transparent 50%);
-    background-position:
-      calc(100% - 14px) calc(50% - 1px),
-      calc(100% - 9px) calc(50% - 1px);
-    background-size: 5px 5px, 5px 5px;
-    background-repeat: no-repeat;
-    padding-right: 28px;
-  }
-
-  /* Footer CTA */
-  .cp-form-foot {
-    display: flex; align-items: center; justify-content: flex-end;
-    gap: 10px;
-    margin-top: 4px;
-  }
-  .cp-btn {
-    border-radius: 999px;
-    padding: 9px 18px;
-    font-size: 12px; font-weight: 600;
-    line-height: 1;
-    border: 1px solid transparent;
-  }
-  .cp-btn.secondary {
-    background: #FFFFFF; color: #0D1B2A; border-color: #E4E5E8;
-    font-weight: 500;
-  }
-  .cp-btn.secondary:hover { background: #F5F6F7; }
-  .cp-btn.primary { background: #008C8C; color: #FFFFFF; }
-  .cp-btn.primary:hover { background: #00787A; }
+  #cp-root:empty + .cp-boot-error { display: block; }
 </style>
 </head>
 <body>
-
-<header class="cp-np-head">
-  <div class="cp-np-title"><?php echo xlt('New / Search Patient'); ?></div>
-  <div class="cp-np-bullet">•</div>
-  <div class="cp-np-meta"><?php echo xlt('Create or look up a patient record'); ?></div>
-  <div class="cp-np-spacer"></div>
-  <button type="button" class="cp-np-help">? <?php echo xlt('Help'); ?></button>
-</header>
-
-<main class="cp-np-body">
-
-  <!-- LEFT — find existing -->
-  <section class="cp-panel cp-panel-find">
-    <div class="cp-panel-lbl"><?php echo xlt('FIND EXISTING PATIENT'); ?></div>
-
-    <div class="cp-search-wrap">
-      <span class="ic">🔍</span>
-      <input type="text" placeholder="<?php echo xla('Name, MRN, DOB, phone, or email'); ?>">
-    </div>
-
-    <div class="cp-tabs">
-      <?php foreach ($status_tabs as [$label, $active]): ?>
-        <button type="button" class="<?php echo $active ? 'active' : ''; ?>"><?php echo text($label); ?></button>
-      <?php endforeach; ?>
-    </div>
-
-    <div class="cp-recent-lbl"><?php echo xlt('RECENT'); ?></div>
-
-    <div class="cp-rec-list">
-      <?php foreach ($recent as $r): ?>
-        <div class="cp-rec-row">
-          <div class="cp-rec-avatar <?php echo attr($r['tone']); ?>"></div>
-          <div class="cp-rec-info">
-            <div class="cp-rec-name"><?php echo text($r['name']); ?></div>
-            <div class="cp-rec-sub">MRN <?php echo text($r['mrn']); ?> • DOB <?php echo text($r['dob']); ?></div>
-          </div>
-          <div class="cp-rec-when"><?php echo text($r['when']); ?></div>
-        </div>
-      <?php endforeach; ?>
-    </div>
-  </section>
-
-  <!-- RIGHT — create new -->
-  <form class="cp-panel cp-panel-create" method="post" action="copilot_new_patient.php">
-    <div class="cp-panel-lbl"><?php echo xlt('CREATE NEW PATIENT'); ?>
-      <?php if ($createdPid): ?>
-        <span class="cp-status-pill good" style="margin-left:10px;"><?php echo xlt('Patient created'); ?> #<?php echo text(str_pad((string)$createdPid, 6, '0', STR_PAD_LEFT)); ?></span>
-      <?php endif; ?>
-    </div>
-
-    <div class="cp-form-section">
-      <h3><?php echo xlt('Identity'); ?></h3>
-      <div class="cp-form-grid two">
-        <div class="cp-field">
-          <label><?php echo xlt('First name'); ?></label>
-          <input class="cp-input" type="text" name="fname" value="Margaret" required>
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Last name'); ?></label>
-          <input class="cp-input" type="text" name="lname" value="Chen" required>
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Date of birth'); ?></label>
-          <input class="cp-input" type="date" name="DOB" value="1958-03-14">
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Sex'); ?></label>
-          <select class="cp-input cp-select" name="sex">
-            <option>Female</option>
-            <option>Male</option>
-            <option>Other</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <div class="cp-form-section">
-      <h3><?php echo xlt('Contact'); ?></h3>
-      <div class="cp-form-grid two">
-        <div class="cp-field">
-          <label><?php echo xlt('Phone'); ?></label>
-          <input class="cp-input" type="text" name="phone_home" value="(512) 555-0142">
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Email'); ?></label>
-          <input class="cp-input" type="email" name="email" value="m.chen@example.com">
-        </div>
-      </div>
-      <div class="cp-form-grid full" style="margin-top: 12px;">
-        <div class="cp-field">
-          <label><?php echo xlt('Address'); ?></label>
-          <input class="cp-input" type="text" name="street" value="847 Main Street, Suite 200, Austin, TX 78701">
-        </div>
-      </div>
-    </div>
-
-    <div class="cp-form-section">
-      <h3><?php echo xlt('Insurance'); ?></h3>
-      <div class="cp-form-grid three">
-        <div class="cp-field">
-          <label><?php echo xlt('Plan'); ?></label>
-          <select class="cp-input cp-select">
-            <option>Blue Cross Blue Shield PPO</option>
-            <option>Aetna HMO</option>
-            <option>Self-pay</option>
-          </select>
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Group #'); ?></label>
-          <input class="cp-input" type="text" value="BCBS-7281">
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Member ID'); ?></label>
-          <input class="cp-input" type="text" value="4QF23-991">
-        </div>
-      </div>
-    </div>
-
-    <div class="cp-form-section">
-      <h3><?php echo xlt('Provider'); ?></h3>
-      <div class="cp-form-grid two">
-        <div class="cp-field">
-          <label><?php echo xlt('Primary provider'); ?></label>
-          <select class="cp-input cp-select">
-            <option>Dr. Eduardo Rivera, MD</option>
-            <option>Dr. Allison Park, DO</option>
-            <option>Dr. James Patel, MD</option>
-          </select>
-        </div>
-        <div class="cp-field">
-          <label><?php echo xlt('Facility'); ?></label>
-          <select class="cp-input cp-select">
-            <option>Riverside Family Medicine</option>
-            <option>Eastside Clinic</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
-    <div class="cp-form-foot">
-      <button type="reset" class="cp-btn secondary"><?php echo xlt('Save as draft'); ?></button>
-      <button type="submit" name="create_patient" value="1" class="cp-btn primary"><?php echo xlt('Create patient'); ?>  →</button>
-    </div>
-  </form>
-
-</main>
-
+<div id="cp-root"
+     data-page="new_patient"
+     data-csrf="<?php echo attr($csrfToken); ?>"
+     data-user-id="<?php echo attr($authUserId); ?>"
+     data-patient-id="<?php echo attr($patientId); ?>"
+     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+<?php if ($jsHref !== null): ?>
+<script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
+<?php else: ?>
+<div class="cp-boot-error">
+  <?php echo xlt('New Patient UI bundle not found. Run "npm run build" in the /frontend directory to generate it.'); ?>
+</div>
+<?php endif; ?>
 </body>
 </html>

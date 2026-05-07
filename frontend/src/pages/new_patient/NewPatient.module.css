@@ -1,0 +1,308 @@
+/*
+ * NewPatient — page-specific styles. Values verified against Figma node 49:2
+ * (Screen 22 — New / Search Patient) on 2026-05-07. Mirrors the values from
+ * the original PHP mock at copilot_new_patient.php; the React port preserves
+ * spacing, colors, and dimensions exactly.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_new_patient.php —
+ * this file owns only NewPatient-component styles.
+ */
+
+/* ── Page header (full width — matches the standing header rule) ── */
+.head {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.bullet {
+  color: #8A91A1;
+  font-size: 14px;
+  line-height: 1;
+}
+.meta {
+  color: #8A91A1;
+  font-size: 12px;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+.help {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #0D1B2A;
+  line-height: 1;
+  cursor: pointer;
+}
+.help:hover { background: #F5F6F7; }
+
+/* ── Layout ── */
+.body {
+  padding: 20px 24px 32px;
+  display: grid;
+  grid-template-columns: 540px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Panel ── */
+.panel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+}
+.findPanel {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.createPanel {
+  padding: 20px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.panelLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+
+/* ── Find existing — search ── */
+.searchWrap {
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  padding: 12px 14px;
+  gap: 8px;
+  width: 100%;
+}
+.searchIcon {
+  color: #8A91A1;
+  font-size: 14px;
+  line-height: 1;
+}
+.searchInput {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: #0D1B2A;
+  line-height: 1;
+  font-family: inherit;
+  padding: 0;
+}
+.searchInput::placeholder { color: #8A91A1; }
+
+/* ── Status tabs ── */
+.tabs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tab {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tab:hover { background: #F5F6F7; }
+.tabActive {
+  background: #E6F4F4;
+  color: #008C8C;
+  border-color: #008C8C;
+  font-weight: 600;
+}
+
+/* ── Recent label and list ── */
+.recentLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+.recList {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.recRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+.recRow:hover { background: #F5F6F7; }
+.recRow:focus-visible { outline: 2px solid #008C8C; outline-offset: -2px; }
+.recRowSelected { background: rgba(0, 140, 140, 0.06); }
+.recRowSelected:hover { background: rgba(0, 140, 140, 0.10); }
+
+.recAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.recInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.recName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.recSub {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.recWhen {
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  flex: 0 0 auto;
+}
+
+/* ── Form sections ── */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+.sectionTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1B2A;
+  margin: 0;
+  line-height: 1;
+}
+.grid {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+}
+.gridTwo   { grid-template-columns: 1fr 1fr; }
+.gridThree { grid-template-columns: 1fr 1fr 1fr; }
+.gridFull  { grid-template-columns: 1fr; }
+.gridGap   { margin-top: 0; }
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4F5763;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.input {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: #0D1B2A;
+  outline: none;
+  font-family: inherit;
+  width: 100%;
+  line-height: 1;
+}
+.input:focus { border-color: #008C8C; }
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8A91A1 50%),
+    linear-gradient(135deg, #8A91A1 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% - 1px),
+    calc(100% - 9px) calc(50% - 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  padding-right: 28px;
+  cursor: pointer;
+}
+
+/* ── Footer CTA ── */
+.foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: auto;
+}
+.btn {
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnSecondary {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border-color: #E4E5E8;
+  font-weight: 500;
+  padding: 8px 16px;
+}
+.btnSecondary:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+.btnPrimary:hover { background: #006F6F; }

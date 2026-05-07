@@ -1,0 +1,321 @@
+/*
+ * Inventory — page-specific styles. Values verified against Figma node 109:2
+ * (Screen 60 — Inventory) on 2026-05-07.
+ *
+ * Layout (top → bottom): 60px page-head, 40px tab bar, 48px filter bar,
+ * then the inventory table (24px side gutter, inside an 8px-radius card).
+ *
+ * Token sources (Figma):
+ *   - Text primary:    #181d26
+ *   - Text secondary:  #4f5763
+ *   - Text muted:      #8a91a1
+ *   - Border:          #e4e5e8
+ *   - Surface:         #ffffff
+ *   - Surface alt:     #fafbfc  (zebra rows)
+ *   - Surface chip:    #f5f6f7
+ *   - Accent (teal):   #008c8c
+ *   - Danger:          #d93838  (controlled-pill bg #fceaea)
+ *   - Warn (orange):   #fa8c33
+ *   - Table header bg: #f9fafb
+ */
+
+/* ── Page head (full width, 60px tall, white, 1px bottom border) ── */
+.pageHead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.titleRow { display: flex; align-items: center; gap: 12px; }
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+  letter-spacing: -0.1px;
+}
+.dot { color: #8A91A1; font-size: 16px; line-height: 1; }
+.meta { font-size: 13px; color: #4F5763; line-height: 1; font-weight: 400; }
+.spacer { flex: 1; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btnGhost:hover { background: #F5F6F7; }
+
+.btnDanger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: #D93838;
+  border: 1px solid #D93838;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btnDanger:hover { background: #BF2C2C; border-color: #BF2C2C; }
+
+.btnHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 12px;
+  background: #F5F6F7;
+  border: none;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.btnHelp:hover { background: #E8E9EC; }
+.btnIcon { font-size: 12px; line-height: 1; }
+
+/* ── Tab bar (full width, 40px, white, 1px bottom border) ── */
+.tabBar {
+  width: 100%;
+  height: 40px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: stretch;
+  padding: 0 24px;
+  gap: 4px;
+}
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.tab:hover { color: #181D26; }
+.tabActive {
+  color: #181D26;
+  font-weight: 600;
+}
+.tabActive::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 3px;
+  background: #008C8C;
+  border-radius: 1.5px;
+}
+
+/* ── Filter bar (full width, 48px, white, 1px bottom border) ── */
+.filterBar {
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 300px;
+  height: 28px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 11px;
+}
+.searchIcon { font-size: 12px; color: #8A91A1; line-height: 1; }
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: #181D26;
+  font-family: inherit;
+  min-width: 0;
+}
+.searchInput::placeholder { color: #8A91A1; }
+
+.select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 28px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 9px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.selectValue {
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1;
+}
+.selectCaret { color: #8A91A1; font-size: 11px; line-height: 1; }
+.selectNative {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+
+/* ── Table wrap (24px side gutter, table inside a card) ── */
+.tableWrap {
+  padding: 17px 24px 24px;
+  background: #F5F6F7;
+}
+.table {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  font-size: 12px;
+  table-layout: auto;
+}
+
+.thead {
+  background: #F9FAFB;
+  height: 40px;
+}
+.thLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+  text-align: left;
+  padding: 0 8px;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+  letter-spacing: 0.4px;
+}
+.thLabel:first-of-type { padding-left: 16px; }
+.thLabel:last-of-type  { padding-right: 16px; }
+
+/* Body rows */
+.tr {
+  height: 44px;
+  background: #FFFFFF;
+}
+.trAlt { background: #FAFBFC; }
+
+.tr td {
+  padding: 0 8px;
+  border-bottom: 1px solid #E4E5E8;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.tr td:first-child { padding-left: 16px; }
+.tr td:last-child  { padding-right: 16px; }
+.tr:last-child td { border-bottom: none; }
+
+/* Drug cell — name on top, form below in muted */
+.drugCell {
+  padding-top: 6px;
+  padding-bottom: 6px;
+  vertical-align: top !important;
+}
+.drugName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.drugForm {
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+.muted { font-size: 11px; color: #4F5763; font-weight: 400; }
+
+/* Schedule pill — orange-ish red on a light pink chip per Figma */
+.schedPill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  background: #FCEAEA;
+  color: #D93838;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+
+/* Exp date tones */
+.expPlain { font-size: 12px; color: #4F5763; font-weight: 400; }
+.expWarn  { font-size: 12px; color: #FA8C33; font-weight: 600; }
+.expPast  { font-size: 12px; color: #D93838; font-weight: 700; }
+
+/* On-hand tones */
+.ohPlain { font-size: 12px; color: #181D26; font-weight: 600; }
+.ohWarn  { font-size: 12px; color: #FA8C33; font-weight: 600; }
+
+/* Kebab action cell */
+.actCell {
+  text-align: right;
+  width: 32px;
+}
+.kebab {
+  color: #8A91A1;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+}
