@@ -6,13 +6,9 @@
 #     unit-test → deploy-{env} → eval-{env} → hold → next env
 #     `railway up --service copilot-agent --path-as-root .` from copilot/agent/
 #
-#   openemr (PHP app) — split deploy strategy, depends on Railway service config:
-#     dev openemr is a Railway "repo-source" service:
-#       unit-test → deploy-openemr-dev (railway up) → smoke → ...
-#     QA + Prod openemr are Railway "image-source" services:
-#       unit-test → publish-openemr-image (build + push GHCR) → ... → hold-qa
-#         → deploy-openemr-qa (railway redeploy → re-pull GHCR :master) → smoke
-#         → ... → hold-prod → deploy-openemr-prod (same redeploy pattern)
+#   openemr (PHP app):
+#     unit-test → deploy-openemr-{env} → smoke-openemr-{env} → hold → next env
+#     `railway up --service openemr` from the repo root
 #
 # Both lanes share unit-test as their pre-deploy gate (same Copilot
 # isolated PHPUnit suite). Each env's hold-{env} approval requires
@@ -32,17 +28,14 @@
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
 #   ANTHROPIC_API_KEY              — for Haiku judge in evals
+#   LANGFUSE_PUBLIC_KEY            — for Langfuse Datasets uploads
+#   LANGFUSE_SECRET_KEY
+#   LANGFUSE_HOST
 #   RAILWAY_TOKEN_DEV              — Railway project token scoped to dev
 #   RAILWAY_TOKEN_QA               — Railway project token scoped to qa
 #   RAILWAY_TOKEN_PROD             — Railway project token scoped to prod
 #   OE_USER_DEPLOY                 — OpenEMR admin username for smoke (default: admin)
 #   OE_PASS_DEPLOY                 — OpenEMR admin password for smoke (default: pass)
-#   GHCR_USERNAME                  — GitHub username (e.g. cxk280) — for openemr image push
-#   GHCR_TOKEN                     — GitHub PAT with write:packages, read:packages
-#
-# Also referenced but intentionally NOT required (legacy):
-#   LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST — see
-#   the run-evals command for why we strip these instead of using them.
 #
 # Token scoping: Railway project tokens can be scoped per-environment via
 # the Railway dashboard. Generate one per env so a Dev compromise can't
@@ -69,10 +62,6 @@ executors:
     docker:
       - image: cimg/base:stable
     resource_class: small
-  docker-builder:
-    docker:
-      - image: cimg/base:stable
-    resource_class: medium
   php:
     docker:
       - image: cimg/php:8.2
@@ -319,55 +308,6 @@ jobs:
           path: /tmp/test-results
           destination: phpunit
 
-  # ─── OpenEMR image publish ─────────────────────────────────────────
-  # Builds the AgentForge openemr image (Dockerfile at repo root) and
-  # publishes it to GHCR so QA and Prod openemr Railway services can
-  # pull from it.
-  #
-  # Why this exists: dev openemr is a Railway "repo-source" service
-  # (Railway clones the repo + builds the Dockerfile on each deploy).
-  # QA and Prod were created as "image-source" services pointing at a
-  # registry — `railway up` against them silently builds local but
-  # never replaces the running image. Publishing to GHCR + pointing the
-  # image-source services there closes the loop without requiring the
-  # services to be recreated.
-  #
-  # Tags pushed:
-  #   :<git-sha-7>   immutable per commit for traceability
-  #   :master        moving tag, what QA/Prod's source image points at
-  #
-  # Limitation (sprint trade-off): both QA and Prod pull :master, so a
-  # second master push between dev-green and a still-pending hold-qa
-  # approval would let QA pick up the newer image. Acceptable for the
-  # sprint window; the proper fix is per-env tag promotion (retag
-  # :<sha> as :qa after hold-qa, then redeploy QA against :qa).
-  #
-  # Required CircleCI env vars (one-time setup):
-  #   GHCR_USERNAME — GitHub username (e.g. cxk280)
-  #   GHCR_TOKEN    — PAT with write:packages, read:packages
-  publish-openemr-image:
-    executor: docker-builder
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run:
-          name: Build & push openemr image to GHCR
-          no_output_timeout: 30m
-          command: |
-            if [ -z "$GHCR_TOKEN" ] || [ -z "$GHCR_USERNAME" ]; then
-              echo "✗ GHCR_USERNAME and GHCR_TOKEN must be set as CircleCI project envs."
-              echo "  Create a GitHub PAT with write:packages + read:packages,"
-              echo "  then add both as project env vars."
-              exit 1
-            fi
-            SHA="${CIRCLE_SHA1:0:7}"
-            IMAGE_BASE="ghcr.io/cxk280/agentforge-openemr"
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-            docker build -t "$IMAGE_BASE:$SHA" -t "$IMAGE_BASE:master" .
-            docker push "$IMAGE_BASE:$SHA"
-            docker push "$IMAGE_BASE:master"
-            echo "✓ Published $IMAGE_BASE:$SHA and :master"
-
   eval-smoke-dev:
     executor: python
     steps:
@@ -478,20 +418,16 @@ jobs:
           base_url: "https://openemr-dev-59c5.up.railway.app"
 
   deploy-openemr-qa:
-    # QA openemr is a Railway "image-source" service pointing at
-    # ghcr.io/cxk280/agentforge-openemr:master. The publish-openemr-image
-    # job (gated upstream by hold-qa's requires) pushed a fresh :master
-    # for this commit, so a redeploy here re-pulls and restarts the
-    # service against the new image. No `railway up` needed (and it
-    # would silently no-op against an image-source service anyway).
     executor: railway
     steps:
+      - checkout
       - install-railway-cli
-      - run:
-          name: Trigger Railway redeploy of openemr (image-source pull)
-          command: |
-            export RAILWAY_TOKEN="${RAILWAY_TOKEN_QA}"
-            railway redeploy --service openemr --yes
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_QA
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: openemr-qa
 
   smoke-openemr-qa:
     executor: railway
@@ -501,16 +437,16 @@ jobs:
           base_url: "https://openemr-qa.up.railway.app"
 
   deploy-openemr-prod:
-    # Prod openemr — same image-source treatment as QA. See the comment
-    # block on deploy-openemr-qa for the rationale.
     executor: railway
     steps:
+      - checkout
       - install-railway-cli
-      - run:
-          name: Trigger Railway redeploy of openemr (image-source pull)
-          command: |
-            export RAILWAY_TOKEN="${RAILWAY_TOKEN_PROD}"
-            railway redeploy --service openemr --yes
+      - railway-deploy:
+          service: openemr
+          env_token: RAILWAY_TOKEN_PROD
+      - store_artifacts:
+          path: /tmp/deploy-logs
+          destination: openemr-prod
 
   smoke-openemr-prod:
     executor: railway
@@ -527,16 +463,6 @@ workflows:
       # Run the isolated PHPUnit Copilot suite once per push; both
       # the agent lane and the openemr lane require it.
       - unit-test
-
-      # ── OpenEMR image publish ──────────────────────────────────
-      # Builds + pushes the openemr image to GHCR so QA/Prod's
-      # image-source services have something fresh to pull. Runs
-      # in parallel with the dev deploys; gated only by unit-test.
-      - publish-openemr-image:
-          requires: [unit-test]
-          filters:
-            branches:
-              only: master
 
       # ── Agent lane: dev ────────────────────────────────────────
       - deploy-dev:
@@ -557,11 +483,9 @@ workflows:
           requires: [deploy-openemr-dev]
 
       # ── QA gate: BOTH lanes' dev-side checks must pass ─────────
-      # Also requires publish-openemr-image so QA's redeploy has a
-      # fresh image to pull when approval lands.
       - hold-qa:
           type: approval
-          requires: [eval-smoke-dev, smoke-openemr-dev, publish-openemr-image]
+          requires: [eval-smoke-dev, smoke-openemr-dev]
 
       # ── Agent lane: qa ─────────────────────────────────────────
       - deploy-qa:
