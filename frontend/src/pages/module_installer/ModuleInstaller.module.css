@@ -1,0 +1,434 @@
+/*
+ * ModuleInstaller — page-specific styles. Values verified against Figma node
+ * 106:2 (Screen 57 — Module Installer) on 2026-05-07. Mirrors the PHP mock
+ * at copilot_module_installer.php.bak; widths converted from Figma's
+ * fixed-pixel 1240px main column to fluid grid columns so the page fills
+ * the iframe at any width.
+ *
+ * Global scaffolding (html/body resets, Inter font, body bg, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_module_installer.php — this file owns
+ * only ModuleInstaller-component styles.
+ */
+
+/* ── Two-column layout: left admin rail + main column ─────────────────── */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* Admin sidebar (left rail) */
+.sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 12px 0 24px;
+  overflow-y: auto;
+}
+.sidebarHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  padding: 4px 16px 8px;
+}
+.group {
+  margin-top: 4px;
+}
+.groupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  padding: 8px 16px 4px;
+  line-height: 1.2;
+}
+.navItem {
+  display: block;
+  margin: 0 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+.navItem:hover {
+  background: #F5F6F7;
+  color: #0D1B2A;
+}
+.navItemActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+
+/* Main column */
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Page head */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+  flex: 0 0 60px;
+}
+.pageheadTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.pageheadDot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.pageheadMeta {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.pageheadSpacer {
+  flex: 1;
+}
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnGhost:hover {
+  background: #F5F6F7;
+}
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover {
+  background: #006F6F;
+}
+.btnArrow {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* ── Tab bar ───────────────────────────────────────────────────────────── */
+.tabbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  flex: 0 0 40px;
+}
+.tab {
+  position: relative;
+  background: transparent;
+  border: none;
+  padding: 0 12px;
+  height: 32px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tab:hover {
+  color: #181D26;
+}
+.tabActive {
+  color: #181D26;
+  font-weight: 600;
+}
+.tabActive::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -5px;
+  height: 3px;
+  background: #008C8C;
+  border-radius: 1.5px;
+}
+
+/* ── Filter bar (search + pills) ───────────────────────────────────────── */
+.filterbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 48px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  flex: 0 0 48px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+.search {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  height: 28px;
+  padding: 0 11px;
+  width: 300px;
+  flex: 0 0 300px;
+}
+.searchIcon {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  color: #181D26;
+  font-family: inherit;
+  min-width: 0;
+}
+.searchInput::placeholder {
+  color: #8A91A1;
+}
+.pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 11px;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+.pill:hover {
+  background: #F5F6F7;
+}
+.pillActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  border-color: #008C8C;
+}
+.pillActive:hover {
+  background: #E6F5F5;
+}
+.pillCt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 18px;
+  min-width: 18px;
+  padding: 0 5px;
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.pillCtActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+
+/* ── Body / card grid ──────────────────────────────────────────────────── */
+.body {
+  flex: 1 1 auto;
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+  background: #F5F6F7;
+}
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+/* ── Module card ───────────────────────────────────────────────────────── */
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 156px;
+}
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cardIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  line-height: 1;
+  flex: 0 0 32px;
+  color: #181D26;
+}
+.cardMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cardName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.cardSub {
+  font-size: 11px;
+  font-weight: 400;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.cardDesc {
+  font-size: 11px;
+  font-weight: 400;
+  color: #4F5763;
+  line-height: 1.4;
+  flex: 1;
+}
+.cardFoot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.statusPills {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.statusActive {
+  background: #E8F7ED;
+  color: #33A666;
+}
+.statusUpdate {
+  background: #EAF1FC;
+  color: #4785D9;
+}
+.statusDisabled {
+  background: #F5F6F7;
+  color: #8A91A1;
+}
+.cardSpacer {
+  flex: 1;
+}
+.settingsBtn {
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  padding: 0 9px;
+  height: 28px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.settingsBtn:hover {
+  background: #F5F6F7;
+}
+
+/* Toggle pill switch */
+.toggle {
+  width: 38px;
+  height: 22px;
+  background: #008C8C;
+  border-radius: 999px;
+  position: relative;
+  flex: 0 0 auto;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+}
+.toggleOff {
+  background: #C7CBD2;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 18px;
+  width: 18px;
+  height: 18px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  transition: left 120ms ease;
+}
+.toggleOff::after {
+  left: 2px;
+}

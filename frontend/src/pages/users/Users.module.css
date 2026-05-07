@@ -1,0 +1,425 @@
+/*
+ * Users & Groups — page-specific styles. Values verified against Figma
+ * node 101:2 (Screen 52 — Users & Groups) on 2026-05-07. Mirrors the
+ * PHP mock at copilot_users.php.bak; widths converted from Figma's
+ * fixed pixel layout (200px sidebar, 60px page head) to a fluid layout
+ * that fills the iframe at any width.
+ *
+ * Global scaffolding (html/body resets, Inter font, body bg, #cp-root
+ * sizing) lives in the PHP wrapper at copilot_users.php — this file
+ * owns only Users-component styles.
+ */
+
+/* ── Two-column shell ─────────────────────────────────────────────── */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── Left sidebar ─────────────────────────────────────────────────── */
+.sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 16px 0 24px;
+  overflow-y: auto;
+}
+.sideHeader {
+  font-size: 10px;
+  font-weight: 700;
+  color: #8A91A1;
+  letter-spacing: 0.7px;
+  padding: 6px 20px 10px;
+}
+.sideGroup { margin-bottom: 12px; }
+.sideGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4F5763;
+  padding: 8px 20px 4px;
+  line-height: 1.2;
+}
+.sideItem {
+  display: block;
+  padding: 7px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.3;
+  position: relative;
+}
+.sideItem:hover {
+  background: #F5F6F7;
+  color: #0D1B2A;
+}
+.sideItemActive {
+  color: #008C8C;
+  font-weight: 600;
+  background: rgba(0, 140, 140, 0.08);
+}
+.sideItemActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #008C8C;
+}
+.sideItemActive:hover {
+  background: rgba(0, 140, 140, 0.08);
+  color: #008C8C;
+}
+
+/* ── Main column ──────────────────────────────────────────────────── */
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Page head ────────────────────────────────────────────────────── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pageheadTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.pageheadDot {
+  font-size: 14px;
+  color: #8A91A1;
+  line-height: 1;
+  padding: 0 2px;
+}
+.pageheadMeta {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.pageheadSpacer { flex: 1; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnGhostIcon {
+  color: #8A91A1;
+  font-size: 12px;
+}
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 16px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+/* ── Tab strip ────────────────────────────────────────────────────── */
+.tabs {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  display: flex;
+  gap: 24px;
+  flex: 0 0 auto;
+}
+.tab {
+  display: inline-block;
+  padding: 12px 0 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  line-height: 1.2;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tab:hover { color: #0D1B2A; }
+.tabActive {
+  color: #008C8C;
+  font-weight: 600;
+  border-bottom-color: #008C8C;
+}
+.tabActive:hover { color: #008C8C; }
+
+/* ── Content area ─────────────────────────────────────────────────── */
+.content {
+  flex: 1 1 auto;
+  padding: 16px 24px 24px;
+  overflow: auto;
+}
+
+/* ── Filter row ───────────────────────────────────────────────────── */
+.filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.search {
+  flex: 1 1 360px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 34px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.searchIcon {
+  color: #8A91A1;
+  font-size: 12px;
+}
+.search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  font-size: 12px;
+  color: #0D1B2A;
+  font-family: inherit;
+}
+.search input::placeholder { color: #8A91A1; }
+.dd {
+  flex: 0 0 130px;
+  height: 34px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 0 28px 0 12px;
+  font-size: 12px;
+  color: #0D1B2A;
+  line-height: 32px;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  background-image:
+    linear-gradient(45deg,  transparent 50%, #8A91A1 50%),
+    linear-gradient(135deg, #8A91A1 50%,    transparent 50%);
+  background-position:
+    calc(100% - 14px) calc(50% - 1px),
+    calc(100% - 9px)  calc(50% - 1px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+.reset {
+  font-size: 11px;
+  color: #4F5763;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 0 4px;
+  font-family: inherit;
+}
+.reset:hover { color: #0D1B2A; }
+
+/* ── User table ───────────────────────────────────────────────────── */
+.tblWrap {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tbl thead tr {
+  background: #F9FAFB;
+}
+.tbl th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+}
+.thLeft { text-align: left; }
+.thChk {
+  width: 28px;
+  padding-left: 18px;
+  padding-right: 0;
+}
+.tbl td {
+  padding: 11px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #E4E5E8;
+  font-size: 12px;
+  color: #181D26;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+.tdChk {
+  width: 28px;
+  padding-left: 18px;
+  padding-right: 0;
+}
+.tdChk input,
+.thChk input {
+  width: 14px;
+  height: 14px;
+  accent-color: #008C8C;
+  margin: 0;
+  vertical-align: middle;
+}
+.muted { color: #4F5763; }
+
+.userCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.userName {
+  font-weight: 600;
+  color: #0D1B2A;
+  font-size: 12px;
+}
+.avatar {
+  background: #C7CBD2;
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 600;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mfaOn {
+  color: #1F8C4D;
+  font-weight: 700;
+  font-size: 14px;
+}
+.mfaOff {
+  color: #8A91A1;
+  font-weight: 400;
+}
+.mfaWarn {
+  color: #FA8C33;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.miniPill {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  line-height: 1.4;
+  margin-left: 6px;
+}
+.miniPillSvc {
+  background: #F0EBFA;
+  color: #8561C7;
+}
+.miniPillInactive {
+  background: #F5F6F7;
+  color: #8A91A1;
+}
+
+.lastLoginRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────── */
+.empty {
+  background: #FFFFFF;
+  border: 1px dashed #E4E5E8;
+  border-radius: 8px;
+  padding: 32px 24px;
+  text-align: center;
+  color: #4F5763;
+  font-size: 13px;
+}
+.emptyLbl {
+  color: #8A91A1;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+/* ── New-group inline form (Groups tab) ───────────────────────────── */
+.newGrp {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.newGrp input[type="text"] {
+  flex: 1;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #0D1B2A;
+  outline: none;
+  font-family: inherit;
+}
+.newGrp input[type="text"]:focus { border-color: #008C8C; }
+
+/* ── "View members" link button (Groups tab) ──────────────────────── */
+.linkBtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #008C8C;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+.linkBtn:hover { text-decoration: underline; }

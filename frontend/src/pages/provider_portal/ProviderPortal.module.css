@@ -1,0 +1,369 @@
+/*
+ * ProviderPortal — page-specific styles. Values verified against Figma node
+ * 100:2 (Screen 51 — Portal Dashboard) on 2026-05-07. Static demo data, no DB.
+ *
+ * Global scaffolding (html/body resets, body bg, Inter font, #cp-root sizing)
+ * lives in the PHP wrapper. This file owns only ProviderPortal styles.
+ *
+ * The navy top nav from the Figma is intentionally skipped (rendered by the
+ * outer PHP shell elsewhere).
+ */
+
+/* ── Page header ── */
+.pageHead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.bullet {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.meta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  color: #4F5763;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.btn:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border-color: #008C8C;
+  font-weight: 600;
+  padding: 0 16px;
+}
+.btnPrimary:hover { background: #006F6F; border-color: #006F6F; }
+.helpPill {
+  background: #F5F6F7;
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 12px;
+  height: 24px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  border: none;
+  cursor: not-allowed;
+  opacity: 0.85;
+  font-family: inherit;
+  line-height: 1;
+}
+
+/* ── Body container ── */
+.body {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip ── */
+.kpi {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  height: 72px;
+}
+.kpiCell {
+  padding: 11px 23px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.kpiCell + .kpiCell::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: #E4E5E8;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.kpiRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.kpiSub {
+  font-size: 11px;
+  color: #4F5763;
+  font-weight: 400;
+  line-height: 1;
+}
+
+/* ── Two columns ── */
+.cols {
+  display: grid;
+  grid-template-columns: 724fr 648fr;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── Generic panel ── */
+.panel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.panelHead {
+  padding: 14px 20px 12px;
+  display: flex;
+  align-items: center;
+}
+.panelHeadStacked {
+  flex-direction: column;
+  align-items: flex-start;
+  padding-bottom: 6px;
+}
+.panelLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  flex: 1;
+  line-height: 1;
+}
+.panelSub {
+  font-size: 11px;
+  color: #8A91A1;
+  font-weight: 400;
+  margin-top: 4px;
+  line-height: 1;
+}
+
+/* ── Activity feed scope toggle (All / Mine) ── */
+.toggle {
+  background: #F5F6F7;
+  border-radius: 12px;
+  height: 24px;
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+.toggleItem {
+  height: 20px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.toggleItemActive {
+  background: #FFFFFF;
+  border-color: #E4E5E8;
+  color: #181D26;
+}
+
+/* ── Activity feed ── */
+.feed {
+  border-top: 1px solid #E4E5E8;
+}
+.feedItem {
+  display: grid;
+  grid-template-columns: 32px 1fr 80px;
+  gap: 0;
+  padding: 11px 20px;
+  border-top: 1px solid #E4E5E8;
+  align-items: center;
+}
+.feedItem:first-child { border-top: none; }
+.feedIcon {
+  font-size: 16px;
+  line-height: 1;
+}
+.feedBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.feedTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.feedDesc {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.feedRight {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-end;
+}
+.feedWhen {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.feedView {
+  font-size: 11px;
+  font-weight: 600;
+  color: #008C8C;
+  line-height: 1.2;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Pending tasks ── */
+.tasks {
+  padding: 0 15px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.task {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 16px 12px 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 60px;
+}
+.taskIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #F5F6F7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex: 0 0 28px;
+}
+.taskInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.taskTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.taskDesc {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.taskOpen {
+  font-size: 12px;
+  font-weight: 600;
+  color: #008C8C;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* ── Adoption ── */
+.adopt {
+  padding: 0 19px 19px;
+}
+.adoptRow {
+  margin-top: 14px;
+}
+.adoptRow:first-child {
+  margin-top: 8px;
+}
+.adoptTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.adoptLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1;
+}
+.adoptPct {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+}
+.adoptBar {
+  height: 8px;
+  background: #F5F6F7;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.adoptFill {
+  height: 100%;
+  border-radius: 4px;
+}
