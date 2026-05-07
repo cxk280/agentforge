@@ -154,7 +154,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -192,7 +192,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
 
   .cp-msg-filter {
     display: inline-flex;
-    background: #F5F7F8;
+    background: #F5F6F7;
     border-radius: 999px;
     padding: 4px;
   }
@@ -200,7 +200,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     padding: 4px 14px;
     border-radius: 999px;
     font-size: 12px; font-weight: 500;
-    color: #4F5662;
+    color: #4F5763;
     line-height: 1.2;
     background: transparent;
     border: none;
@@ -251,7 +251,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     cursor: pointer;
   }
   .cp-msg-item.selected {
-    background: #F2F8F8;
+    background: #F2F9F9;
   }
   .cp-msg-item.selected::before {
     content: '';
@@ -278,7 +278,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
   .cp-msg-sender.unread { font-weight: 600; }
   .cp-msg-time {
     margin-left: auto;
-    font-size: 11px; color: #8A91A0;
+    font-size: 11px; color: #8A91A1;
     flex: 0 0 auto;
   }
   .cp-msg-subject {
@@ -297,7 +297,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     gap: 8px;
   }
   .cp-msg-preview-text {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
     line-height: 1.3;
     white-space: nowrap;
     overflow: hidden;
@@ -343,7 +343,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     flex: 0 0 auto;
   }
   .cp-msg-from-name { font-size: 13px; font-weight: 500; color: #0D1B2A; line-height: 1.2; }
-  .cp-msg-from-meta { font-size: 11px; color: #8A91A0; margin-top: 1px; line-height: 1.2; }
+  .cp-msg-from-meta { font-size: 11px; color: #8A91A1; margin-top: 1px; line-height: 1.2; }
 
   .cp-msg-detail-body {
     flex: 1 1 auto;
@@ -360,7 +360,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     white-space: pre-line;
   }
   .cp-msg-finding {
-    background: #F5F7F8;
+    background: #F5F6F7;
     border-radius: 8px;
     padding: 10px 14px;
     display: inline-flex;
@@ -375,7 +375,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     line-height: 1.3;
   }
   .cp-msg-finding-detail {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
     line-height: 1.3;
     margin-top: 1px;
   }
@@ -407,7 +407,7 @@ $filterTabs = ['All' => true, 'Inbox' => false, 'Sent' => false, 'Recalls' => fa
     font-weight: 600;
   }
   .cp-msg-btn--primary:hover { background: #006F6F; border-color: #006F6F; }
-  .cp-msg-btn--muted { color: #4F5662; }
+  .cp-msg-btn--muted { color: #4F5763; }
   .cp-msg-actions-spacer { flex: 1; }
   .cp-msg-link-chart {
     font-size: 12px; font-weight: 500; color: #008C8C;

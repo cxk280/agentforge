@@ -465,7 +465,7 @@ foreach ($output_types as $ot) {
     background: transparent; border: 0; width: 100%;
     text-align: left;
   }
-  .pp-cat:hover { background: #F5F7F8; }
+  .pp-cat:hover { background: #F5F6F7; }
   .pp-cat .ic { font-size: 14px; line-height: 1; flex: 0 0 16px; text-align: center; }
   .pp-cat.active { background: #E6F5F5; color: #008C8C; font-weight: 600; }
 

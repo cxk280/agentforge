@@ -85,7 +85,7 @@ $sections = [
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -108,10 +108,10 @@ $sections = [
   .cp-rep-spacer { flex: 1; }
   .cp-rep-search {
     display: inline-flex; align-items: center; gap: 8px;
-    background: #F5F7F8;
+    background: #F5F6F7;
     border-radius: 999px;
     padding: 8px 16px;
-    font-size: 13px; color: #8A91A0;
+    font-size: 13px; color: #8A91A1;
     border: none;
     cursor: pointer;
     line-height: 1;
@@ -137,7 +137,7 @@ $sections = [
   }
   .cp-rep-sec-label {
     font-size: 11px; font-weight: 600;
-    color: #8A91A0;
+    color: #8A91A1;
     letter-spacing: 0.6px;
   }
 
@@ -184,7 +184,7 @@ $sections = [
     line-height: 1.2;
   }
   .cp-rep-card-desc {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
     line-height: 1.5;
     margin: 0;
   }

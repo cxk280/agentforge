@@ -73,7 +73,7 @@ $activity = [
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -102,8 +102,8 @@ $activity = [
     font-size: 13px;
     line-height: 1;
   }
-  .cp-adm-bcrumb-sep { color: #8A91A0; }
-  .cp-adm-bcrumb-mid { color: #4F5662; }
+  .cp-adm-bcrumb-sep { color: #8A91A1; }
+  .cp-adm-bcrumb-mid { color: #4F5763; }
   .cp-adm-bcrumb-end { color: #0D1B2A; font-weight: 500; }
 
   /* ── Two-column layout ───────────────────────────────────────────────── */
@@ -130,14 +130,14 @@ $activity = [
     padding: 0 24px;
     line-height: 40px;
     font-size: 13px; font-weight: 500;
-    color: #4F5662;
+    color: #4F5763;
     text-decoration: none;
     background: transparent;
     border: 0;
     text-align: left;
     cursor: pointer;
   }
-  .cp-adm-cat:hover { background: #F5F7F8; color: #0D1B2A; }
+  .cp-adm-cat:hover { background: #F5F6F7; color: #0D1B2A; }
   .cp-adm-cat.active {
     background: rgba(0, 140, 140, 0.08);
     color: #008C8C;
@@ -178,7 +178,7 @@ $activity = [
   }
   .cp-adm-stat-label {
     font-size: 11px; font-weight: 500;
-    color: #8A91A0;
+    color: #8A91A1;
     letter-spacing: 0.5px;
     text-transform: uppercase;
     line-height: 1.2;
@@ -190,7 +190,7 @@ $activity = [
   }
   .cp-adm-stat-sub {
     display: inline-flex; align-items: center; gap: 6px;
-    font-size: 11px; color: #8A91A0;
+    font-size: 11px; color: #8A91A1;
     line-height: 1.2;
   }
   .cp-adm-stat-dot {
@@ -233,7 +233,7 @@ $activity = [
     cursor: pointer;
   }
   .cp-adm-action:last-child { border-bottom: 0; }
-  .cp-adm-action:hover { background: #F5F7F8; }
+  .cp-adm-action:hover { background: #F5F6F7; }
   .cp-adm-action-icon {
     width: 36px; height: 36px;
     border-radius: 8px;
@@ -245,7 +245,7 @@ $activity = [
   .cp-adm-action-text { flex: 1 1 auto; min-width: 0; }
   .cp-adm-action-title { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
   .cp-adm-action-desc {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
     line-height: 1.3;
     margin-top: 2px;
   }
@@ -283,16 +283,16 @@ $activity = [
     padding: 0 22px;
   }
   .cp-adm-activity-time {
-    font-size: 11px; font-weight: 500; color: #8A91A0;
+    font-size: 11px; font-weight: 500; color: #8A91A1;
     line-height: 1.2;
     flex: 0 0 70px;
   }
   .cp-adm-activity-tag {
-    background: #F5F7F8;
+    background: #F5F6F7;
     border-radius: 4px;
     padding: 2px 8px;
     font-size: 10px; font-weight: 500;
-    color: #4F5662;
+    color: #4F5763;
     letter-spacing: 0.4px;
     line-height: 1.2;
     flex: 0 0 auto;

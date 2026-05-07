@@ -1,0 +1,50 @@
+/*
+ * AgentForge / Clinical Co-Pilot — design tokens.
+ *
+ * CSS custom properties exposing the Figma design tokens used by both the
+ * existing PHP mocks and the React tree under /frontend. Tokens verified
+ * against the Figma file kj4MWNr8mpjZ2wVg1PbS0F (Clinical Co-Pilot — UI
+ * Mockups) on 2026-05-07.
+ *
+ * Loaded by /interface/main/calendar/copilot_calendar.php and any future
+ * Reactified page wrapper. Existing PHP mocks may also reference these
+ * variables when they are next touched — for now they continue to use
+ * inline literals.
+ */
+
+:root {
+  /* Brand */
+  --cp-teal:        #008C8C;
+  --cp-teal-hover:  #006F6F;
+  --cp-teal-soft:   #5FD0D0;
+  --cp-teal-tint:   #F2F9F9;   /* rgba(0,140,140,0.05) flattened over white */
+  --cp-navy:        #0D1B2A;
+  --cp-nav-active:  #5FD0D0;
+  --cp-nav-text:    #B2C7DB;
+
+  /* Neutrals */
+  --cp-bg:          #F5F6F7;
+  --cp-card:        #FFFFFF;
+  --cp-border:      #E4E5E8;
+  --cp-muted:       #4F5763;
+  --cp-label:       #8A91A1;
+
+  /* Status */
+  --cp-urgent:      #D93838;
+  --cp-warn:        #FA8C33;
+
+  /* Type scale */
+  --cp-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --cp-fs-xs: 10px;
+  --cp-fs-sm: 11px;
+  --cp-fs-md: 12px;
+  --cp-fs-lg: 13px;
+  --cp-fs-xl: 16px;
+  --cp-fs-2xl: 18px;
+
+  /* Radii */
+  --cp-radius-sm: 6px;
+  --cp-radius-md: 8px;
+  --cp-radius-lg: 12px;
+  --cp-radius-pill: 999px;
+}

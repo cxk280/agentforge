@@ -149,7 +149,7 @@ $sections = [
     background: transparent; border: 0;
     text-align: left;
   }
-  .cp-adm-cat:hover { background: #F5F7F8; color: #0D1B2A; }
+  .cp-adm-cat:hover { background: #F5F6F7; color: #0D1B2A; }
   .cp-adm-cat.active {
     background: rgba(0, 140, 140, 0.08);
     color: #008C8C;

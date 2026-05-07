@@ -341,7 +341,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
   html, body { margin: 0; padding: 0; height: 100%; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -366,14 +366,14 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
 
   .cp-pf-search {
     display: inline-flex; align-items: center; gap: 10px;
-    background: #F5F7F8;
+    background: #F5F6F7;
     border: 1px solid #E4E5E8;
     border-radius: 999px;
     padding: 8px 18px;
     height: 40px;
     min-width: 200px;
   }
-  .cp-pf-search-icon { font-size: 14px; color: #8A91A0; line-height: 1; }
+  .cp-pf-search-icon { font-size: 14px; color: #8A91A1; line-height: 1; }
   .cp-pf-search-input {
     flex: 1;
     border: 0;
@@ -412,18 +412,18 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
     gap: 8px;
   }
   .cp-pf-filter-label {
-    font-size: 12px; font-weight: 500; color: #8A91A0;
+    font-size: 12px; font-weight: 500; color: #8A91A1;
     margin-right: 4px;
     line-height: 1;
   }
   .cp-pf-chip {
     display: inline-flex; align-items: center; gap: 6px;
-    background: #F5F7F8;
+    background: #F5F6F7;
     border: 1px solid #E4E5E8;
     border-radius: 999px;
     padding: 5px 12px;
     font-size: 12px; font-weight: 500;
-    color: #4F5662;
+    color: #4F5763;
     cursor: pointer;
     line-height: 1.2;
   }
@@ -441,7 +441,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
   }
   .cp-pf-results-count {
     margin-left: auto;
-    font-size: 12px; font-weight: 500; color: #8A91A0;
+    font-size: 12px; font-weight: 500; color: #8A91A1;
     line-height: 1;
   }
 
@@ -461,13 +461,13 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
     grid-template-columns:
       280px 120px 180px 180px 200px 140px 1fr;
     height: 44px;
-    background: #F5F7F8;
+    background: #F5F6F7;
     align-items: center;
     padding: 0 18px;
   }
   .cp-pf-th {
     font-size: 11px; font-weight: 600;
-    color: #8A91A0;
+    color: #8A91A1;
     letter-spacing: 0.5px;
     line-height: 1;
   }
@@ -500,7 +500,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
   }
   .cp-pf-name { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
 
-  .cp-pf-mrn   { font-size: 12px; font-weight: 500; color: #4F5662; }
+  .cp-pf-mrn   { font-size: 12px; font-weight: 500; color: #4F5763; }
   .cp-pf-dob   { font-size: 12px; color: #0D1B2A; }
   .cp-pf-prov  { font-size: 12px; color: #0D1B2A; }
   .cp-pf-ins   { font-size: 12px; color: #0D1B2A; }
@@ -522,7 +522,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
   .cp-pf-empty {
     padding: 48px 24px;
     text-align: center;
-    color: #8A91A0;
+    color: #8A91A1;
     font-size: 13px;
   }
   .cp-pf-pager {
@@ -530,7 +530,7 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
     gap: 8px;
     padding: 12px 24px 24px;
     font-size: 12px;
-    color: #4F5662;
+    color: #4F5763;
   }
   .cp-pf-pager a, .cp-pf-pager span.disabled {
     display: inline-flex; align-items: center;
@@ -538,12 +538,12 @@ $next_url = $page < $last_page ? cp_filter_url(['page' => $page + 1]) : null;
     border-radius: 999px;
     padding: 5px 12px;
     background: #FFFFFF;
-    color: #4F5662;
+    color: #4F5763;
     font-weight: 500;
   }
   .cp-pf-pager span.disabled { color: #C0C5CC; cursor: not-allowed; }
-  .cp-pf-pager a:hover { background: #F5F7F8; }
-  .cp-pf-pager .cp-pf-pager-status { margin-right: 8px; color: #8A91A0; }
+  .cp-pf-pager a:hover { background: #F5F6F7; }
+  .cp-pf-pager .cp-pf-pager-status { margin-right: 8px; color: #8A91A1; }
 </style>
 </head>
 <body>

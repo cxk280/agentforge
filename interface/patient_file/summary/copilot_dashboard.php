@@ -197,7 +197,7 @@ if (!$visits) {
   html, body { margin: 0; padding: 0; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -237,7 +237,7 @@ if (!$visits) {
   .cp-vital { padding: 16px 18px; }
   .cp-vital .lbl {
     font-size: 11px; font-weight: 600;
-    color: #8A91A0; letter-spacing: 0.6px;
+    color: #8A91A1; letter-spacing: 0.6px;
     text-transform: uppercase;
     margin-bottom: 8px;
   }
@@ -249,7 +249,7 @@ if (!$visits) {
     line-height: 1.1;
   }
   .cp-vital .unit {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
   }
   .cp-vital .trend {
     margin-top: 8px;
@@ -288,7 +288,7 @@ if (!$visits) {
   .cp-list-item .ico.note  { color: #008C8C; }
   .cp-list-item .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .cp-list-item .name { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
-  .cp-list-item .sub  { font-size: 12px; color: #8A91A0; line-height: 1.3; }
+  .cp-list-item .sub  { font-size: 12px; color: #8A91A1; line-height: 1.3; }
 
   /* ── Two-up panels (Labs / Visits) ───────────────────────────────────── */
   .cp-two-up {
@@ -306,7 +306,7 @@ if (!$visits) {
   .cp-lab-table thead th {
     text-align: left;
     font-size: 11px; font-weight: 600;
-    color: #8A91A0;
+    color: #8A91A1;
     letter-spacing: 0.5px;
     text-transform: uppercase;
     padding: 8px 12px;
@@ -335,7 +335,7 @@ if (!$visits) {
   .cp-lab-table .val-cell.normal .dot { background: #26A65B; }
   .cp-lab-table .val-cell.high   .dot { background: #FA8C33; }
   .cp-lab-table .val-cell.high          { color: #FA8C33; }
-  .cp-lab-table .range, .cp-lab-table .date { color: #8A91A0; font-size: 12px; }
+  .cp-lab-table .range, .cp-lab-table .date { color: #8A91A1; font-size: 12px; }
 
   /* ── Visit list ──────────────────────────────────────────────────────── */
   .cp-visit-list { display: flex; flex-direction: column; }
@@ -351,7 +351,7 @@ if (!$visits) {
   }
   .cp-visit .body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .cp-visit .title { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
-  .cp-visit .sub   { font-size: 12px; color: #8A91A0; line-height: 1.3; }
+  .cp-visit .sub   { font-size: 12px; color: #8A91A1; line-height: 1.3; }
 </style>
 </head>
 <body>

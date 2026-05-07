@@ -88,7 +88,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
   html, body { margin: 0; padding: 0; }
   body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    background: #F5F7F8;
+    background: #F5F6F7;
     color: #0D1B2A;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -99,10 +99,10 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
   .cp-hist-head {
     padding: 20px 24px 14px;
     display: flex; align-items: center; gap: 12px;
-    background: #F5F7F8;
+    background: #F5F6F7;
   }
   .cp-hist-title { font-size: 18px; font-weight: 700; color: #0D1B2A; line-height: 1; }
-  .cp-hist-meta  { font-size: 12px; color: #8A91A0; line-height: 1; }
+  .cp-hist-meta  { font-size: 12px; color: #8A91A1; line-height: 1; }
   .cp-hist-meta::before {
     content: ''; display: inline-block;
     width: 4px; height: 4px; border-radius: 50%;
@@ -117,7 +117,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
     border-radius: 999px;
     border: 1px solid #E4E5E8;
     background: #FFFFFF;
-    color: #4F5662;
+    color: #4F5763;
     font-size: 12px;
     font-weight: 500;
     line-height: 1;
@@ -175,7 +175,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
     line-height: 1.1;
   }
   .cp-rail .day {
-    font-size: 12px; color: #8A91A0;
+    font-size: 12px; color: #8A91A1;
   }
   .cp-rail .pip {
     margin-top: 6px;
@@ -187,7 +187,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
     padding: 4px 10px;
     border-radius: 999px;
     background: #ECEEF0;
-    color: #4F5662;
+    color: #4F5763;
     font-size: 11px; font-weight: 500;
     line-height: 1;
   }
@@ -202,7 +202,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
   .cp-body { flex: 1; min-width: 0; padding-right: 90px; display: flex; flex-direction: column; gap: 8px; }
   .cp-body .meta-row {
     display: flex; align-items: center; gap: 12px;
-    font-size: 12px; color: #4F5662;
+    font-size: 12px; color: #4F5763;
     line-height: 1;
   }
   .cp-body .meta-row .sep::before {
@@ -223,7 +223,7 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
     line-height: 1.3;
   }
   .cp-body .v-desc {
-    font-size: 13px; color: #4F5662;
+    font-size: 13px; color: #4F5763;
     line-height: 1.5;
     margin: 0;
   }
@@ -232,9 +232,9 @@ foreach ($visits as $v) { $by_year[$v['year']][] = $v; }
     height: 22px;
     padding: 0 10px;
     border-radius: 999px;
-    background: #F5F7F8;
+    background: #F5F6F7;
     border: 1px solid #E4E5E8;
-    color: #4F5662;
+    color: #4F5763;
     font-size: 11px; font-weight: 500;
     line-height: 1;
     display: inline-flex; align-items: center;
