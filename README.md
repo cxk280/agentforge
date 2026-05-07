@@ -179,7 +179,7 @@ gates every PR.
 |---|---|
 | Document ingestion (lab + intake + medication-list PDFs → strict-schema JSON) | `copilot/agent/ingest/` |
 | Sample PDFs covering 3 lab + 2 intake + 2 med-list layouts | `copilot/agent/ingest/test_fixtures/samples/` |
-| Hybrid RAG over a curated guideline corpus (ADA / ACC-AHA / USPSTF / GINA / KDIGO) | `copilot/agent/rag/` + `copilot/guidelines/seed_corpus.json` |
+| Hybrid RAG over a curated guideline corpus (ADA / ACC-AHA / USPSTF / GINA / KDIGO) | `copilot/agent/rag/` + `copilot/agent/guidelines/seed_corpus.json` |
 | LangGraph supervisor + intake_extractor + evidence_retriever + critic + final_answer | `copilot/agent/graph.py` |
 | New agent tools: `search_guidelines`, `get_extracted_facts` (visible to /chat directly) | `copilot/agent/tools.py` |
 | Click-to-source bbox-overlay PDF viewer | `interface/patient_file/documents/copilot_doc_viewer.php` |

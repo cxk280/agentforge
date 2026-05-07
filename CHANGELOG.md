@@ -13,7 +13,7 @@
 
 ### Added — Hybrid RAG over guideline corpus
 
-- **`POST /search`** — hybrid BM25 + (optional) Cohere Rerank over `copilot/guidelines/seed_corpus.json` (12 hand-curated chunks across ADA, ACC/AHA, USPSTF, GINA, KDIGO).
+- **`POST /search`** — hybrid BM25 + (optional) Cohere Rerank over `copilot/agent/guidelines/seed_corpus.json` (12 hand-curated chunks across ADA, ACC/AHA, USPSTF, GINA, KDIGO).
 - **`copilot/agent/rag/retriever.py`** — pluggable shape so dense (Voyage-3 + pgvector) can swap in without changing `search()`.
 
 ### Added — LangGraph multi-agent

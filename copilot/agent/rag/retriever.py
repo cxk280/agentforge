@@ -4,8 +4,13 @@ MVP-shape: BM25 sparse + (optional) Cohere Rerank. Dense retrieval
 (Voyage-3 + pgvector) lands later this week — this module exposes the
 same `search()` shape so the upgrade is a swap rather than a rewrite.
 
-The corpus is loaded from copilot/guidelines/seed_corpus.json at module
-import time. Each chunk is precomputed once; queries are O(corpus_size)
+The corpus is loaded from copilot/agent/guidelines/seed_corpus.json at
+module import time. (It used to live at `copilot/guidelines/` —
+moved 2026-05-07 so it sits inside the agent's docker build context;
+the prior layout meant `railway up --service copilot-agent
+--path-as-root .` produced an image with no corpus, which silently
+broke `/search` until manually scp'd in.) Each chunk is precomputed
+once; queries are O(corpus_size)
 which is fine at ~250 chunks.
 """
 
@@ -28,7 +33,7 @@ from rank_bm25 import BM25Okapi
 # ---------------------------------------------------------------------------
 
 _DEFAULT_CORPUS_PATH = (
-    Path(__file__).resolve().parent.parent.parent
+    Path(__file__).resolve().parent.parent
     / "guidelines"
     / "seed_corpus.json"
 )
