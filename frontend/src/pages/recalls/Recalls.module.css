@@ -1,0 +1,385 @@
+/*
+ * Recalls — page-specific styles. Values verified against Figma node 78:2
+ * (Screen 33 — Recalls) on 2026-05-07.
+ *
+ * Layout: 60px page-head, 56px filter bar, 72px KPI card (in a 24px-padded
+ * outer wrap), then the recall queue table. Body bg / Inter / scaffold
+ * live in the PHP wrapper.
+ *
+ * Token sources (Figma):
+ *   - Text primary: #181d26
+ *   - Text secondary: #4f5763
+ *   - Text muted: #8a91a1
+ *   - Border: #e4e5e8
+ *   - Surface: #ffffff
+ *   - Surface alt (zebra rows): #fafbfc
+ *   - Surface chip neutral: #f5f6f7
+ *   - Accent: #008c8c
+ *   - Danger: #d93838 (pill bg #fceaea)
+ *   - Warn:   #fa8c33 (pill bg #fff4ea)
+ *   - Good:   #33a666 (pill bg #e8f7ed)
+ */
+
+/* ── Page head (full width, 60px tall, white, 1px bottom border) ── */
+.pageHead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.titleRow { display: flex; align-items: center; gap: 12px; }
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+  letter-spacing: -0.1px;
+}
+.dot { color: #8A91A1; font-size: 16px; line-height: 1; }
+.meta { font-size: 13px; color: #4F5763; line-height: 1; font-weight: 400; }
+.spacer { flex: 1; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 16px;
+  background: #008C8C;
+  border: 1px solid #008C8C;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.btnHelp {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 12px;
+  background: #F5F6F7;
+  border: none;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnHelp:hover { background: #E8E9EC; }
+.btnIcon { font-size: 12px; line-height: 1; }
+
+/* ── Filter bar (full width, 56px tall, white, 1px bottom border) ── */
+.filterBar {
+  width: 100%;
+  height: 56px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 300px;
+  height: 32px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 12px;
+}
+.searchIcon { font-size: 12px; color: #8A91A1; line-height: 1; }
+.searchInput {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: #181D26;
+  font-family: inherit;
+  min-width: 0;
+}
+.searchInput::placeholder { color: #8A91A1; }
+
+.select {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.selectLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+.selectValue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1;
+  margin-top: 4px;
+}
+.selectCaret { color: #8A91A1; font-size: 11px; line-height: 1; }
+.selectNative {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  padding: 0;
+  font-family: inherit;
+}
+
+/* ── KPI strip wrap (24px gutter, 17px top spacing matches Figma) ── */
+.kpiWrap {
+  padding: 17px 24px 16px;
+  background: #F5F6F7;
+}
+.kpiCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 72px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+}
+.kpiCell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 11px 23px;
+  border-right: 1px solid #E4E5E8;
+  min-width: 0;
+}
+.kpiCellLast { border-right: none; }
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+}
+.kpiRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.kpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1.1;
+  letter-spacing: -0.2px;
+}
+.kpiValueRed    { color: #D93838; }
+.kpiValueOrange { color: #FA8C33; }
+.kpiValueGreen  { color: #33A666; }
+.kpiSub {
+  font-size: 11px;
+  font-weight: 400;
+  color: #4F5763;
+  line-height: 1.2;
+}
+
+/* ── Table wrap (24px side gutter, table inside a card) ── */
+.tableWrap {
+  padding: 0 24px 24px;
+  background: #F5F6F7;
+}
+.table {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  overflow: hidden;
+  font-size: 13px;
+  table-layout: auto;
+}
+
+/* Header row */
+.thead {
+  background: #F9FAFB;
+  height: 40px;
+}
+.thLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+  text-align: left;
+  padding: 0 8px;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+  letter-spacing: 0.4px;
+}
+.thLabel:first-of-type { padding-left: 0; }
+
+/* Checkbox column shared by header + body */
+.colCb {
+  width: 48px;
+  padding: 0 0 0 16px;
+  border-bottom: 1px solid #E4E5E8;
+}
+
+/* Open column right alignment */
+.colOpen {
+  width: 80px;
+  padding: 0 16px 0 0;
+  text-align: right;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+}
+
+/* Body rows */
+.tr {
+  height: 44px;
+  background: #FFFFFF;
+}
+.trAlt { background: #FAFBFC; }
+
+.tr td {
+  padding: 0 8px;
+  border-bottom: 1px solid #E4E5E8;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.tr td:first-child { padding-left: 0; }
+.tr:last-child td { border-bottom: none; }
+
+/* Patient cell */
+.patient {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #C9CDD4 0%, #A8AEB8 100%);
+  flex-shrink: 0;
+}
+.patientName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+
+/* Other cell variants */
+.mrn         { font-size: 13px; color: #4F5763; font-weight: 400; }
+.recallType  { font-size: 13px; color: #181D26; font-weight: 400; }
+.due         { font-size: 13px; color: #181D26; font-weight: 500; }
+.dueOverdue  { font-size: 13px; color: #D93838; font-weight: 700; letter-spacing: 0.4px; }
+.lastContact { font-size: 13px; color: #4F5763; font-weight: 400; }
+.attempts    { font-size: 13px; color: #181D26; font-weight: 400; font-variant-numeric: tabular-nums; }
+.provider    { font-size: 13px; color: #4F5763; font-weight: 400; }
+
+/* Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pillWarn    { background: #FFF4EA; color: #FA8C33; }
+.pillGood    { background: #E8F7ED; color: #33A666; }
+.pillDanger  { background: #FCEAEA; color: #D93838; }
+.pillNeutral { background: #F5F6F7; color: #4F5763; }
+
+/* Open link */
+.openLink {
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.openLink:hover { color: #006F6F; }
+
+/* ── Custom checkbox ── */
+.cb {
+  width: 16px;
+  height: 16px;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  background: #FFFFFF;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  vertical-align: middle;
+  font-family: inherit;
+}
+.cb:hover { border-color: #008C8C; }
+.cbOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.cbCheck {
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+.cbDash {
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}

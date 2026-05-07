@@ -1,0 +1,369 @@
+/*
+ * ACL Editor — page-specific styles. Values verified against Figma node
+ * 102:2 (Screen 53 — ACL Editor) on 2026-05-07. Mirrors the PHP mock at
+ * copilot_acl.php.bak; widths converted from Figma's fixed pixel layout
+ * (200px sidebar, 60px page head, ~16px row height) to a fluid layout
+ * that fills the iframe at any width.
+ *
+ * Global scaffolding (html/body resets, Inter font, body bg, #cp-root
+ * sizing) lives in the PHP wrapper at copilot_acl.php — this file owns
+ * only Acl-component styles.
+ */
+
+/* ── Two-column shell ─────────────────────────────────────────────────── */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* ── Left sidebar ─────────────────────────────────────────────────────── */
+.sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 16px 0 24px;
+  overflow-y: auto;
+}
+.sideHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  padding: 0 16px 12px;
+}
+.sideGroup { margin-bottom: 8px; }
+.sideGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  padding: 8px 16px 4px;
+}
+.sideItem {
+  display: block;
+  margin: 0 8px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.sideItem:hover {
+  background: #F5F6F7;
+  color: #0D1B2A;
+}
+.sideItemActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+.sideItemActive:hover {
+  background: #E6F5F5;
+  color: #008C8C;
+}
+
+/* ── Main column ──────────────────────────────────────────────────────── */
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* ── Page head ────────────────────────────────────────────────────────── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+}
+.pageheadTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.pageheadDot {
+  font-size: 16px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.pageheadMeta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.pageheadSpacer { flex: 1; }
+
+.unsaved {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFF4EA;
+  color: #FA8C33;
+  border-radius: 9px;
+  padding: 3px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.unsavedDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #FA8C33;
+}
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnGhostIcon {
+  color: #8A91A1;
+  font-size: 12px;
+}
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+/* ── Sub-toolbar ──────────────────────────────────────────────────────── */
+.toolbar {
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 32px;
+}
+.tbGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.tbLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+}
+.tbViewBy {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+}
+.tbSelect {
+  appearance: none;
+  -webkit-appearance: none;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  height: 24px;
+  padding: 0 24px 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8A91A1 50%),
+    linear-gradient(135deg, #8A91A1 50%, transparent 50%);
+  background-position:
+    calc(100% - 12px) calc(50% - 1px),
+    calc(100% - 8px)  calc(50% - 1px);
+  background-size: 4px 4px, 4px 4px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+  min-width: 140px;
+  line-height: 1;
+}
+.tbCopyGo {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  height: 24px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+}
+.tbCopyGo:hover { color: #0D1B2A; border-color: #C9CDD4; }
+
+.seg {
+  display: inline-flex;
+  background: #F5F6F7;
+  border-radius: 12px;
+  padding: 2px;
+}
+.segItem {
+  background: transparent;
+  border: 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  border-radius: 10px;
+  cursor: pointer;
+  line-height: 1.2;
+}
+.segItemActive {
+  background: #FFFFFF;
+  color: #181D26;
+  border: 1px solid #E4E5E8;
+  font-weight: 500;
+}
+
+.tbRight {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+.tbNewRole {
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+}
+.tbNewRole:hover { text-decoration: underline; }
+
+/* ── Matrix grid ──────────────────────────────────────────────────────── */
+.gridWrap {
+  flex: 1 1 auto;
+  padding: 16px 24px 24px;
+  overflow: auto;
+}
+.grid {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  table-layout: auto;
+}
+.tbl thead tr {
+  background: #F9FAFB;
+  height: 40px;
+}
+.tbl th {
+  padding: 0 8px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+}
+.thLeft { text-align: left; }
+.thCat { width: 110px; padding-left: 16px; }
+.thPerm { width: auto; padding-left: 0; text-align: left; }
+
+.tbl td {
+  padding: 9px 8px;
+  text-align: center;
+  font-size: 12px;
+  color: #181D26;
+  border-bottom: 1px solid #E4E5E8;
+  vertical-align: middle;
+}
+.tbl tbody tr:last-child td { border-bottom: 0; }
+
+.rowZebra { background: #FAFBFC; }
+
+.tdCat {
+  text-align: left;
+  padding-left: 16px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #181D26;
+  white-space: nowrap;
+}
+.tdPerm {
+  text-align: left;
+  padding-left: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: #181D26;
+  white-space: nowrap;
+}
+.tdCheck { width: 88px; }
+
+/* Custom checkbox visuals — match Figma 16x16 / 4px radius */
+.cb {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  line-height: 1;
+}
+.cb:hover { border-color: #C9CDD4; }
+.cbOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.cbOn:hover {
+  background: #006F6F;
+  border-color: #006F6F;
+}
+.cbDeny {
+  background: #FCEAEA;
+  border-color: #D93838;
+}
+.cbCheck {
+  color: #FFFFFF;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.cbX {
+  color: #D93838;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}

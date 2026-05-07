@@ -1,0 +1,479 @@
+/*
+ * Facilities — page-specific styles. Values verified against Figma node
+ * 103:2 (Screen 54 — Facilities) on 2026-05-07. Mirrors the PHP mock at
+ * copilot_facilities.php.bak; widths converted from Figma's fixed-pixel
+ * 1240px main column to fluid grid columns so the page fills the iframe
+ * at any width.
+ *
+ * Global scaffolding (html/body resets, Inter font, body bg, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_facilities.php — this file owns only
+ * Facilities-component styles.
+ */
+
+/* ── Two-column layout: left admin rail + main column ─────────────────── */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+}
+
+/* Admin sidebar (left rail) */
+.sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 12px 0 24px;
+  overflow-y: auto;
+}
+.sidebarHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  padding: 4px 16px 8px;
+}
+.group {
+  margin-top: 4px;
+}
+.groupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  padding: 8px 16px 4px;
+  line-height: 1.2;
+}
+.navItem {
+  display: block;
+  margin: 0 8px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+.navItem:hover {
+  background: #F5F6F7;
+  color: #0D1B2A;
+}
+.navItemActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+
+/* Main column */
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Page head */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+  flex: 0 0 60px;
+}
+.pageheadTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.pageheadDot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0 4px;
+}
+.pageheadMeta {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.pageheadSpacer {
+  flex: 1;
+}
+.newBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.newBtn:hover {
+  background: #006F6F;
+}
+
+/* Body — 2-column grid (list + form) on F5F6F7 background */
+.body {
+  flex: 1 1 auto;
+  padding: 16px 24px 24px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 16px;
+  align-content: start;
+  background: #F5F6F7;
+}
+
+/* ── Facility list panel ───────────────────────────────────────────────── */
+.list {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 12px 8px;
+  align-self: start;
+}
+.listLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  padding: 4px 8px 8px;
+  line-height: 1.2;
+}
+.card {
+  display: flex;
+  gap: 12px;
+  padding: 14px 12px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  border-radius: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+}
+.card:first-of-type {
+  margin-top: 0;
+}
+.card:hover {
+  border-color: #C8CDD3;
+}
+.cardActive {
+  background: #E6F5F5;
+  border-color: #E6F5F5;
+}
+.cardActive:hover {
+  border-color: #E6F5F5;
+}
+.cardIcon {
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 24px;
+  color: #181D26;
+}
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+.cardName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+.cardSub {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.2;
+  margin-bottom: 8px;
+}
+.pill {
+  display: inline-block;
+  border-radius: 9px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.pillPrimary {
+  background: #FFFFFF;
+  color: #008C8C;
+}
+.pillGood {
+  background: #E8F7ED;
+  color: #33A666;
+}
+.pillNeutral {
+  background: #F5F6F7;
+  color: #8A91A1;
+}
+
+/* ── Edit Facility form ────────────────────────────────────────────────── */
+.form {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: start;
+}
+.formHead {
+  height: 56px;
+  padding: 0 20px;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.formHeadInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.formHeadKicker {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.formHeadTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dirtyPill {
+  align-self: flex-end;
+  background: #FFF4EA;
+  color: #FA8C33;
+  border-radius: 9px;
+  padding: 2px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.2px;
+}
+.formHeadSpacer {
+  flex: 1;
+}
+.btnGhost {
+  border-radius: 16px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.btnGhost:hover {
+  background: #F5F6F7;
+}
+.btnPrimary {
+  border-radius: 16px;
+  padding: 7px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  background: #008C8C;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.btnPrimary:hover {
+  background: #006F6F;
+}
+
+.formBody {
+  padding: 16px 20px 20px;
+}
+
+/* ── Sections ──────────────────────────────────────────────────────────── */
+.section {
+  margin-top: 18px;
+}
+.section:first-child {
+  margin-top: 0;
+}
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+/* ── Field grids ───────────────────────────────────────────────────────── */
+.grid {
+  display: grid;
+  gap: 12px 16px;
+}
+.identityR1 {
+  grid-template-columns: 1fr 1fr;
+}
+.identityR2 {
+  grid-template-columns: 1fr 176px 156px;
+  margin-top: 12px;
+}
+.addressR1 {
+  grid-template-columns: 1fr;
+}
+.addressR2 {
+  grid-template-columns: 300px 140px 140px 120px;
+  margin-top: 12px;
+}
+.contactRow {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.fieldLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.input,
+.select {
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  background: #FFFFFF;
+  font-size: 14px;
+  color: #181D26;
+  line-height: 1;
+  width: 100%;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.input:focus,
+.select:focus {
+  outline: none;
+  border-color: #008C8C;
+}
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238A91A1' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 30px;
+}
+
+/* ── Service hours + Capabilities row ──────────────────────────────────── */
+.svcSection {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 32px;
+  align-items: start;
+}
+.svcCol {
+  min-width: 0;
+}
+.svcRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.svcRow {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  align-items: center;
+  gap: 8px;
+}
+.svcDay {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.svcVal {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  background: #FFFFFF;
+  font-size: 11px;
+  color: #181D26;
+  line-height: 1;
+  width: 100%;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.svcVal:focus {
+  outline: none;
+  border-color: #008C8C;
+}
+.svcValMuted {
+  color: #8A91A1;
+}
+
+/* Capabilities */
+.capList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.capRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.capInput {
+  /* visually hidden, but still keyboard-focusable */
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+}
+.capBox {
+  width: 16px;
+  height: 16px;
+  background: #FFFFFF;
+  border: 1px solid #C8CDD3;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: transparent;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.capBoxChecked {
+  background: #008C8C;
+  border-color: #008C8C;
+  color: #FFFFFF;
+}
+.capLabel {
+  font-size: 12px;
+  font-weight: 400;
+  color: #181D26;
+  line-height: 1;
+}
