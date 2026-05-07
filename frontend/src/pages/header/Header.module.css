@@ -1,0 +1,220 @@
+/*
+ * Header — top navy nav. Verified against Figma node 26:3 (Screen 6's
+ * top-nav, identical structure on Screens 7, 8, 9, 10, etc.).
+ *
+ * Lives in the OpenEMR outer shell (interface/main/tabs/main.php), not
+ * inside an iframe. Replaces the upstream Bootstrap <nav> so Calendar /
+ * Messages / Reports / Admin / More + patient search + user avatar
+ * render exactly as Figma. Click handlers reach into the existing
+ * window-level helpers (navigateTab, activateTabByName, viewPtFinder)
+ * so iframe tab management and shortcuts.js continue to work unchanged.
+ */
+
+.bar {
+  width: 100%;
+  height: 52px;
+  background: #0D1B2A;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  position: relative;
+  z-index: 1000;
+}
+
+/* ── Brand (left) ── */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.brandIcon {
+  width: 28px;
+  height: 28px;
+  background: #008C8C;
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+.brandText {
+  color: #FFFFFF;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ── Menu (after brand) ── */
+.menu {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-left: 24px;
+  flex-shrink: 0;
+}
+.menuItem {
+  background: transparent;
+  border: none;
+  color: #B2C7DB;
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.menuItem:hover { color: #FFFFFF; }
+.menuItemActive {
+  color: #5FD0D0;
+  font-weight: 600;
+}
+.menuItemActive:hover { color: #5FD0D0; }
+
+.menuMore { position: relative; }
+.menuMoreList {
+  position: absolute;
+  top: 36px;
+  left: 0;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 6px 0;
+  min-width: 240px;
+  max-height: 70vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(13, 27, 42, 0.18);
+  z-index: 1100;
+}
+.menuMoreItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  font-size: 13px;
+  color: #0D1B2A;
+  cursor: pointer;
+  font-family: inherit;
+}
+.menuMoreItem:hover:not(:disabled) { background: #F5F6F7; }
+.menuMoreItem:disabled {
+  color: #8A91A1;
+  cursor: default;
+}
+.menuMoreItemIndent { padding-left: 28px; color: #4F5763; }
+.menuMoreSection {
+  padding: 10px 16px 4px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: #8A91A1;
+  margin-top: 4px;
+  border-top: 1px solid #F0F1F3;
+}
+.menuMoreSection:first-child { border-top: none; margin-top: 0; }
+
+.spacer { flex: 1; }
+
+/* ── Search (right side) ──
+ * Uses :global(#cp-header) ID prefix to beat copilot-overlay.css's
+ * `input[type="text"] { background: var(--cp-surface) !important; ... }`
+ * which loads later than this CSS module. Class+!important alone ties on
+ * specificity (0,1,0) and loses on cascade order; ID+class+!important
+ * wins outright. */
+.search {
+  display: flex;
+  align-items: center;
+  border-radius: 15px;
+  padding: 0 12px;
+  height: 30px;
+  flex-shrink: 0;
+  width: 220px;
+  border: none;
+  box-shadow: none;
+}
+:global(#cp-header) .search {
+  background: rgba(255, 255, 255, 0.10) !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+:global(#cp-header) input.searchInput {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  color: #FFFFFF !important;
+  font-size: 12px !important;
+  font-family: inherit;
+  outline: none !important;
+  box-shadow: none !important;
+  width: 100%;
+  padding: 0 !important;
+  margin: 0 !important;
+  height: 30px;
+  line-height: 30px;
+  border-radius: 0 !important;
+}
+:global(#cp-header) input.searchInput::placeholder {
+  color: rgba(255, 255, 255, 0.50) !important;
+  font-weight: 400;
+  opacity: 1;
+}
+
+/* ── User badge (rightmost) ── */
+.user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 16px;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #5FD0D0;
+  flex-shrink: 0;
+}
+.userName {
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+/* ── Avatar dropdown popover ── */
+.avatarPopover {
+  position: absolute;
+  top: 56px;
+  right: 16px;
+  width: 360px;
+  max-height: calc(100vh - 80px);
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  box-shadow: 0 12px 36px rgba(13, 27, 42, 0.20);
+  overflow: hidden;
+  z-index: 1100;
+}
+.avatarPopover iframe {
+  width: 100%;
+  height: 600px;
+  border: none;
+  display: block;
+}
+
+/* Click-outside backdrop */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  z-index: 1050;
+}

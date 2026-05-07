@@ -94,12 +94,54 @@ if (OEGlobalsBag::getInstance()->get('prevent_browser_refresh') > 1) {
 $esignApi = new Api();
 $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->getTwig();
 
+// ---------------------------------------------------------------------------
+// AgentForge React Header — manifest read + nav data prep
+//
+// Replaces the upstream Bootstrap <nav> below with a React mount. Tab clicks
+// from React call into the existing window-level helpers (navigateTab /
+// activateTabByName) so iframe lifecycles and shortcuts.js continue to work.
+// Knockout still binds against #tabs_div / #framesDisplay / #attendantData;
+// only the navbar's contents change.
+// ---------------------------------------------------------------------------
+$cpHeaderManifestPath = $fileroot . '/public/build/.vite/manifest.json';
+$cpHeaderManifest     = is_file($cpHeaderManifestPath)
+    ? (json_decode((string)file_get_contents($cpHeaderManifestPath), true) ?: [])
+    : [];
+$cpHeaderEntry        = $cpHeaderManifest['src/pages/header/index.tsx'] ?? null;
+$cpHeaderJsHref       = is_array($cpHeaderEntry) && isset($cpHeaderEntry['file'])
+    ? '/public/build/' . $cpHeaderEntry['file']
+    : null;
+$cpHeaderCssHrefs     = is_array($cpHeaderEntry) && isset($cpHeaderEntry['css']) && is_array($cpHeaderEntry['css'])
+    ? $cpHeaderEntry['css']
+    : [];
+
+// Display name + avatar menu URL + CSRF (for boot-context data attributes)
+$cpHeaderUserRow  = sqlQuery("select fname, lname from users where username = ?", [$session->get('authUser')]);
+$cpHeaderUserName = trim((string)($cpHeaderUserRow['fname'] ?? '') . ' ' . (string)($cpHeaderUserRow['lname'] ?? ''));
+if ($cpHeaderUserName === '') {
+    $cpHeaderUserName = (string)$session->get('authUser');
+}
+$cpHeaderActiveTarget  = 'cal';   // first-load default; React updates on click
+$cpHeaderAvatarMenuUrl = $webroot . '/interface/main/copilot_avatar_menu.php';
+$cpHeaderCsrf          = CsrfUtils::collectCsrfToken(session: $session);
+// $cpHeaderNav is populated below after $menu_restrictions is built (line ~467)
+// so role/ACL filtering applied by MainMenuRole flows through to the React tree.
+
 ?>
 <!DOCTYPE html>
 <html>
 
 <head>
     <title><?php echo text($openemr_name); ?></title>
+
+    <!-- AgentForge React Header CSS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/copilot-tokens.css">
+    <?php foreach ($cpHeaderCssHrefs as $h): ?>
+    <link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/build/<?php echo attr((string)$h); ?>">
+    <?php endforeach; ?>
 
     <script>
         // This is to prevent users from losing data by refreshing or backing out of OpenEMR.
@@ -406,6 +448,86 @@ $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->get
     // Collect the menu then build it
     $menuMain = new MainMenuRole(OEGlobalsBag::getInstance()->getKernel()->getEventDispatcher());
     $menu_restrictions = $menuMain->getMenu();
+
+    // ---------------------------------------------------------------------------
+    // AgentForge React Header — flatten $menu_restrictions into primary + more
+    // for the React Header bundle. ACL filtering already applied by getMenu().
+    //
+    // The standard menu top-level is exactly Calendar / Messages / Reports /
+    // Admin / More — matching the Figma. We split: first 4 leaves are primary;
+    // the children of the "More" header become the dropdown.
+    // ---------------------------------------------------------------------------
+    // Patient-context flag: a non-empty $_SESSION['pid'] means a patient
+    // is selected. Items with requirement >= 1 need patient (1), encounter
+    // (2-3), or therapy-group (4-5) context, so we hide them when no
+    // patient is in the session. Encounter-only items will surface when
+    // an encounter is also active.
+    $cpHasPatient = !empty($_SESSION['pid']);
+    $cpStripLabel = static function (string $s): string {
+        // Menu labels embed runtime placeholders like "Dashboard{{patient file}}"
+        // — strip the {{...}} segments to keep the visible text clean.
+        return trim((string) preg_replace('/\{\{[^}]*\}\}/', '', $s));
+    };
+    $cpRequirementOk = static function (array $entryArr) use ($cpHasPatient): bool {
+        $req = (int)($entryArr['requirement'] ?? 0);
+        return $req === 0 || $cpHasPatient;
+    };
+
+    $cpHeaderPrimary = [];
+    $cpHeaderMore    = [];
+    foreach ($menu_restrictions as $entry) {
+        $entryArr = is_object($entry) ? (array) $entry : (array) $entry;
+        $label    = $cpStripLabel((string)($entryArr['label'] ?? ''));
+        $target   = (string)($entryArr['target'] ?? '');
+        $url      = (string)($entryArr['url'] ?? '');
+        $children = (array)($entryArr['children'] ?? []);
+        if ($label === 'More') {
+            foreach ($children as $child) {
+                $childArr  = is_object($child) ? (array) $child : (array) $child;
+                $childLbl  = $cpStripLabel((string)($childArr['label'] ?? ''));
+                $childUrl  = (string)($childArr['url'] ?? '');
+                $childKids = (array)($childArr['children'] ?? []);
+                if ($childUrl !== '') {
+                    if (!$cpRequirementOk($childArr)) {
+                        continue;
+                    }
+                    $cpHeaderMore[] = [
+                        'label'  => $childLbl,
+                        'target' => (string)($childArr['target'] ?? ''),
+                        'url'    => $webroot . $childUrl,
+                    ];
+                } elseif (!empty($childKids)) {
+                    // Header item — flatten its leaves into the main list
+                    // (no section labels). After requirement-filtering the
+                    // sections often only have 1-2 items each, so the headers
+                    // add visual noise without grouping value.
+                    foreach ($childKids as $grand) {
+                        $grandArr = is_object($grand) ? (array) $grand : (array) $grand;
+                        $grandUrl = (string)($grandArr['url'] ?? '');
+                        if ($grandUrl === '' || !$cpRequirementOk($grandArr)) {
+                            continue;
+                        }
+                        $cpHeaderMore[] = [
+                            'label'  => $cpStripLabel((string)($grandArr['label'] ?? '')),
+                            'target' => (string)($grandArr['target'] ?? ''),
+                            'url'    => $webroot . $grandUrl,
+                        ];
+                    }
+                }
+            }
+        } elseif ($url !== '' && $cpRequirementOk($entryArr)) {
+            $cpHeaderPrimary[] = [
+                'label'  => $label,
+                'target' => $target,
+                'url'    => $webroot . $url,
+            ];
+        }
+    }
+    $cpHeaderNav = [
+        'primary'   => $cpHeaderPrimary,
+        'more'      => $cpHeaderMore,
+        'finderUrl' => $webroot . '/interface/main/finder/dynamic_finder.php',
+    ];
     echo $twig->render("interface/main/tabs/menu_json.html.twig", ['menu_restrictions' => $menu_restrictions]);
     ?>
     <?php $userQuery = sqlQuery("select * from users where username = ?", [$session->get('authUser')]); ?>
@@ -478,42 +600,27 @@ $twig = (new TwigContainer(null, OEGlobalsBag::getInstance()->getKernel()))->get
     }
     ?>
     <div id="mainBox" <?php echo $disp_mainBox ?>>
-        <nav class="navbar navbar-expand-xl navbar-light bg-light py-0">
-            <?php if (OEGlobalsBag::getInstance()->getBoolean('display_main_menu_logo')) {
-                $bag = OEGlobalsBag::getInstance();
-                $logoLinkDefault = 'https://www.open-emr.org/';
-                $logoTitleDefault = xl('OpenEMR Website');
-                $logoLink = trim($bag->getString('main_menu_logo_link', $logoLinkDefault));
-                $logoTitle = trim($bag->getString('main_menu_logo_title', $logoTitleDefault));
-                $logoImg = '<img src="' . attr($menuLogo) . '" class="d-inline-block align-middle" height="16" alt="' . xla('Main Menu Logo') . '">';
-                if ($logoLink !== '') {
-                    echo '<a class="navbar-brand" href="' . attr($logoLink) . '" title="' . attr($logoTitle) . '" rel="noopener" target="_blank">' . $logoImg . '</a>' . "\n";
-                } else {
-                    echo '<span class="navbar-brand">' . $logoImg . '</span>' . "\n";
-                }
-            } ?>
-            <button class="navbar-toggler mr-auto" type="button" data-toggle="collapse" data-target="#mainMenu" aria-controls="mainMenu" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="mainMenu" data-bind="template: {name: 'menu-template', data: application_data}"></div>
-            <?php if (OEGlobalsBag::getInstance()->get('search_any_patient') != 'none') : ?>
-                <form name="frm_search_globals" class="form-inline">
-                    <div class="input-group">
-                        <input type="text" id="anySearchBox" class="form-control-sm <?php echo $any_search_class ?> form-control" name="anySearchBox" placeholder="<?php echo xla("Search by any demographics") ?>" autocomplete="off">
-                        <div class="input-group-append">
-                            <button type="button" id="search_globals" class="btn btn-sm btn-secondary <?php echo $search_globals_class ?>" title='<?php echo xla("Search for patient by entering whole or part of any demographics field information"); ?>' data-bind="event: {mousedown: viewPtFinder.bind( $data, '<?php echo xla("The search field cannot be empty. Please enter a search term") ?>', '<?php echo attr($search_any_type); ?>')}">
-                                <i class="fa fa-search">&nbsp;</i></button>
-                        </div>
-                    </div>
-                </form>
-            <?php endif; ?>
-            <!--Below is the user data section that contains the user information and the attendant data-->
-            <span id="userData" data-bind="template: {name: 'user-data-template', data: application_data}"></span>
-            <?php
-            // fire off a nav event
-            $dispatcher->dispatch(new RenderEvent(), RenderEvent::EVENT_BODY_RENDER_NAV);
-            ?>
-        </nav>
+        <!-- AgentForge React Header (replaces upstream <nav>). Mount node carries
+             boot context + nav payload as data-* attributes; the bundle parses
+             them at startup. Click handlers reach into navigateTab /
+             activateTabByName so existing iframe + tab behavior is preserved. -->
+        <div id="cp-header"
+             data-page="header"
+             data-csrf="<?php echo attr($cpHeaderCsrf); ?>"
+             data-user-id="<?php echo attr((string)($_SESSION['authUserID'] ?? '')); ?>"
+             data-patient-id="<?php echo attr((string)($_SESSION['pid'] ?? '')); ?>"
+             data-api-base="<?php echo attr($webroot); ?>/apis"
+             data-user-name="<?php echo attr($cpHeaderUserName); ?>"
+             data-active-target="<?php echo attr($cpHeaderActiveTarget); ?>"
+             data-avatar-menu-url="<?php echo attr($cpHeaderAvatarMenuUrl); ?>"
+             data-nav="<?php echo attr((string)json_encode($cpHeaderNav)); ?>"></div>
+        <?php if ($cpHeaderJsHref !== null): ?>
+        <script type="module" src="<?php echo attr($webroot . $cpHeaderJsHref); ?>"></script>
+        <?php endif; ?>
+        <?php
+        // fire off a nav event (kept for any listeners that depend on it)
+        $dispatcher->dispatch(new RenderEvent(), RenderEvent::EVENT_BODY_RENDER_NAV);
+        ?>
         <div id="attendantData" class="body_title acck" data-bind="template: {name: app_view_model.attendant_template_type, data: application_data}"></div>
         <div class="body_title pt-1" id="tabs_div" data-bind="template: {name: 'tabs-controls', data: application_data}"></div>
         <div class="mainFrames d-flex flex-row" id="mainFrames_div">

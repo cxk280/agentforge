@@ -30,6 +30,7 @@ export default defineConfig({
       input: {
         calendar: resolve(__dirname, 'src/pages/calendar/index.tsx'),
         messages: resolve(__dirname, 'src/pages/messages/index.tsx'),
+        header:   resolve(__dirname, 'src/pages/header/index.tsx'),
       },
     },
   },

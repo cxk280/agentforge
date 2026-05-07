@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AgentForge Header — standalone dev</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; height: 100%; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #F5F6F7;
+    }
+  </style>
+</head>
+<body>
+  <div id="cp-header"
+       data-page="header"
+       data-csrf="dev"
+       data-user-id="1"
+       data-patient-id=""
+       data-api-base="/apis"
+       data-user-name="Dr. Rivera"
+       data-active-target="cal"
+       data-avatar-menu-url="about:blank"
+       data-nav='{"primary":[{"label":"Calendar","target":"cal","url":"/interface/main/main_info.php"},{"label":"Messages","target":"msg","url":"/interface/main/messages/copilot_messages.php"},{"label":"Reports","target":"rep","url":"/interface/reports/copilot_reports.php"},{"label":"Admin","target":"adm","url":"/interface/super/copilot_admin.php"}],"more":[{"label":"Patient Finder","target":"fin","url":"/interface/main/finder/copilot_finder.php"},{"label":"Office Notes","target":"notes","url":"/interface/main/onotes/copilot_office_notes.php"},{"label":"Inventory","target":"inv","url":"/interface/billing/copilot_inventory.php"}],"finderUrl":"/interface/main/finder/dynamic_finder.php"}'></div>
+  <script>
+    // Stub the window functions the Header expects so dev clicks don't 404.
+    window.navigateTab = (url, name, cb) => { console.log('navigateTab', name, url); cb && cb(); };
+    window.activateTabByName = (name, hideOthers) => { console.log('activateTabByName', name, hideOthers); };
+    window.viewPtFinder = (msg, type) => { console.log('viewPtFinder', msg, type); };
+    window.webroot_url = '';
+  </script>
+  <script type="module" src="/src/pages/header/index.tsx"></script>
+</body>
+</html>
