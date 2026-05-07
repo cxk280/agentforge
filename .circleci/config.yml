@@ -251,8 +251,18 @@ commands:
             source .venv/bin/activate
             pip install -q -r requirements.txt
             export EVAL_AGENT_ENDPOINT="<< parameters.endpoint >>"
-            ARGS=""
-            if [ "<< parameters.smoke >>" = "true" ]; then ARGS="--smoke"; fi
+            # Silence the Langfuse SDK in CI: the only LANGFUSE_* keys
+            # available at the project level are prod-scoped (they have
+            # the wrong audience for dev/qa Langfuse instances and a
+            # trailing-whitespace artifact that makes the SDK 401 on
+            # every export). Per feedback_environment_isolation, evals
+            # must NOT upload to a cross-env Langfuse instance. Until
+            # we wire per-env CircleCI contexts, drop the keys here so
+            # the runner short-circuits to the no-Langfuse path and the
+            # SDK never tries to export.
+            unset LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_HOST
+            ARGS="--no-langfuse"
+            if [ "<< parameters.smoke >>" = "true" ]; then ARGS="$ARGS --smoke"; fi
             python run_evals.py $ARGS 2>&1 | tee /tmp/eval-artifacts/eval-output.txt || true
             cp cases.json /tmp/eval-artifacts/cases.json
       - store_artifacts:
