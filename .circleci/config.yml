@@ -3,7 +3,7 @@
 # Two parallel deploy lanes — one per Railway service we care about:
 #
 #   copilot-agent (FastAPI):
-#     unit-test → deploy-{env} → eval-{env} → hold → next env
+#     unit-test → deploy-agent-{env} → eval-{smoke|full}-agent-{env} → hold → next env
 #     `railway up --service copilot-agent --path-as-root .` from copilot/agent/
 #
 #   openemr (PHP app):
@@ -16,15 +16,15 @@
 # agent OR a broken OpenEMR will block QA/Prod promotion equally.
 #
 # Stages:
-#   1. unit-test            — isolated PHPUnit Copilot suite. Both lanes.
-#   2. deploy-{env}         — agent: railway up against the env's project token.
-#   3. eval-smoke-dev       — 5-case smoke against dev's agent (~$0.05).
-#   4. deploy-openemr-{env} — openemr: railway up against the env's project token.
-#   5. smoke-openemr-{env}  — wait for login, re-run copilot_enable_api.php,
-#                             smoke-test FHIR endpoint with admin/pass.
-#   6. hold-qa, hold-prod   — manual approval gates after BOTH lanes
-#                             pass their previous-env verifications.
-#   7. eval-full-{qa,prod}  — full 25-case eval against the deployed agent.
+#   1. unit-test                 — isolated PHPUnit Copilot suite. Both lanes.
+#   2. deploy-agent-{env}        — agent: railway up against the env's project token.
+#   3. eval-smoke-agent-dev      — 5-case smoke against dev's agent (~$0.05).
+#   4. deploy-openemr-{env}      — openemr: railway up against the env's project token.
+#   5. smoke-openemr-{env}       — wait for login, re-run copilot_enable_api.php,
+#                                  smoke-test FHIR endpoint with admin/pass.
+#   6. hold-qa, hold-prod        — manual approval gates after BOTH lanes
+#                                  pass their previous-env verifications.
+#   7. eval-full-agent-{qa,prod} — full 50-case eval against the deployed agent.
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
 #   ANTHROPIC_API_KEY              — for Haiku judge in evals
@@ -308,7 +308,7 @@ jobs:
           path: /tmp/test-results
           destination: phpunit
 
-  eval-smoke-dev:
+  eval-smoke-agent-dev:
     executor: python
     steps:
       - checkout
@@ -321,7 +321,7 @@ jobs:
           smoke: true
           min_pass: 4
 
-  deploy-dev:
+  deploy-agent-dev:
     executor: railway
     steps:
       - checkout
@@ -337,7 +337,7 @@ jobs:
           path: /tmp/deploy-logs
           destination: railway-dev
 
-  deploy-qa:
+  deploy-agent-qa:
     executor: railway
     steps:
       - checkout
@@ -353,7 +353,7 @@ jobs:
           path: /tmp/deploy-logs
           destination: railway-qa
 
-  eval-full-qa:
+  eval-full-agent-qa:
     executor: python
     steps:
       - checkout
@@ -362,7 +362,7 @@ jobs:
           smoke: false
           min_pass: 23
 
-  deploy-prod:
+  deploy-agent-prod:
     executor: railway
     steps:
       - checkout
@@ -378,7 +378,7 @@ jobs:
           path: /tmp/deploy-logs
           destination: railway-prod
 
-  eval-full-prod:
+  eval-full-agent-prod:
     executor: python
     steps:
       - checkout
@@ -465,13 +465,13 @@ workflows:
       - unit-test
 
       # ── Agent lane: dev ────────────────────────────────────────
-      - deploy-dev:
+      - deploy-agent-dev:
           requires: [unit-test]
           filters:
             branches:
               only: master
-      - eval-smoke-dev:
-          requires: [deploy-dev]
+      - eval-smoke-agent-dev:
+          requires: [deploy-agent-dev]
 
       # ── OpenEMR lane: dev ──────────────────────────────────────
       - deploy-openemr-dev:
@@ -485,13 +485,13 @@ workflows:
       # ── QA gate: BOTH lanes' dev-side checks must pass ─────────
       - hold-qa:
           type: approval
-          requires: [eval-smoke-dev, smoke-openemr-dev]
+          requires: [eval-smoke-agent-dev, smoke-openemr-dev]
 
       # ── Agent lane: qa ─────────────────────────────────────────
-      - deploy-qa:
+      - deploy-agent-qa:
           requires: [hold-qa]
-      - eval-full-qa:
-          requires: [deploy-qa]
+      - eval-full-agent-qa:
+          requires: [deploy-agent-qa]
 
       # ── OpenEMR lane: qa ───────────────────────────────────────
       - deploy-openemr-qa:
@@ -502,13 +502,13 @@ workflows:
       # ── Prod gate: BOTH lanes' qa-side checks must pass ────────
       - hold-prod:
           type: approval
-          requires: [eval-full-qa, smoke-openemr-qa]
+          requires: [eval-full-agent-qa, smoke-openemr-qa]
 
       # ── Agent lane: prod ───────────────────────────────────────
-      - deploy-prod:
+      - deploy-agent-prod:
           requires: [hold-prod]
-      - eval-full-prod:
-          requires: [deploy-prod]
+      - eval-full-agent-prod:
+          requires: [deploy-agent-prod]
 
       # ── OpenEMR lane: prod ─────────────────────────────────────
       - deploy-openemr-prod:
