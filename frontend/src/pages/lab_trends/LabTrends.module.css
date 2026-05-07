@@ -1,0 +1,379 @@
+/*
+ * LabTrends — page-specific styles. Values verified against Figma node
+ * 93:2 (Screen 45 — Lab Trends Report) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_lab_trends.php — this
+ * file owns only LabTrends-component styles.
+ */
+
+/* ── Page header (full width — matches the Figma intent and the user's
+ *    standing rule that headers span full width edge to edge) ── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.subtitle {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.spacer { flex: 1; }
+
+/* Lab selector pill (display-only — no native <select> dropdown; the
+ * static demo shows the active label). */
+.labSelect {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 13px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1;
+  cursor: pointer;
+}
+.caret {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 11px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+}
+.exportBtn:hover { background: #F5F6F7; }
+
+.runBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 26px;
+  background: #008C8C;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+  cursor: pointer;
+}
+.runBtn:hover { background: #006F6F; }
+
+/* ── Content area ── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip ── */
+.kpiCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 72px;
+  display: flex;
+  align-items: stretch;
+  padding: 0 23px;
+}
+.kpi {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  padding-right: 16px;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+.kpiNavy   { color: #181D26; }
+.kpiGreen  { color: #33A666; }
+.kpiOrange { color: #FA8C33; }
+.kpiRed    { color: #D93838; }
+.kpiDivider {
+  align-self: center;
+  width: 1px;
+  height: 40px;
+  background: #E4E5E8;
+  flex: 0 0 auto;
+}
+
+/* ── Histogram card ── */
+.histCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 19px 16px;
+  height: 288px;
+  position: relative;
+  overflow: hidden;
+}
+.histTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  margin: 0;
+  line-height: 1.2;
+}
+.histDesc {
+  font-size: 11px;
+  color: #4F5763;
+  margin-top: 4px;
+  line-height: 1.2;
+}
+.chartArea {
+  margin-top: 28px;
+  position: relative;
+  height: 200px;
+}
+.targetLabel {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-weight: 600;
+  color: #4F5763;
+  white-space: nowrap;
+  background: #FFFFFF;
+  padding: 0 4px;
+  z-index: 2;
+}
+.targetLine {
+  position: absolute;
+  top: 18px;
+  bottom: 18px;
+  width: 2px;
+  background: #4F5763;
+  transform: translateX(-50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.barsRow {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 100%;
+}
+.barCol {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  position: relative;
+}
+.barInner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1;
+  min-height: 0;
+}
+.barPct {
+  font-size: 11px;
+  font-weight: 600;
+  color: #181D26;
+  margin-bottom: 4px;
+  line-height: 1;
+}
+.bar {
+  width: 78px;
+  max-width: 100%;
+  border-radius: 4px;
+  min-height: 4px;
+}
+.barGood   { background: #33A666; }
+.barWarn   { background: #FA8C33; }
+.barDanger { background: #D93838; }
+.barXLabel {
+  margin-top: 8px;
+  font-size: 10px;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+/* ── Bottom row (provider + outliers) ── */
+.bottomRow {
+  display: grid;
+  grid-template-columns: 488px 1fr;
+  gap: 16px;
+}
+
+.provCard, .outCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 19px 18px;
+  height: 360px;
+}
+.cardHead {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+.cardSub {
+  font-size: 11px;
+  color: #8A91A1;
+  margin-top: 5px;
+  line-height: 1.2;
+}
+
+/* Provider list */
+.provList {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.provRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: baseline;
+  column-gap: 12px;
+  row-gap: 2px;
+}
+.provName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.provPct {
+  font-size: 16px;
+  font-weight: 600;
+  color: #33A666;
+  line-height: 1.2;
+}
+.provRatio {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.provBar {
+  grid-column: 1 / -1;
+  height: 6px;
+  background: #F5F6F7;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.provBarFill {
+  display: block;
+  height: 100%;
+  background: #33A666;
+  border-radius: 3px;
+}
+
+/* Outliers list */
+.outList {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  margin-left: -19px;
+  margin-right: -19px;
+}
+.outRow {
+  display: grid;
+  grid-template-columns: 16px minmax(120px, 1fr) 80px minmax(110px, 1fr) minmax(80px, 1fr) minmax(100px, 1fr) 56px;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 19px;
+  font-size: 12px;
+  background: #FFFFFF;
+}
+.outRowAlt { background: #FAFBFC; }
+.outAvatar {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #B8CFEE;
+  display: inline-block;
+}
+.outName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+}
+.outMrn {
+  font-size: 11px;
+  color: #8A91A1;
+}
+.outVal {
+  font-size: 12px;
+  font-weight: 600;
+  color: #D93838;
+  white-space: nowrap;
+}
+.outProv {
+  font-size: 11px;
+  color: #4F5763;
+}
+.outLast {
+  font-size: 11px;
+  color: #8A91A1;
+  white-space: nowrap;
+}
+.outOpen {
+  font-size: 11px;
+  font-weight: 600;
+  color: #008C8C;
+  text-decoration: none;
+  text-align: right;
+  white-space: nowrap;
+}
+.outOpen:hover { text-decoration: underline; }

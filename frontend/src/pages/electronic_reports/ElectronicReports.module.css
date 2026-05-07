@@ -1,0 +1,294 @@
+/*
+ * ElectronicReports — page-specific styles. Values verified against Figma
+ * node 85:2 (Screen 39 — Electronic Reports) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_electronic_reports.php
+ * — this file owns only ElectronicReports-component styles.
+ *
+ * The Figma renders against the page bg #F5F6F7 inside the Main column. The
+ * page header is white (60px tall), then a single white KPI card, a filter
+ * bar of pills, and a single white table card.
+ */
+
+/* ── Page header (full width — matches the standing rule that headers
+ *    span full width edge to edge) ── */
+.header {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+
+.titleBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.subtitle {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+
+.spacer { flex: 1; }
+
+/* ── Header buttons ── */
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 16px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.btnHelp {
+  width: 40px;
+  height: 24px;
+  background: #F5F6F7;
+  color: #4F5763;
+  border: none;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btnHelp:hover { background: #ECEEF0; }
+
+/* ── Content column ── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip — one white card with 5 cells separated by 1px dividers ── */
+.kpiCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 72px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: center;
+}
+.kpiItem {
+  position: relative;
+  padding: 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1;
+}
+.valGreen  { color: #33A666; }
+.valOrange { color: #FA8C33; }
+.valRed    { color: #D93838; }
+
+.kpiSep {
+  width: 1px;
+  height: 40px;
+  background: #E4E5E8;
+  justify-self: end;
+  margin-right: -0.5px;
+}
+
+/* ── Filter pills ── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+}
+.pillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pillBtn:hover { background: #F5F6F7; }
+.pillBtnActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  border-color: #008C8C;
+}
+.pillBtnActive:hover { background: #D5EFEF; }
+
+.pillCt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.pillCtActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+
+/* ── Table ── */
+.tableCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+  font-family: inherit;
+}
+.th {
+  background: #F9FAFB;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  padding: 13px 16px;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+}
+.thAct { width: 36px; }
+
+.td {
+  padding: 13px 16px;
+  font-size: 12px;
+  color: #181D26;
+  border-bottom: 1px solid #E4E5E8;
+  vertical-align: middle;
+  line-height: 1.3;
+}
+.tdMuted { color: #4F5763; }
+
+/* Alternating row stripe (figma uses #FAFBFC on even rows). */
+.rowAlt .td { background: #FAFBFC; }
+
+/* Last row should not show its own border (the card border closes it). */
+.table tbody tr:last-child .td { border-bottom: none; }
+
+.idCell a {
+  color: #008C8C;
+  font-weight: 500;
+  text-decoration: none;
+}
+.idCell a:hover { text-decoration: underline; }
+
+.tdAct {
+  width: 36px;
+  text-align: center;
+  color: #8A91A1;
+  font-weight: 600;
+  font-size: 16px;
+  cursor: default;
+}
+
+.emptyRow {
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  color: #8A91A1;
+}
+
+/* ── Status pills ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pillGood {
+  background: #E8F7ED;
+  color: #33A666;
+}
+.pillWarn {
+  background: #FFF4EA;
+  color: #FA8C33;
+}
+.pillDanger {
+  background: #FCEAEA;
+  color: #D93838;
+}

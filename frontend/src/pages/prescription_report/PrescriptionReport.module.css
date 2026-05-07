@@ -1,0 +1,373 @@
+/*
+ * Prescription Report — page-specific styles. Values verified against Figma
+ * node 92:2 (Screen 44 — Prescription Report, fileKey kj4MWNr8mpjZ2wVg1PbS0F)
+ * on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_prescription_report.php
+ * — this file owns only PrescriptionReport-component styles.
+ *
+ * Layout: 200px sidebar + flex main column. Inside main: 60px PageHead,
+ * 1px hairline, 16px gutter, KPI strip (72px), 16px gutter, 2-column grid
+ * (488px + 1fr) of panels.
+ */
+
+.shell {
+  display: flex;
+  min-height: 100%;
+  background: #F5F6F7;
+}
+
+/* ── Left sub-nav (Reports categories) ───────────────────────────────── */
+.sidebar {
+  flex: 0 0 200px;
+  width: 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 16px 0 24px;
+  overflow-y: auto;
+}
+.sideHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  padding: 0 16px 12px;
+}
+.sideGroup { margin-bottom: 8px; }
+.sideGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  padding: 8px 16px 4px;
+  letter-spacing: 0.2px;
+}
+.sideItem {
+  display: block;
+  margin: 0 8px;
+  padding: 9px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.2;
+  border-radius: 6px;
+}
+.sideItem:hover { background: #F5F6F7; color: #0D1B2A; }
+.sideItemActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+.sideItemActive:hover { background: #E6F5F5; color: #008C8C; }
+
+/* ── Main column ─────────────────────────────────────────────────────── */
+.main {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #F5F6F7;
+}
+
+/* PageHead — full-width white bar with 1px bottom hairline */
+.pageHead {
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.metaDot {
+  font-size: 16px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.meta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.headSpacer { flex: 1 1 auto; }
+
+.exportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.exportBtn:hover { background: #F5F6F7; }
+
+.runBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 22px;
+  background: #008C8C;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.runBtn:hover { background: #006F6F; }
+
+/* ── Content area — 24px gutter on all sides, 16px between blocks ───── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* KPI strip — single rounded card with 5 columns + vertical dividers */
+.kpiStrip {
+  height: 72px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  align-items: stretch;
+}
+.kpiTile {
+  position: relative;
+  padding: 11px 23px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  justify-content: center;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1;
+}
+.kpiVal_red    { color: #D93838; }
+.kpiVal_green  { color: #33A666; }
+.kpiVal_orange { color: #FA8C33; }
+.kpiDivider {
+  position: absolute;
+  right: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 1px;
+  background: #E4E5E8;
+}
+
+/* ── 2-column main grid ──────────────────────────────────────────────── */
+.cols {
+  display: grid;
+  grid-template-columns: 488px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* Top medications panel (488px wide) */
+.medsPanel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 19px 20px;
+}
+.medsHead {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+}
+.medsSub {
+  font-size: 11px;
+  color: #8A91A1;
+  margin-top: 4px;
+  margin-bottom: 12px;
+  line-height: 1.2;
+}
+.medsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.medsRow {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  column-gap: 0;
+  align-items: start;
+}
+.medsNum {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1.4;
+  padding-top: 2px;
+}
+.medsBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.medsName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.medsInd {
+  font-size: 11px;
+  font-weight: 400;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.medsBar {
+  display: block;
+  margin-top: 4px;
+  height: 4px;
+  background: #F5F6F7;
+  border-radius: 2px;
+  overflow: hidden;
+  width: 400px;
+  max-width: 100%;
+}
+.medsBar > i {
+  display: block;
+  height: 100%;
+  background: #008C8C;
+  border-radius: 2px;
+}
+.medsCount {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+  align-self: start;
+  padding-top: 2px;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+
+/* Recent prescriptions panel */
+.recentPanel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 0 0;
+  overflow: hidden;
+}
+.recentHead {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1.2;
+  padding: 0 19px 12px;
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  position: relative;
+}
+.tab {
+  position: relative;
+  background: transparent;
+  border: 0;
+  padding: 8px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+}
+.tabActive {
+  color: #008C8C;
+  font-weight: 600;
+}
+.tabActive::after {
+  content: '';
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: -1px;
+  height: 2px;
+  background: #008C8C;
+  border-radius: 1px;
+}
+.tabsRule {
+  height: 1px;
+  background: #E4E5E8;
+  margin-top: 4px;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.table tr { height: 44px; }
+.table .rowAlt { background: #FAFBFC; }
+.table td {
+  padding: 0 0;
+  vertical-align: middle;
+  line-height: 1.3;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table tr:last-child td { border-bottom: 0; }
+
+.cTime { color: #4F5763; font-size: 11px; padding-left: 20px; width: 80px; }
+.cPat  { color: #181D26; font-size: 12px; font-weight: 600; width: 140px; }
+.cDrug { color: #181D26; font-size: 12px; width: 160px; }
+.cNote { color: #4F5763; font-size: 11px; width: 160px; }
+.cProv { color: #4F5763; font-size: 11px; width: 80px; }
+.cTag  { width: 60px; padding-right: 20px; text-align: left; }
+
+.pill {
+  display: inline-block;
+  border-radius: 9px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pillCtl   { background: #FCEAEA; color: #D93838; }
+.pillBrand { background: #FFF4EA; color: #FA8C33; }
