@@ -1,0 +1,12 @@
+# Local frontend deps would clobber the alpine-installed node_modules
+# in the `frontend` build stage and break esbuild's platform binary.
+# `npm ci` inside the build stage reinstalls cleanly.
+frontend/node_modules
+
+# Frontend build output is produced fresh inside the `frontend` stage
+# and COPY'd into the runtime image — local builds would just be
+# overwritten and waste context-upload bandwidth.
+public/build
+
+# .git is large and not needed in either build stage.
+.git

@@ -20,6 +20,19 @@
 # whenever NEW_RELIC_LICENSE_KEY is set on the Railway service.
 FROM newrelic/infrastructure:latest AS nri
 
+# --- AgentForge React UI builder ---------------------------------------
+# Compiles the /frontend Vite project to /app/public/build/. Output is
+# COPY'd into the runtime stage below. /public/build is NOT in the
+# openemr/openemr:flex VOLUME list (only public/themes and public/assets
+# are), so artifacts COPY'd there survive at runtime.
+FROM node:24-alpine AS frontend
+WORKDIR /app
+COPY frontend/package.json frontend/package-lock.json ./frontend/
+RUN cd frontend && npm ci
+COPY frontend/ ./frontend/
+RUN cd frontend && npm run build
+# vite outDir is ../public/build relative to /app/frontend, i.e. /app/public/build
+
 FROM openemr/openemr:flex@sha256:e4562b0c7d3f222ec8f72122ce00d10ffa93f559c38c00ab12c1355394c35d1c
 
 # --- New Relic Infrastructure agent (Go binary, statically linked) ---
@@ -48,6 +61,12 @@ RUN apk add --no-cache --virtual .nr-deps curl bash \
  && apk del .nr-deps
 
 COPY --chown=root:root . /var/www/localhost/htdocs/openemr/
+
+# Bundle React build output. Layered separately so we drop fresh React
+# bundles on top of the source COPY. This must run after the source COPY
+# so the manifest.json reaches the right path even if the local
+# /public/build was empty at docker-build time.
+COPY --from=frontend --chown=root:root /app/public/build /var/www/localhost/htdocs/openemr/public/build
 
 # Wrap the base image's CMD (./openemr.sh) so the NR Infrastructure
 # agent starts as a side-process before OpenEMR's normal startup runs.
