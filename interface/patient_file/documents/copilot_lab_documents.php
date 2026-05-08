@@ -57,6 +57,154 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live document inbox.
+//
+// Pulls recent rows from `documents` (joined to categories +
+// patient_data). Categorisation comes from the categories_to_documents →
+// categories link with name LIKE patterns (Lab / Imaging / Discharge /
+// Other). Match status is driven by foreign_id (NULL or 0 = unmatched).
+//
+// Demo state: the demo seed does not populate `documents` (real on-disk
+// PDF binaries are out of scope). The page reads whatever has been
+// uploaded via the existing /interface/patient_file/documents/ Upload
+// flow and renders an empty-state otherwise — that is the honest read
+// on a fresh install.
+// ---------------------------------------------------------------------------
+
+function cp_doc_category(?string $catName): string
+{
+    if ($catName === null || $catName === '') { return 'Other'; }
+    $n = strtolower($catName);
+    if (str_contains($n, 'lab'))      { return 'Lab'; }
+    if (str_contains($n, 'imag'))     { return 'Imaging'; }
+    if (str_contains($n, 'radiol'))   { return 'Imaging'; }
+    if (str_contains($n, 'discharge')) { return 'Discharge'; }
+    return 'Other';
+}
+
+function cp_doc_format_size(int $bytes): string
+{
+    if ($bytes <= 0)            { return '—'; }
+    if ($bytes < 1024)          { return $bytes . ' B'; }
+    if ($bytes < 1024 * 1024)   { return number_format($bytes / 1024, 0) . ' KB'; }
+    return number_format($bytes / 1024 / 1024, 1) . ' MB';
+}
+
+function cp_doc_format_received(string $iso): string
+{
+    if ($iso === '') { return ''; }
+    $t = strtotime($iso);
+    if ($t === false) { return ''; }
+    return date('m/d H:i', $t);
+}
+
+function cp_doc_format_received_long(string $iso, string $source): string
+{
+    $short = cp_doc_format_received($iso);
+    if ($short === '' && $source === '') { return ''; }
+    if ($short === '')  { return $source; }
+    if ($source === '') { return $short; }
+    return $short . ' · ' . $source;
+}
+
+$listSql = "
+    SELECT d.id,
+           d.name,
+           d.size,
+           d.mimetype,
+           d.url,
+           d.foreign_id,
+           d.docdate,
+           d.date,
+           pd.pid AS pat_pid,
+           pd.fname AS pat_fname,
+           pd.lname AS pat_lname,
+           pd.DOB AS pat_dob,
+           pd.pubpid AS pat_mrn,
+           c.name AS cat_name
+      FROM documents d
+ LEFT JOIN patient_data pd ON pd.pid = d.foreign_id
+ LEFT JOIN categories_to_documents c2d ON c2d.document_id = d.id
+ LEFT JOIN categories c ON c.id = c2d.category_id
+     WHERE d.deleted = 0
+  GROUP BY d.id
+  ORDER BY COALESCE(d.docdate, DATE(d.date)) DESC, d.id DESC
+     LIMIT 50
+";
+
+$docs = [];
+$counts = ['all' => 0, 'unmatched' => 0, 'lab' => 0, 'imaging' => 0, 'discharge' => 0, 'other' => 0];
+
+$rs = sqlStatement($listSql);
+while ($r = sqlFetchArray($rs)) {
+    $unmatched = empty($r['foreign_id']) || (int)$r['foreign_id'] === 0;
+    $category  = cp_doc_category($r['cat_name'] ?? null);
+
+    $patientName = null;
+    $mrn = null;
+    $dob = null;
+    if (!$unmatched) {
+        $fn = trim((string)($r['pat_fname'] ?? ''));
+        $ln = trim((string)($r['pat_lname'] ?? ''));
+        $patientName = trim($fn . ' ' . $ln) ?: null;
+        $mrn = $r['pat_mrn'] !== null && $r['pat_mrn'] !== ''
+            ? '#' . (string)$r['pat_mrn']
+            : null;
+        $rawDob = (string)($r['pat_dob'] ?? '');
+        if ($rawDob !== '' && $rawDob !== '0000-00-00') {
+            $t = strtotime($rawDob);
+            if ($t !== false) { $dob = date('m/d/Y', $t); }
+        }
+    }
+
+    $iso = (string)($r['docdate'] ?: $r['date'] ?: '');
+    // The url column on `documents` is a host-style path. Strip the file
+    // prefix and use just the trailing segment as a fallback "source"
+    // label when no category gives a hint.
+    $urlBase = '';
+    if (!empty($r['url'])) {
+        $parts = explode('/', (string)$r['url']);
+        $urlBase = $parts[count($parts) - 1] ?? '';
+    }
+    $source = $r['cat_name'] ? (string)$r['cat_name'] : ($urlBase !== '' ? $urlBase : 'Uploaded document');
+
+    $icon = $category === 'Imaging' ? '🩻' : '📄';
+    $unmatchedSubLabel = null;
+    if ($unmatched) {
+        $unmatchedSubLabel = 'UNMATCHED — needs routing';
+    }
+
+    $docs[] = [
+        'id'                => (int)$r['id'],
+        'filename'          => (string)$r['name'],
+        'icon'              => $icon,
+        'patientName'       => $patientName,
+        'mrn'               => $mrn,
+        'dob'               => $dob,
+        'category'          => $category,
+        'receivedShort'     => cp_doc_format_received($iso),
+        'receivedLong'      => cp_doc_format_received_long($iso, $source),
+        'size'              => cp_doc_format_size((int)($r['size'] ?? 0)),
+        'source'            => $source,
+        'unmatched'         => $unmatched,
+        'unmatchedSubLabel' => $unmatchedSubLabel,
+    ];
+
+    $counts['all']++;
+    if ($unmatched) { $counts['unmatched']++; }
+    if ($category === 'Lab')       { $counts['lab']++; }
+    if ($category === 'Imaging')   { $counts['imaging']++; }
+    if ($category === 'Discharge') { $counts['discharge']++; }
+    if ($category === 'Other')     { $counts['other']++; }
+}
+
+$docsPayload = [
+    'docs'   => $docs,
+    'counts' => $counts,
+];
+$docsJson = json_encode($docsPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,7 +248,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-docs="<?php echo attr($docsJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

@@ -165,6 +165,10 @@ This is a one-week demo. Some honesty about scope:
   - Pending Review (Screen 35 → cross-patient queue of
     `procedure_report` rows where review_status is unset or not
     'reviewed'; Last-3 trend per row pre-fetched on the wrapper)
+  - Lab Documents (Screen 40 → live `documents` join
+    `categories` + `patient_data`; row metadata is real, inline
+    PDF preview is replaced by an "Open original" link since
+    `documents.url` points at on-disk binaries)
   - Aging (Screen 56 → `billing` reconciled per-bucket against
     `ar_activity` for 0-30 / 31-60 / 61-90 / 91-120 / >120)
   - Billing Manager (Screen 57 → `billing` with patient/provider
@@ -187,8 +191,11 @@ This is a one-week demo. Some honesty about scope:
 **Mocked (visually faithful but synthetic / static):**
 - Pages whose backing tables aren't seeded in the demo DB show
   plausible synthetic data instead of empty state — Patient
-  Tracker, Lab Documents (`documents` table empty for the demo),
-  Quality Measures, Electronic Reports, e-Rx queue.
+  Tracker, Quality Measures, Electronic Reports, e-Rx queue.
+- Lab Documents reads `documents` live but the demo seed does not
+  populate that table (it stores on-disk binaries, out of scope
+  for the SQL seed). Upload a PDF via the Documents page to see
+  the inbox populate.
 - KPI tiles on dashboard archetypes (Recalls KPIs, Aging buckets,
   Pending Review counts) — the underlying schema doesn't carry
   these aggregates.
