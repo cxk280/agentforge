@@ -50,7 +50,7 @@ Langfuse for review.
 
 ## What's in this repo
 
-This is a **fork of OpenEMR** with three layered pieces of new work:
+This is built **on top of OpenEMR** with three layered pieces of new work:
 
 1. **Clinical Co-Pilot agent** (`copilot/agent/`) — FastAPI service
    running an Anthropic Claude agent with FHIR-backed retrieval tools.
@@ -66,10 +66,10 @@ This is a **fork of OpenEMR** with three layered pieces of new work:
 
 The OpenEMR skeleton underneath provides the database schema
 (MySQL), the auth/session layer, and the surrounding clinical
-workflow primitives. The fork is intentionally light-touch on the
+workflow primitives. New work is intentionally light-touch on the
 core OpenEMR code — almost all new files live in their own
 namespaces (`copilot_*.php`, `copilot/agent/`, `tests/.../Copilot/`)
-so the fork stays mergeable with upstream.
+so a future merge from OpenEMR upstream remains straightforward.
 
 ---
 
