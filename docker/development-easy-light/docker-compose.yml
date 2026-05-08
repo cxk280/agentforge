@@ -91,6 +91,22 @@ services:
       # as a fallback for clones that haven't exported the var. Do not
       # commit the real token — `${COPILOT_INTERNAL_TOKEN:-}` is fine.
       COPILOT_INTERNAL_TOKEN: ${COPILOT_INTERNAL_TOKEN:-}
+      # Same shell-env pattern for the agent's OAuth credentials.
+      # `interface/super/copilot_enable_api.php?confirm=1` reads these via
+      # getenv() to INSERT/REFRESH the agent's row in `oauth_clients`. If
+      # the values are empty, the script silently skips registration and
+      # the agent gets `invalid_client` 401s on its OAuth password grant
+      # — that's exactly what blocked the local pre-push eval smoke on
+      # 2026-05-08 until we re-registered manually. Source
+      # `copilot/agent/.env` before `docker compose up` so these flow in:
+      #
+      #   set -a && source copilot/agent/.env && set +a
+      #   docker compose up --detach --wait
+      #
+      # Per Railway env, these are set in the openemr service config and
+      # don't depend on this file.
+      OPENEMR_CLIENT_ID: ${OPENEMR_CLIENT_ID:-}
+      OPENEMR_CLIENT_SECRET: ${OPENEMR_CLIENT_SECRET:-}
     depends_on:
       mysql:
         condition: service_healthy
