@@ -1,0 +1,201 @@
+/*
+ * Pro — page-specific styles. Values verified against Figma node 41:2
+ * (Screen 20 — PRO) on 2026-05-07. Original values come straight from the
+ * static-HTML mock previously at /interface/easipro/copilot_pro.php; only
+ * scoping (CSS-modules) and the dynamic bar-height inline style differ.
+ *
+ * Global scaffolding (html/body resets, body bg, Inter font, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_pro.php — this file owns only
+ * Pro-component styles.
+ */
+
+/* ── In-page header strip (full width). The PHP outer shell already owns the
+ *    navy top nav + patient demographics banner; this is the white strip
+ *    immediately below the navtab, holding title/meta/CTA. ── */
+.head {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+.cta {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.cta:hover { background: #00787A; }
+
+/* ── Body wrapper ── */
+.body {
+  padding: 16px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Instrument cards ── */
+.instGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 16px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.titleRow { display: flex; align-items: center; gap: 8px; }
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.dot_violet { background: #8561C7; }
+.dot_info   { background: #4785D9; }
+.dot_warn   { background: #FA8C33; }
+.dot_teal   { background: #008C8C; }
+
+.name { font-size: 13px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.cardBullet { color: #8A91A1; font-size: 13px; line-height: 1; }
+.topic { font-size: 12px; color: #8A91A1; line-height: 1; }
+
+.score {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  margin-top: 2px;
+}
+.scoreNum { font-size: 26px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.scoreMax { font-size: 14px; color: #8A91A1; line-height: 1; }
+
+.cardMeta { display: flex; align-items: center; gap: 8px; }
+.sevPill {
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.sevPill_mild     { background: rgba(250, 140, 51, 0.14); color: #FA8C33; }
+.sevPill_moderate { background: rgba(250, 140, 51, 0.14); color: #FA8C33; }
+.arrow {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+.arrowGood { color: #1F8C4D; }
+.arrowBad  { color: #D93838; }
+.change { font-size: 11px; color: #8A91A1; line-height: 1; }
+
+.bars {
+  margin-top: 6px;
+  background: #F5F6F7;
+  border-radius: 8px;
+  padding: 10px;
+  height: 56px;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+.bar {
+  flex: 1;
+  border-radius: 3px;
+}
+.bars_violet .bar { background: rgba(133, 97, 199, 0.55); }
+.bars_info   .bar { background: rgba(71, 133, 217, 0.55); }
+.bars_warn   .bar { background: rgba(250, 140, 51, 0.55); }
+.bars_teal   .bar { background: rgba(0, 140, 140, 0.55); }
+
+/* ── Submission history table ── */
+.subCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.subHead {
+  height: 48px;
+  padding: 0 22px;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+}
+.subTitle { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1; }
+.subSpacer { flex: 1; }
+.subLink {
+  font-size: 11px;
+  font-weight: 500;
+  color: #008C8C;
+  line-height: 1;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+.subLink:hover { text-decoration: underline; }
+
+.subTable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+.subTable thead th {
+  background: #F5F6F7;
+  color: #8A91A1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.subTable tbody td {
+  padding: 14px 14px;
+  border-bottom: 0.5px solid #E4E5E8;
+  font-size: 12px;
+  color: #0D1B2A;
+  vertical-align: middle;
+}
+.subTable tbody tr:last-child td { border-bottom: none; }
+
+.colDate  { width: 96px;  color: #4F5763; font-weight: 500; }
+.colInst  { width: 140px; font-weight: 600; }
+.colScore { width: 100px; }
+.colVia   { color: #4F5763; }
+
+.changeGood { color: #1F8C4D; font-weight: 500; }
+.changeBad  { color: #D93838; font-weight: 500; }
+
+.subAction {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  margin-right: 6px;
+  cursor: pointer;
+}
+.subAction:hover { background: #F5F6F7; }

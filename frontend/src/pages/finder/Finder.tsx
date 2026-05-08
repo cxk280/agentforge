@@ -161,28 +161,36 @@ const DEFAULT_FILTERS: ReadonlySet<FilterKey> = new Set<FilterKey>([
 ]);
 
 // Reach into the helpers the parent shell defines (interface/main/tabs/js/
-// tabs_view_model.js). Same pattern the React Header uses to drive tab nav.
-declare global {
-  interface Window {
-    navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
-    activateTabByName?: (name: string, hideOthers?: boolean) => void;
-    webroot_url?: string;
-  }
-}
+// tabs_view_model.js). Finder runs INSIDE the #maimain iframe, so the helpers
+// live on `window.parent` (the shell), not on the iframe's own `window`.
+type Win = Window & {
+  navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
+  activateTabByName?: (name: string, hideOthers?: boolean) => void;
+  webroot_url?: string;
+};
 
 function openDemographics(pid: number): void {
-  const webroot = window.webroot_url ?? '';
+  const self = window as Win;
+  const parent = (self.parent !== self ? self.parent : self) as Win;
+  const top = (self.top !== null && self.top !== self ? self.top : self) as Win;
+
+  const webroot = parent.webroot_url ?? top.webroot_url ?? self.webroot_url ?? '';
   const url = `${webroot}/interface/patient_file/summary/demographics.php?set_pid=${pid}`;
-  if (typeof window.navigateTab === 'function') {
-    window.navigateTab(url, 'pat', () => {
-      window.activateTabByName?.('pat', true);
+
+  // Prefer the shell-level helpers — they update the tab viewmodel + show the
+  // demographics banner ("header2") + unlock the patient nav menu.
+  const navigateTab = parent.navigateTab ?? top.navigateTab;
+  const activateTabByName = parent.activateTabByName ?? top.activateTabByName;
+  if (typeof navigateTab === 'function') {
+    navigateTab(url, 'pat', () => {
+      activateTabByName?.('pat', true);
     });
-  } else {
-    // Fallback: hard-navigate. Should not happen in the live shell.
-    window.top !== null && window.top !== window
-      ? (window.top.location.href = url)
-      : (window.location.href = url);
+    return;
   }
+
+  // Fallback: navigate just THIS iframe (preserves the parent shell + nav).
+  // Never replace window.top — that would destroy the navy header.
+  self.location.href = url;
 }
 
 type FinderProps = {

@@ -1,0 +1,555 @@
+/*
+ * LabDocuments — page-specific styles. Values verified against Figma node
+ * 87:2 (Screen 40 — Lab Documents) on 2026-05-07. The PHP mock at
+ * copilot_lab_documents.php.bak used a different layout; this React port
+ * matches the Figma frame exactly.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_lab_documents.php
+ * — this file owns only LabDocuments-component styles.
+ */
+
+/* ── Page header ── */
+.head {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.bullet {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.meta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+.upload {
+  height: 32px;
+  padding: 0 16px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+}
+.upload:hover { background: #F5F6F7; }
+.uploadIcon { font-size: 13px; line-height: 1; }
+.route {
+  height: 32px;
+  padding: 0 16px;
+  background: #008C8C;
+  border: 1px solid #008C8C;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  line-height: 1;
+}
+.route:hover { background: #006F6F; }
+.route:disabled { opacity: 0.55; cursor: not-allowed; }
+.help {
+  height: 24px;
+  padding: 0 12px;
+  background: #F5F6F7;
+  border: 0;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: not-allowed;
+  line-height: 1;
+}
+
+/* ── Filter bar ── */
+.filterBar {
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 8px;
+}
+.pillBtn {
+  height: 28px;
+  padding: 0 11px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+}
+.pillBtn:hover { background: #F5F6F7; }
+.pillBtnActive {
+  background: #E6F5F5;
+  border-color: #008C8C;
+  color: #008C8C;
+}
+.pillBtnActive:hover { background: #D9EFEF; }
+.pillCt {
+  min-width: 22px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #F5F6F7;
+  color: #4F5763;
+  font-size: 10px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.pillCtActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+
+.sortLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+}
+.sortSelect {
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  padding: 0;
+  appearance: none;
+  -webkit-appearance: none;
+}
+.sortCaret { color: #8A91A1; font-size: 10px; line-height: 1; }
+
+/* ── Flash banner ── */
+.flash {
+  margin: 12px 24px 0;
+  background: #E6F6F2;
+  color: #1F8C4D;
+  border: 1px solid #B6E5D6;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Body grid (list + preview) ── */
+.body {
+  display: grid;
+  grid-template-columns: 512px 1fr;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  align-items: stretch;
+}
+
+/* Document list */
+.list {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: start;
+}
+.emptyList {
+  padding: 32px 20px;
+  text-align: center;
+  color: #8A91A1;
+  font-size: 12px;
+}
+.row {
+  height: 60px;
+  display: grid;
+  grid-template-columns: 32px 24px 1fr auto;
+  column-gap: 8px;
+  padding: 0 16px;
+  align-items: center;
+  border-bottom: 1px solid #E4E5E8;
+  cursor: pointer;
+  background: #FFFFFF;
+  text-align: left;
+}
+.row:hover { background: #FAFBFB; }
+.row:focus-visible { outline: 2px solid #008C8C; outline-offset: -2px; }
+.rowLast { border-bottom: 0; }
+.rowSel { background: #E6F5F5; }
+.rowSel:hover { background: #DCEFEF; }
+
+.cb {
+  width: 16px; height: 16px;
+  border-radius: 4px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFFFFF;
+  flex-shrink: 0;
+}
+.cbOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+
+.docIcon {
+  font-size: 18px;
+  line-height: 1;
+  color: #181D26;
+}
+
+.rowMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rowName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+}
+.subMatched {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.subUnmatched {
+  font-size: 11px;
+  font-weight: 500;
+  color: #FA8C33;
+  line-height: 1.2;
+}
+.rowCat {
+  font-size: 10px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+}
+.rowRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.rowDate {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+/* Pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.pillWarn {
+  background: #FFF4EA;
+  color: #FA8C33;
+}
+.pillNeutral {
+  background: #F5F6F7;
+  color: #4F5763;
+}
+.pillConfHigh {
+  background: #E8F7ED;
+  color: #33A666;
+}
+.pillConfLow {
+  background: #F5F6F7;
+  color: #4F5763;
+}
+
+/* ── Preview pane ── */
+.preview {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 704px;
+}
+.prevHead {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  border-bottom: 1px solid #E4E5E8;
+  flex-shrink: 0;
+}
+.prevIcon {
+  font-size: 22px;
+  line-height: 1;
+  color: #181D26;
+  flex-shrink: 0;
+}
+.prevHeadInfo { flex: 1; min-width: 0; }
+.prevName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prevSub {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+}
+
+.prevSplit {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 308px;
+  min-height: 0;
+}
+.pdfCol {
+  background: #EDEDF0;
+  padding: 28px 32px;
+  overflow: auto;
+}
+.pdfPage {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  padding: 23px;
+  font-size: 10px;
+  line-height: 1.55;
+  color: #181D26;
+  min-height: 504px;
+}
+.pdfBrand {
+  font-size: 11px;
+  font-weight: 700;
+  color: #181D26;
+  letter-spacing: 0.4px;
+}
+.pdfTestName {
+  margin-top: 4px;
+  font-size: 9px;
+  color: #4F5763;
+  letter-spacing: 0.6px;
+}
+.pdfRule {
+  height: 1px;
+  background: #E4E5E8;
+  margin: 12px 0;
+}
+.pdfLine {
+  font-size: 10px;
+  color: #181D26;
+  margin-top: 4px;
+}
+.pdfTblHead {
+  display: grid;
+  grid-template-columns: 156px 100px 80px 1fr;
+  margin-top: 18px;
+  padding-bottom: 4px;
+}
+.pdfTblHead span {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+}
+.pdfTblRow {
+  display: grid;
+  grid-template-columns: 156px 100px 80px 1fr;
+  margin-top: 4px;
+}
+.pdfTblRow span {
+  font-size: 10px;
+  color: #181D26;
+}
+.pdfCol1 { color: #181D26; }
+.pdfCol2 { color: #181D26; }
+.pdfCol3 { color: #4F5763; }
+.pdfCol4 { color: #4F5763; }
+.pdfNote {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border: 1px dashed #C9CDD4;
+  border-radius: 6px;
+  color: #4F5763;
+  font-size: 11px;
+}
+.pdfOpenLink {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: #008C8C;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pdfOpenLink:hover { text-decoration: underline; }
+.pdfSigned {
+  margin-top: 22px;
+  font-size: 9px;
+  color: #8A91A1;
+}
+
+/* ── Match rail ── */
+.matchRail {
+  background: #FFFFFF;
+  border-left: 1px solid #E4E5E8;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+}
+.railLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  margin-top: 8px;
+  line-height: 1;
+}
+.railLbl:first-child { margin-top: 0; }
+.railSearch {
+  height: 32px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 11px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.railSearchIcon { font-size: 13px; line-height: 1; }
+
+.cand {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 10px;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  width: 100%;
+}
+.cand:hover { background: #FAFBFB; }
+.candPrimary {
+  border: 2px solid #008C8C;
+  padding: 9px;
+}
+.candAva {
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  background: #F0F4F9;
+  flex-shrink: 0;
+}
+.candInfo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.candName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+}
+.candDet {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+}
+
+.railEmpty {
+  font-size: 11px;
+  color: #8A91A1;
+  padding: 10px 4px;
+}
+
+.actPrimary {
+  height: 32px;
+  background: #008C8C;
+  border: 1px solid #008C8C;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  line-height: 1;
+  margin-top: 4px;
+}
+.actPrimary:hover { background: #006F6F; }
+.actPrimary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.actGhost {
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+}
+.actGhost:hover { background: #F5F6F7; }
+
+.emptyPreview {
+  padding: 48px;
+  text-align: center;
+  color: #8A91A1;
+  font-size: 13px;
+}

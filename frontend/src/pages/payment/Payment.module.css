@@ -1,0 +1,489 @@
+/*
+ * Payment — page styles. Values lifted directly from the original
+ * /interface/billing/copilot_payment.php inline <style> block (Figma
+ * node 107:2 — Screen 58 Payment Intake), trimmed to module scope.
+ *
+ * Global scaffolding (Inter font, body bg, html/body resets, #cp-root
+ * sizing) lives in the PHP wrapper at copilot_payment.php — this file
+ * owns only Payment-component styles.
+ */
+
+/* ── Page header (full width — matches the standing rule) ── */
+.pagehead {
+  width: 100%;
+  height: 56px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  gap: 12px;
+}
+.pageheadInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pageheadTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.pageheadBullet {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.pageheadMeta {
+  font-size: 13px;
+  color: #4F5763;
+  line-height: 1;
+}
+.helpBtn {
+  margin-left: auto;
+  background: #F5F6F7;
+  border: 0;
+  border-radius: 12px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  height: 24px;
+  line-height: 1;
+}
+.helpBtn:hover { background: #E4E5E8; }
+
+.flash {
+  background: #EBF8F0;
+  border: 1px solid #B6E0C5;
+  padding: 8px 12px;
+  color: #1F8C4D;
+  font-size: 12px;
+  border-radius: 8px;
+  margin: 12px 20px 0;
+}
+
+/* ── Two-column shell ── */
+.shell {
+  padding: 16px 20px 28px;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+  align-items: start;
+}
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Section card ── */
+.section {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+}
+.hd {
+  padding: 14px 18px 8px;
+  border-bottom: 1px solid #F0F1F3;
+}
+.lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+}
+.sub {
+  font-size: 11px;
+  color: #8A91A1;
+  margin-top: 4px;
+}
+
+/* ── Tables ── */
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tbl th {
+  text-align: left;
+  padding: 10px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  border-bottom: 1px solid #F0F1F3;
+}
+.tbl td {
+  padding: 12px 14px;
+  border-top: 1px solid #F0F1F3;
+  color: #0D1B2A;
+  vertical-align: top;
+  font-size: 12px;
+}
+.r { text-align: right; }
+.muted { color: #8A91A1; }
+.bold { font-weight: 600; }
+.nowrap { white-space: nowrap; }
+.unchecked td { color: #8A91A1; }
+.unchecked td.bold { color: #8A91A1; }
+.charge {
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.3;
+}
+.enc {
+  font-size: 11px;
+  color: #8A91A1;
+  margin-top: 2px;
+}
+.unchecked .charge { color: #8A91A1; }
+
+/* ── Checkbox glyph ── */
+.check {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #C7CBD2;
+  background: #FFFFFF;
+  display: inline-block;
+  vertical-align: middle;
+  position: relative;
+  flex: 0 0 auto;
+  padding: 0;
+  cursor: pointer;
+}
+.checkOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.checkOn::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 9px;
+  border: solid #FFFFFF;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.checkSm {
+  width: 14px;
+  height: 14px;
+}
+.checkSm.checkOn::after {
+  left: 3px;
+  top: 0;
+  width: 4px;
+  height: 8px;
+}
+
+/* ── Insurance pill ── */
+.tag {
+  display: inline-block;
+  background: #F0F4F9;
+  color: #4785D9;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Allocation row inputs ── */
+.allocInput {
+  width: 90px;
+  height: 28px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #0D1B2A;
+  text-align: left;
+  outline: none;
+  font-family: inherit;
+}
+.allocInput:focus { border-color: #008C8C; }
+.rem {
+  color: #1F8C4D;
+  font-weight: 500;
+}
+
+.totalRow td {
+  border-top: 2px solid #E4E5E8;
+  padding-top: 14px;
+  padding-bottom: 14px;
+  font-weight: 700;
+}
+.totalRow td.muted {
+  font-weight: 500;
+  color: #4F5763;
+}
+
+/* ── Note ── */
+.note {
+  padding: 12px 18px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.note label {
+  font-size: 11px;
+  color: #8A91A1;
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+.note input {
+  flex: 1;
+  height: 32px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #0D1B2A;
+  outline: none;
+  font-family: inherit;
+  background: #FFFFFF;
+}
+.note input:focus { border-color: #008C8C; }
+
+/* ── Right column ── */
+.right {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 14px 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.grpLbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+}
+
+/* ── Tender pills ── */
+.tender {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+.tenderItem {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  line-height: 1;
+  cursor: pointer;
+}
+.tenderItemActive {
+  background: #FFFFFF;
+  border-color: #008C8C;
+  color: #008C8C;
+  font-weight: 600;
+}
+.tender input { display: none; }
+.tenderIco { font-size: 12px; }
+
+/* ── Card on file ── */
+.cardOnFile {
+  border: 1.5px solid #008C8C;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #FFFFFF;
+  margin-top: 6px;
+}
+.cardThumb {
+  width: 30px;
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #F2C674 0%, #DBA94B 100%);
+  flex: 0 0 auto;
+  position: relative;
+}
+.cardThumb::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 13px;
+  width: 8px;
+  height: 5px;
+  background: #A87B22;
+  border-radius: 1px;
+}
+.cardInfo {
+  flex: 1;
+  line-height: 1.3;
+}
+.cardL1 {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0D1B2A;
+}
+.cardL2 {
+  font-size: 11px;
+  color: #8A91A1;
+  margin-top: 2px;
+}
+.cardPill {
+  background: #EBF8F0;
+  color: #1F8C4D;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+}
+
+/* ── New card form ── */
+.newCardBox {
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.fld {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fld label {
+  font-size: 11px;
+  color: #8A91A1;
+  font-weight: 500;
+}
+.fld input {
+  height: 32px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 10px;
+  font-size: 12px;
+  color: #0D1B2A;
+  outline: none;
+  font-family: inherit;
+  background: #FFFFFF;
+  width: 100%;
+  min-width: 0;
+}
+.fld input:focus { border-color: #008C8C; }
+.fld input::placeholder { color: #C7CBD2; }
+.fldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── Email receipt ── */
+.receipt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #4F5763;
+}
+.receipt input[type=email] {
+  flex: 1;
+  height: 28px;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 8px;
+  font-size: 12px;
+  color: #0D1B2A;
+  outline: none;
+  font-family: inherit;
+  background: #FFFFFF;
+  min-width: 0;
+}
+.receipt input[type=email]:focus { border-color: #008C8C; }
+
+/* ── Amount summary ── */
+.amount {
+  background: #F8F9FA;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.amountLbl {
+  font-size: 10px;
+  color: #8A91A1;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+}
+.amountVal {
+  font-size: 26px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.amountRight { text-align: right; }
+.amountL1 {
+  font-size: 11px;
+  color: #0D1B2A;
+  font-weight: 500;
+}
+.amountL2 {
+  font-size: 10px;
+  color: #8A91A1;
+  margin-top: 3px;
+}
+
+/* ── Actions ── */
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1.6fr;
+  gap: 8px;
+}
+.cancel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  color: #4F5763;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cancel:hover { background: #F5F6F7; }
+.chargeBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.chargeBtn:hover { background: #006F6F; }
