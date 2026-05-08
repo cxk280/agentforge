@@ -129,10 +129,35 @@ i.e. the same auth layer that gates the rest of the EHR.
 
 This is a one-week demo. Some honesty about scope:
 
-**Real (queries live data, persists user actions):**
+**Real (queries live data — every render reflects current DB state):**
 - Patient demographics, encounter history, vitals, prescriptions,
   conditions, allergies, immunizations — all read from the OpenEMR
   schema.
+- React pages with their tables / cards driven by live SQL (the PHP
+  wrapper queries the DB and JSON-encodes the typed payload onto a
+  `data-*` attribute on `#cp-root`):
+  - Patient Finder (Screen 21 → `patient_data` join `users`)
+  - Patient Dashboard / History / Issues / Transactions / Ledger /
+    Documents / Immunization Registry / Assessments / Report /
+    Patient Modules (Screens 11–17 → patient-context joins)
+  - Visit History (Screen 30 → `form_encounter` join `users` +
+    `openemr_postcalendar_categories`)
+  - Encounter Detail (Screen 23 → `form_encounter` + most-recent
+    `form_vitals` row)
+  - Office Notes (Screen 49 → `onotes`)
+  - Recalls (Screen 33 → `medex_recalls` join `patient_data`)
+  - Authorizations (Screen 34 → `cp_authorizations`)
+  - Patient Education (Screen 48 → `lists` ICD-10 problems)
+  - Record Request (Screen 31 → `pharmacies` recipients)
+  - Patient List Report (Screen 43 → cohort SQL with last-visit /
+    primary-dx subqueries)
+  - Prescription Report (Screen 92 → `prescriptions` join `users`)
+  - Audit Log (Screen 55 → `log`, ~27k real entries)
+  - Users & Groups (Screen 52 → `users` + `groups` + last-login)
+  - Facilities (Screen 54 → `facility`)
+  - Module Installer (Screen 106 → `modules`)
+  - Coding & Lists (Screen 53 → `list_options` with per-list
+    COUNT(\*))
 - CRUD flows that write to the DB and persist across reload:
   - Create patient (Screen 22 → `patient_data` insert)
   - Post office note (Screen 49 → `onotes`)
@@ -144,21 +169,27 @@ This is a one-week demo. Some honesty about scope:
   - **Calendar (W2):** create / edit / delete events backed by
     `openemr_postcalendar_events`, filtered to the logged-in
     user via `pc_aid`.
-- Audit log (Screen 55) reads ~80k real entries from the OpenEMR
-  `log` table.
 - The Co-Pilot agent answers from real FHIR data for the active
   patient.
 
 **Mocked (visually faithful but synthetic / static):**
-- Some KPI tiles on the dashboard archetypes (Recalls, Aging,
-  Pending Review) display plausible synthetic data because the
-  underlying schema doesn't exist in the OpenEMR demo dataset.
+- Pages whose backing tables aren't seeded in the demo DB show
+  plausible synthetic data instead of empty state — Patient Tracker
+  (no recent encounters), Lab Overview / Patient Results / Pending
+  Review / Lab Documents (`procedure_result` empty), Aging /
+  Billing Manager (`billing` empty), Inventory (`drug_inventory`
+  empty), Quality Measures, Electronic Reports, e-Rx queue.
+- KPI tiles on dashboard archetypes (Recalls KPIs, Aging buckets,
+  Pending Review counts) — the underlying schema doesn't carry
+  these aggregates.
 - Lab trends / quality measures pages show illustrative numbers.
 - The "Co-Pilot suggestion" card on encounter views is static text
   in the mock; the agent itself answers in the chat surface.
 
-A complete view-by-view inventory is in
-`/interface/main/copilot_mock_index.php` on the live demo.
+Per-page real-vs-mocked verification scripts live in
+`frontend/.fidelity-references/<page>-verify.mjs` (gitignored;
+each runs Playwright headless, parses the rendered DOM, and
+cross-checks at least two values against `mysql -e ...`).
 
 ---
 
