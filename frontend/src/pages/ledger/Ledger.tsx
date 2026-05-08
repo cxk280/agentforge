@@ -5,20 +5,23 @@
 // Collect Payment / Generate Statement actions; below is the line-item
 // ledger table (debit / credit / insurance / running balance).
 //
-// 1:1 port of the PHP-rendered mock previously at
-// /interface/patient_file/ledger/copilot_ledger.php. Static demo data only —
-// no API wiring.
+// DB-backed: the PHP wrapper at /interface/patient_file/ledger/copilot_ledger.php
+// composes charges (billing) and payments / adjustments (ar_activity +
+// ar_session + insurance_companies) into a single LedgerPayload, JSON-encodes
+// it onto data-ledger on #cp-root, and the entry index.tsx parses it and
+// passes it here. With no active patient or no activity, the React tree
+// falls back to the static demo dataset so the Figma frame stays browsable.
 
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './Ledger.module.css';
 
-type AgingBucket = {
+export type AgingBucket = {
   readonly range: string;
   readonly amount: string;
   readonly value: number;
 };
 
-type LedgerRow = {
+export type LedgerRow = {
   readonly date: string;
   readonly txn: string;
   readonly desc: string;
@@ -29,16 +32,25 @@ type LedgerRow = {
   readonly outstanding?: boolean | undefined;
 };
 
-const AGING: readonly AgingBucket[] = [
+export type LedgerPayload = {
+  readonly outstandingBalance: string;
+  readonly lastActivity: string;
+  readonly aging: readonly AgingBucket[];
+  readonly rows: readonly LedgerRow[];
+};
+
+// Static demo dataset, shown only when the PHP wrapper hands us no rows
+// (typically: no active patient pid in the session, or a freshly seeded
+// patient with no charges yet). Keeps the Figma mock rendering identically
+// in those cases.
+const DEMO_AGING: readonly AgingBucket[] = [
   { range: '0–30',  amount: '$0.00',     value: 0 },
   { range: '31–60', amount: '$0.00',     value: 0 },
   { range: '61–90', amount: '$98.00',    value: 98.00 },
   { range: '91+',   amount: '$1,205.60', value: 1205.60 },
 ];
 
-const AGING_TOTAL = AGING.reduce((sum, b) => sum + b.value, 0);
-
-const ROWS: readonly LedgerRow[] = [
+const DEMO_ROWS: readonly LedgerRow[] = [
   { date: '04/12/2026', txn: 'TX-9402', desc: 'Office visit (99213)',           debit: '$152.00', credit: '—',       ins: 'BCBS PPO • Pending', bal: '$1,303.60' },
   { date: '04/12/2026', txn: 'TX-9403', desc: 'BCBS payment — claim BC-99281',  debit: '—',       credit: '$152.00', ins: 'BCBS PPO • Paid',    bal: '$1,303.60' },
   { date: '02/18/2026', txn: 'TX-9311', desc: 'Annual wellness visit (99396)',  debit: '$280.00', credit: '—',       ins: 'BCBS PPO • Paid',    bal: '$1,303.60' },
@@ -52,26 +64,46 @@ const ROWS: readonly LedgerRow[] = [
   { date: '08/22/2025', txn: 'TX-8823', desc: 'Contractual write-off (BCBS)',   debit: '—',       credit: '$48.00',  ins: '—',                  bal: '$1,157.60' },
 ];
 
-type LedgerProps = {
-  readonly boot: BootContext;
+const DEMO_PAYLOAD: LedgerPayload = {
+  outstandingBalance: '$1,303.60',
+  lastActivity:       '04/12/2026',
+  aging:              DEMO_AGING,
+  rows:               DEMO_ROWS,
 };
 
-export function Ledger(_props: LedgerProps): JSX.Element {
+type LedgerProps = {
+  readonly boot: BootContext;
+  readonly ledger?: LedgerPayload | undefined;
+};
+
+export function Ledger({ ledger }: LedgerProps): JSX.Element {
+  // Fall back to the demo dataset when the wrapper hands us no rows so the
+  // Figma frame keeps rendering even on patients with no billing history.
+  const payload: LedgerPayload =
+    ledger && ledger.rows.length > 0 ? ledger : DEMO_PAYLOAD;
+
+  const aging = payload.aging.length > 0 ? payload.aging : DEMO_AGING;
+  const agingTotal = aging.reduce((sum, b) => sum + b.value, 0);
+
   return (
     <>
       <header className={styles.banner}>
         <div className={styles.balance}>
           <div className={styles.label}>OUTSTANDING BALANCE</div>
           <div className={styles.balanceVal}>
-            $1,303.60 <span className={styles.usd}>USD</span>
+            {payload.outstandingBalance} <span className={styles.usd}>USD</span>
           </div>
-          <div className={styles.sub}>Last activity 04/12/2026 • Patient responsibility</div>
+          <div className={styles.sub}>
+            {payload.lastActivity !== ''
+              ? `Last activity ${payload.lastActivity} • Patient responsibility`
+              : 'No recent activity • Patient responsibility'}
+          </div>
         </div>
 
         <div className={styles.aging}>
           <div className={styles.label}>AGING (PATIENT)</div>
           <div className={styles.buckets}>
-            {AGING.map((b) => (
+            {aging.map((b) => (
               <div key={b.range} className={styles.bucketCol}>
                 <div className={styles.bucketTop}>{b.range}</div>
                 <div className={styles.bucketAmt}>{b.amount}</div>
@@ -79,11 +111,11 @@ export function Ledger(_props: LedgerProps): JSX.Element {
             ))}
           </div>
           <div className={styles.bar}>
-            {AGING.map((b, i) => {
-              if (b.value <= 0 || AGING_TOTAL <= 0) {
+            {aging.map((b, i) => {
+              if (b.value <= 0 || agingTotal <= 0) {
                 return null;
               }
-              const pct = (b.value / AGING_TOTAL) * 100;
+              const pct = (b.value / agingTotal) * 100;
               const segClass = i === 3 ? `${styles.seg} ${styles.seg4}` : styles.seg;
               return (
                 <div
@@ -116,7 +148,7 @@ export function Ledger(_props: LedgerProps): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((r) => {
+            {payload.rows.map((r) => {
               const rowClass = r.outstanding ? styles.rowOut : '';
               const creditClass = r.credit !== '—'
                 ? `${styles.colAmt} ${styles.creditAmt}`
@@ -127,7 +159,7 @@ export function Ledger(_props: LedgerProps): JSX.Element {
                   <td className={styles.colTx}>{r.txn}</td>
                   <td>
                     {r.desc}
-                    {r.outstanding && (
+                    {r.outstanding === true && (
                       <span className={styles.outPill}>OUTSTANDING</span>
                     )}
                   </td>

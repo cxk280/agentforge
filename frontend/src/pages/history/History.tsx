@@ -1,16 +1,18 @@
 // History — Figma "Screen 12 — History".
 //
-// Static demo port of the patient Visit History page. Renders the local
-// page header (Visit History title + encounter count + filter chips +
-// New Visit button) and a year-grouped list of visit cards. The outer
-// shell (navy top nav, patient-demographics banner, navtab strip) is
-// owned by the surrounding PHP wrapper; this component only renders the
-// page body that lives below those shells.
+// 1:1 port of the PHP-rendered patient Visit History page previously at
+// /interface/patient_file/history/copilot_history.php (preserved as .bak).
+// DB-backed: the PHP wrapper queries form_encounter LEFT JOIN users for the
+// active patient and JSON-encodes the result as data-history on #cp-root;
+// the entry index.tsx parses it and passes it here as the `history` prop,
+// so the UI reflects the patient the user actually opened.
 //
-// Hardcoded from Figma node 33:2 — no DB, no API. Wiring to real
-// /apis/copilot/history endpoints is a follow-up.
+// The outer shell (navy top nav, patient-demographics banner, navtab strip)
+// is owned by the surrounding PHP wrapper; this component only renders the
+// page body that lives below those shells. Filter chips and search are
+// purely client-side state.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './History.module.css';
 
@@ -36,7 +38,8 @@ type Tag = {
   readonly kind?: 'default' | 'copilot' | undefined;
 };
 
-type Visit = {
+// Server-side row shape (mirrors the PHP query in copilot_history.php).
+export type Visit = {
   readonly date: string;
   readonly day: string;
   readonly rail: RailKind;
@@ -50,81 +53,68 @@ type Visit = {
   readonly tags: readonly Tag[];
 };
 
-type YearGroup = {
+export type YearGroup = {
   readonly year: string;
   readonly visits: readonly Visit[];
 };
 
-const TOTAL_LABEL = '32 encounters since 2018';
+export type HistoryData = {
+  readonly totalCount: number;
+  readonly years: readonly YearGroup[];
+};
 
-// Hardcoded demo data taken straight from the Figma frame.
-const YEAR_GROUPS: readonly YearGroup[] = [
-  {
-    year: '2026',
-    visits: [
-      {
-        date: 'Apr 12',
-        day: 'Tuesday',
-        rail: 'lab-review',
-        typeLabel: 'Lab Review',
-        provider: 'Dr. S. Chen',
-        modality: 'Tele',
-        duration: '15 min',
-        status: 'Signed',
-        title: 'A1C trending up — review medication options',
-        desc: 'Discussed recent A1C of 7.9% (up from 7.2%). Reviewed dietary log. Recommended adding GLP-1 agonist if no improvement at next check.',
-        tags: [
-          { label: 'A1C ↑' },
-          { label: 'GLP-1 considered' },
-          { label: '✦ Co-Pilot insight', kind: 'copilot' },
-        ],
-      },
-      {
-        date: 'Feb 18',
-        day: 'Wednesday',
-        rail: 'annual-physical',
-        typeLabel: 'Annual Physical',
-        provider: 'Dr. E. Rivera',
-        duration: '30 min',
-        status: 'Signed',
-        title: 'Annual exam — diabetes well-controlled, BP improved',
-        desc: 'BP 130/82 (down from 145/90). All age-appropriate screenings ordered. No new concerns. Continue current regimen.',
-        tags: [
-          { label: 'BP improved' },
-          { label: 'Routine' },
-        ],
-      },
-      {
-        date: 'Nov 15',
-        day: 'Friday',
-        rail: 'follow-up',
-        typeLabel: 'Follow-up',
-        provider: 'Dr. E. Rivera',
-        duration: '20 min',
-        status: 'Signed',
-        title: 'Diabetes follow-up — Lisinopril increased',
-        desc: 'BP elevated at 145/90. Increased Lisinopril from 5 mg to 10 mg daily. Recheck in 6 weeks.',
-        tags: [
-          { label: 'Rx adjusted' },
-        ],
-      },
-    ],
-  },
-];
+// Map a typeLabel onto the FilterKey used by the chip strip. Anything we
+// don't recognise falls into the 'all' bucket (only 'all' shows it).
+function filterKeyForType(typeLabel: string): Exclude<FilterKey, 'all'> | null {
+  switch (typeLabel) {
+    case 'Office Visit':     return 'office';
+    case 'Telehealth':       return 'tele';
+    case 'Lab Review':       return 'lab';
+    case 'Annual Physical':  return null;
+    case 'Follow-up':        return null;
+    default:                 return null;
+  }
+}
+
+function totalLabel(years: readonly YearGroup[], totalCount: number): string {
+  if (totalCount <= 0 || years.length === 0) {
+    return `${totalCount} encounters`;
+  }
+  // Earliest year is the last group (server orders DESC, so the last entry
+  // in `years` holds the oldest visits).
+  const lastGroup = years[years.length - 1];
+  const earliestYear = lastGroup?.year ?? '';
+  return earliestYear !== ''
+    ? `${totalCount} encounters since ${earliestYear}`
+    : `${totalCount} encounters`;
+}
 
 type HistoryProps = {
   readonly boot: BootContext;
+  readonly history: HistoryData;
 };
 
-export function History(_props: HistoryProps): JSX.Element {
+export function History({ history }: HistoryProps): JSX.Element {
   const [activeFilter, setActiveFilter] = useState<FilterKey>('all');
+
+  const visibleYears = useMemo<readonly YearGroup[]>(() => {
+    if (activeFilter === 'all') return history.years;
+    return history.years
+      .map<YearGroup>((g) => ({
+        year: g.year,
+        visits: g.visits.filter((v) => filterKeyForType(v.typeLabel) === activeFilter),
+      }))
+      .filter((g) => g.visits.length > 0);
+  }, [history.years, activeFilter]);
+
+  const hasAny = history.years.some((g) => g.visits.length > 0);
 
   return (
     <>
       <header className={styles.head}>
         <div className={styles.title}>Visit History</div>
         <div className={styles.metaDot} aria-hidden="true" />
-        <div className={styles.meta}>{TOTAL_LABEL}</div>
+        <div className={styles.meta}>{totalLabel(history.years, history.totalCount)}</div>
         <div className={styles.spacer} />
         <div className={styles.filters}>
           {FILTERS.map((f) => {
@@ -151,9 +141,16 @@ export function History(_props: HistoryProps): JSX.Element {
       </header>
 
       <main className={styles.body}>
-        {YEAR_GROUPS.map((group) => (
-          <YearSection key={group.year} group={group} />
-        ))}
+        {!hasAny ? (
+          <div className={styles.yearRow}>
+            <span className={styles.year}>No visits on file for this patient.</span>
+            <span className={styles.yearRule} />
+          </div>
+        ) : (
+          visibleYears.map((group) => (
+            <YearSection key={group.year} group={group} />
+          ))
+        )}
       </main>
     </>
   );
@@ -189,6 +186,8 @@ function VisitCard({ visit }: VisitCardProps): JSX.Element {
         ? `${styles.rail} ${styles.railAnnual}`
         : `${styles.rail} ${styles.railFollow}`;
 
+  const hasModality = visit.modality !== undefined && visit.modality !== '';
+
   return (
     <article className={styles.card}>
       <div className={railClass}>
@@ -204,13 +203,13 @@ function VisitCard({ visit }: VisitCardProps): JSX.Element {
           <span className={styles.provider}>{visit.provider}</span>
           <span className={styles.metaSep}>•</span>
           <span className={styles.metaDim}>
-            {visit.modality !== undefined ? `${visit.modality} • ${visit.duration}` : visit.duration}
+            {hasModality ? `${visit.modality} • ${visit.duration}` : visit.duration}
           </span>
           <span className={styles.metaSep}>•</span>
           <span className={styles.signed}>{visit.status}</span>
         </div>
         <div className={styles.vTitle}>{visit.title}</div>
-        <p className={styles.vDesc}>{visit.desc}</p>
+        {visit.desc !== '' && <p className={styles.vDesc}>{visit.desc}</p>}
         <div className={styles.tagsRow}>
           <div className={styles.tags}>
             {visit.tags.map((t, i) => {

@@ -1,16 +1,16 @@
 // Issues — Figma "Screen 17 — Issues" (file kj4MWNr8mpjZ2wVg1PbS0F, node 38:2).
 //
-// Patient-context Issues page. Static demo only — values mirror the Figma
-// mock exactly so the side-by-side fidelity check passes. The PHP outer
-// shell at /interface/main/tabs/main.php still owns the navy top nav and
-// patient header2 banner; this file renders inside the #maimain iframe and
-// skips those chrome elements.
+// Patient-context Issues page. The PHP wrapper at copilot_issues.php queries
+// the lists table (medical_problem + allergy rows for the current pid) and
+// JSON-encodes the result onto data-issues; the entry index.tsx parses it
+// and hands it here as the `issues` prop. Status pills (Active / Inactive /
+// Resolved / All) and group rendering are local React state.
 //
-// Wiring to real lists data (medical_problem / allergy rows) is a follow-up
-// task; the original DB-driven PHP is preserved at copilot_issues.php.bak
-// for reference.
+// The PHP outer shell at /interface/main/tabs/main.php still owns the navy
+// top nav and patient header2 banner; this file renders inside the
+// #maimain iframe and skips those chrome elements.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './Issues.module.css';
 
@@ -18,12 +18,20 @@ type StatusTab = 'active' | 'inactive' | 'resolved' | 'all';
 
 type SeverityTone = 'warn' | 'good';
 
-type IssueRow = {
+// Server-side issue row shape (mirrors the PHP query in copilot_issues.php).
+export type IssueRow = {
   readonly icd: string;
   readonly title: string;
   readonly sub: string;
   readonly sev: string;
   readonly sevTone: SeverityTone;
+};
+
+// Server-side payload — two parallel arrays, one per group. The PHP wrapper
+// emits this shape on data-issues; the React side groups them into cards.
+export type IssuesPayload = {
+  readonly problems: readonly IssueRow[];
+  readonly allergies: readonly IssueRow[];
 };
 
 type IssueGroup = {
@@ -33,8 +41,6 @@ type IssueGroup = {
   readonly rows: readonly IssueRow[];
 };
 
-const SUMMARY_LABEL = 'Active 9 • Inactive 4 • Resolved 12';
-
 const STATUS_TABS: ReadonlyArray<{ readonly id: StatusTab; readonly label: string }> = [
   { id: 'active',   label: 'Active'   },
   { id: 'inactive', label: 'Inactive' },
@@ -42,43 +48,60 @@ const STATUS_TABS: ReadonlyArray<{ readonly id: StatusTab; readonly label: strin
   { id: 'all',      label: 'All'      },
 ];
 
-const GROUPS: readonly IssueGroup[] = [
-  {
-    title: 'Active — Medical Problems',
-    count: 4,
-    dotTone: 'warn',
-    rows: [
-      { icd: 'E11.9', title: 'Type 2 Diabetes Mellitus',     sub: 'Onset 2019 • Active',                  sev: 'MODERATE', sevTone: 'warn' },
-      { icd: 'I10',   title: 'Essential Hypertension',       sub: 'Onset 2017 • Controlled w/ Lisinopril', sev: 'MODERATE', sevTone: 'warn' },
-      { icd: 'E03.9', title: 'Hypothyroidism, unspecified',  sub: 'Onset 2021 • Levothyroxine 50mcg daily', sev: 'STABLE',   sevTone: 'good' },
-      { icd: 'M17.0', title: 'Bilateral knee osteoarthritis', sub: 'Onset 2022 • Conservative management',  sev: 'MILD',     sevTone: 'good' },
-    ],
-  },
-  {
-    title: 'Active — Allergies & Risk Factors',
-    count: 3,
-    dotTone: 'danger',
-    rows: [
-      { icd: 'Z88.0', title: 'Allergy to Penicillin',                   sub: 'Documented 2017 • Itching, rash',  sev: 'MILD',     sevTone: 'good' },
-      { icd: 'Z88.2', title: 'Allergy to Sulfa drugs',                  sub: 'Documented 2017 • Skin reaction',  sev: 'MILD',     sevTone: 'good' },
-      { icd: 'Z83.3', title: 'Family hx of diabetes (mother, brother)', sub: 'Documented 2019 • Risk factor',    sev: 'ADVISORY', sevTone: 'good' },
-    ],
-  },
-];
-
 type IssuesProps = {
   readonly boot: BootContext;
+  readonly issues: IssuesPayload;
 };
 
-export function Issues(_props: IssuesProps): JSX.Element {
+export function Issues({ issues }: IssuesProps): JSX.Element {
   const [status, setStatus] = useState<StatusTab>('active');
+
+  // Build the visible group list from the server payload. The .bak page only
+  // surfaced active rows (enddate IS NULL), so under the 'active' / 'all'
+  // tabs we render whatever the server sent. Inactive / Resolved aren't
+  // populated server-side yet, so those tabs show empty groups — matching
+  // the .bak fallback ("No active issues") when nothing is present.
+  const groups = useMemo<readonly IssueGroup[]>(() => {
+    const showActiveData = status === 'active' || status === 'all';
+    const problems  = showActiveData ? issues.problems  : [];
+    const allergies = showActiveData ? issues.allergies : [];
+    const out: IssueGroup[] = [];
+    if (problems.length > 0) {
+      out.push({
+        title: 'Active — Medical Problems',
+        count: problems.length,
+        dotTone: 'warn',
+        rows: problems,
+      });
+    }
+    if (allergies.length > 0) {
+      out.push({
+        title: 'Active — Allergies & Risk Factors',
+        count: allergies.length,
+        dotTone: 'danger',
+        rows: allergies,
+      });
+    }
+    if (out.length === 0) {
+      out.push({
+        title: 'No active issues',
+        count: 0,
+        dotTone: 'good',
+        rows: [],
+      });
+    }
+    return out;
+  }, [issues, status]);
+
+  const activeCount = issues.problems.length + issues.allergies.length;
+  const summaryLabel = `Active ${activeCount} • Inactive 0 • Resolved 0`;
 
   return (
     <>
       <header className={styles.head}>
         <div className={styles.title}>Issues</div>
         <div className={styles.bullet}>•</div>
-        <div className={styles.meta}>{SUMMARY_LABEL}</div>
+        <div className={styles.meta}>{summaryLabel}</div>
         <div className={styles.spacer} />
         <div className={styles.seg} role="tablist">
           {STATUS_TABS.map((t) => {
@@ -105,7 +128,7 @@ export function Issues(_props: IssuesProps): JSX.Element {
       </header>
 
       <main className={styles.body}>
-        {GROUPS.map((grp) => (
+        {groups.map((grp) => (
           <section key={grp.title} className={styles.grpCard}>
             <header className={styles.grpHead}>
               <span className={`${styles.dot} ${dotClass(grp.dotTone)}`} />
@@ -116,7 +139,7 @@ export function Issues(_props: IssuesProps): JSX.Element {
               const isLast = i === grp.rows.length - 1;
               const rowCls = isLast ? `${styles.row} ${styles.rowLast}` : styles.row;
               return (
-                <div key={r.icd + r.title} className={rowCls}>
+                <div key={`${r.icd}-${r.title}-${i}`} className={rowCls}>
                   <span className={styles.icd}>{r.icd}</span>
                   <div className={styles.rowInfo}>
                     <div className={styles.rowTitle}>{r.title}</div>

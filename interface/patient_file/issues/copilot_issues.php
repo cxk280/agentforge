@@ -13,8 +13,11 @@
  * is passed to React via data-* attributes on the #cp-root mount node and
  * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
  *
- * The original DB-driven mock is preserved at copilot_issues.php.bak so a
- * side-by-side screenshot diff remains possible.
+ * Live patient issues (medical_problem + allergy rows from the lists table)
+ * are queried server-side and JSON-encoded onto data-issues, mirroring the
+ * pattern used by the Finder page. The original DB-driven mock is preserved
+ * at copilot_issues.php.bak so a side-by-side screenshot diff remains
+ * possible.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
@@ -54,6 +57,84 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live issues — preserves the SQL the pre-React PHP page (copilot_issues.php
+// .bak) ran against the lists table. We pull medical_problem + allergy rows
+// for the current pid and let React render the grouped cards client-side.
+// If pid is empty/0 (no patient context) we render an empty array so the
+// page renders cleanly instead of crashing.
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract an ICD code from a diagnosis field. Mirrors cp_extract_icd from
+ * the .bak file — supports the "ICD10:X##.#" / "ICD9:###" formats OpenEMR
+ * stores in lists.diagnosis.
+ */
+function cp_issues_extract_icd(string $diagnosis): string
+{
+    if (preg_match('#ICD10:([A-Z][0-9.]+)#i', $diagnosis, $m)) {
+        return strtoupper($m[1]);
+    }
+    if (preg_match('#ICD9:([0-9.]+)#i', $diagnosis, $m)) {
+        return $m[1];
+    }
+    return '—';
+}
+
+$pid = (int)$patientId;
+
+$problems   = [];
+$allergies  = [];
+
+if ($pid > 0) {
+    $problemRows = sqlStatement(
+        "SELECT DISTINCT title, diagnosis, date FROM lists "
+        . "WHERE pid = ? AND type = 'medical_problem' "
+        . "AND COALESCE(enddate, '0000-00-00') = '0000-00-00' "
+        . "ORDER BY date ASC",
+        [$pid],
+    );
+    while ($r = sqlFetchArray($problemRows)) {
+        $dateStr = (string)($r['date'] ?? '');
+        $year    = $dateStr !== '' ? substr($dateStr, 0, 4) : '';
+        $problems[] = [
+            'icd'     => cp_issues_extract_icd((string)($r['diagnosis'] ?? '')),
+            'title'   => (string)($r['title'] ?? ''),
+            'sub'     => ($year !== '' ? "Onset $year" : 'Onset unknown') . ' • Active',
+            'sev'     => 'ACTIVE',
+            'sevTone' => 'warn',
+        ];
+    }
+
+    $allergyRows = sqlStatement(
+        "SELECT DISTINCT title, severity_al, comments, date FROM lists "
+        . "WHERE pid = ? AND type = 'allergy' "
+        . "AND COALESCE(enddate, '0000-00-00') = '0000-00-00' "
+        . "ORDER BY date ASC",
+        [$pid],
+    );
+    while ($r = sqlFetchArray($allergyRows)) {
+        $dateStr  = (string)($r['date'] ?? '');
+        $year     = $dateStr !== '' ? substr($dateStr, 0, 4) : '';
+        $comments = (string)($r['comments'] ?? '');
+        $sub      = ($year !== '' ? "Documented $year" : 'Documented')
+                  . ($comments !== '' ? ' • ' . $comments : '');
+        $sevRaw   = strtoupper((string)($r['severity_al'] ?? ''));
+        $allergies[] = [
+            'icd'     => 'Z88',
+            'title'   => 'Allergy to ' . (string)($r['title'] ?? ''),
+            'sub'     => $sub,
+            'sev'     => $sevRaw !== '' ? $sevRaw : 'MILD',
+            'sevTone' => 'good',
+        ];
+    }
+}
+
+$issues = [
+    'problems'  => $problems,
+    'allergies' => $allergies,
+];
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,7 +178,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-issues="<?php echo attr((string)json_encode($issues)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

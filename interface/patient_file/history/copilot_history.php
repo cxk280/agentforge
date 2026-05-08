@@ -13,8 +13,12 @@
  * is passed to React via data-* attributes on the #cp-root mount node and
  * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
  *
- * The pre-React PHP mock is preserved at copilot_history.php.bak so a
- * side-by-side screenshot diff remains possible.
+ * Live encounter rows for the active patient are queried server-side
+ * (form_encounter LEFT JOIN users) and JSON-encoded onto data-visits, so
+ * PIDs the user actually opens drive what the History UI shows. Mirrors the
+ * SQL the pre-React PHP page (copilot_history.php.bak) ran. If pid is
+ * empty/0 (no patient context) we ship empty arrays so the page renders
+ * cleanly instead of crashing.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
@@ -24,6 +28,7 @@
 declare(strict_types=1);
 
 require_once(__DIR__ . "/../../globals.php");
+require_once(__DIR__ . "/../../main/copilot_helpers.php");
 
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -54,6 +59,112 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live visit history — preserves the SQL the pre-React PHP page
+// (copilot_history.php.bak) ran. We pull recent encounters for the current
+// pid (joined to users for the provider name) and group by year. The React
+// component renders the cards client-side and handles filter chips locally.
+// ---------------------------------------------------------------------------
+
+$pid        = (int)$patientId;
+$totalCount = 0;
+$yearGroups = [];
+
+if ($pid > 0) {
+    $totalCount = (int)(sqlQuery(
+        "SELECT COUNT(*) AS n FROM form_encounter WHERE pid = ?",
+        [$pid]
+    )['n'] ?? 0);
+
+    $rows = sqlStatement(
+        "SELECT fe.id, fe.date, fe.reason, fe.last_level_closed,
+                u.username, u.fname, u.lname, u.title
+         FROM form_encounter fe
+         LEFT JOIN users u ON fe.provider_id = u.id
+         WHERE fe.pid = ?
+         ORDER BY fe.date DESC
+         LIMIT 30",
+        [$pid]
+    );
+
+    /** @var array<string, list<array<string, mixed>>> $byYear */
+    $byYear = [];
+
+    while ($r = sqlFetchArray($rows)) {
+        $rawDate = (string)($r['date'] ?? '');
+        $ts      = $rawDate !== '' ? strtotime($rawDate) : false;
+        if ($ts === false) {
+            $ts = time();
+        }
+        $year    = date('Y', $ts);
+        $dateLbl = date('M j', $ts);
+        $dayLbl  = date('l', $ts);
+        $reason  = trim((string)($r['reason'] ?? ''));
+        if ($reason === '') {
+            $reason = 'Office visit';
+        }
+
+        // Heuristic visit-type classification from reason text. Mirrors the
+        // .bak. The React component picks rail styling off `rail`.
+        $reasonL = strtolower($reason);
+        if (str_contains($reasonL, 'annual')) {
+            $type = 'Annual Physical';
+            $rail = 'annual-physical';
+        } elseif (
+            str_contains($reasonL, 'lab')
+            || str_contains($reasonL, 'a1c')
+            || str_contains($reasonL, 'cholesterol')
+        ) {
+            $type = 'Lab Review';
+            $rail = 'lab-review';
+        } elseif (str_contains($reasonL, 'follow')) {
+            $type = 'Follow-up';
+            $rail = 'follow-up';
+        } elseif (str_contains($reasonL, 'tele')) {
+            $type = 'Telehealth';
+            $rail = 'follow-up';
+        } else {
+            $type = 'Office Visit';
+            $rail = 'follow-up';
+        }
+
+        $providerName = cp_format_provider_name([
+            'username' => (string)($r['username'] ?? ''),
+            'fname'    => (string)($r['fname'] ?? ''),
+            'lname'    => (string)($r['lname'] ?? ''),
+            'title'    => (string)($r['title'] ?? ''),
+        ]);
+
+        $closed = (int)($r['last_level_closed'] ?? 0) > 0;
+
+        $byYear[$year][] = [
+            'date'      => $dateLbl,
+            'day'       => $dayLbl,
+            'rail'      => $rail,
+            'typeLabel' => $type,
+            'provider'  => $providerName,
+            'modality'  => str_contains($reasonL, 'tele') ? 'Tele' : '',
+            'duration'  => '—',
+            'status'    => $closed ? 'Signed' : 'Open',
+            'title'     => $reason,
+            'desc'      => '',
+            'tags'      => [],
+        ];
+    }
+
+    foreach ($byYear as $year => $visits) {
+        $yearGroups[] = [
+            'year'   => (string)$year,
+            'visits' => $visits,
+        ];
+    }
+}
+
+$historyData = [
+    'totalCount' => $totalCount,
+    'years'      => $yearGroups,
+];
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,7 +208,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-history="<?php echo attr((string)json_encode($historyData)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

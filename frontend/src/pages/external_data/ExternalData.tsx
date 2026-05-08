@@ -3,11 +3,15 @@
 // source connection cards (HIE / LabCorp / Imaging / Surescripts), and a
 // "Recent Imports" feed.
 //
-// 1:1 port of the static PHP mock previously at
-// /interface/patient_file/external_data/copilot_external_data.php — same demo
-// data, same visual treatment. Patient-context page; the navy nav and
-// patient demographics banner are owned by the outer OpenEMR shell, not this
-// component.
+// Originally a 1:1 port of the static PHP mock at
+// /interface/patient_file/external_data/copilot_external_data.php — that .bak
+// also shipped hardcoded demo arrays (no DB-backed external_data_sources
+// table exists in this build). The PHP wrapper now JSON-encodes those same
+// arrays onto data-sources / data-imports / data-summary on #cp-root and the
+// entry index.tsx parses them and passes them here as props, so the React
+// page is consistent with the Finder data-attribute → prop pattern even
+// while the underlying data is still stub. When real ingestion adapters
+// land, only the PHP wrapper has to change.
 //
 // Reference: frontend/.fidelity-references/external_data-figma-2026-05-07.png
 
@@ -18,7 +22,7 @@ type Tone = 'good' | 'info' | 'violet' | 'warn';
 type StatusTone = 'good' | 'warn';
 type ActionVariant = 'primary' | 'secondary';
 
-type SourceCard = {
+export type SourceCard = {
   readonly name: string;
   readonly icon: string;
   readonly tone: Tone;
@@ -28,7 +32,7 @@ type SourceCard = {
   readonly count: number;
 };
 
-type ImportRow = {
+export type ImportRow = {
   readonly icon: string;
   readonly tone: Tone;
   readonly title: string;
@@ -42,21 +46,10 @@ type ImportRow = {
   readonly actionVariant: ActionVariant;
 };
 
-const SOURCES: readonly SourceCard[] = [
-  { name: 'Texas HIE — CommonWell',   icon: '🌐', tone: 'good',   status: 'Connected',    statusTone: 'good', sub: 'Today 08:14 AM',              count: 24 },
-  { name: 'LabCorp Direct Connect',   icon: '🧪', tone: 'info',   status: 'Connected',    statusTone: 'good', sub: 'Today 08:14 AM',              count: 18 },
-  { name: 'Riverside Imaging API',    icon: '🩻', tone: 'violet', status: 'Connected',    statusTone: 'good', sub: 'Yesterday',                   count: 5  },
-  { name: 'Surescripts Rx History',   icon: '💊', tone: 'warn',   status: 'Needs review', statusTone: 'warn', sub: '1 record awaiting reconcile', count: 1  },
-];
-
-const IMPORTS: readonly ImportRow[] = [
-  { icon: '🌐', tone: 'good',   title: 'ED Visit — Riverside General Hospital',              type: 'Encounter Summary',   src: 'Texas HIE',          date: 'Apr 9, 2026',  fields: 12, status: 'Reconciled',   statusTone: 'good', action: 'View',      actionVariant: 'secondary' },
-  { icon: '🧪', tone: 'info',   title: 'Comprehensive Metabolic Panel + CBC',                type: 'Lab Result',          src: 'LabCorp Direct',     date: 'Apr 12, 2026', fields: 18, status: 'Reconciled',   statusTone: 'good', action: 'View',      actionVariant: 'secondary' },
-  { icon: '💊', tone: 'warn',   title: 'External Rx: Atorvastatin 20mg → 40mg (Walgreens)',  type: 'Medication History',  src: 'Surescripts',        date: 'Apr 8, 2026',  fields: 1,  status: 'Needs review', statusTone: 'warn', action: 'Reconcile', actionVariant: 'primary'   },
-  { icon: '🌐', tone: 'good',   title: 'DEXA scan — South Austin Imaging',                   type: 'Imaging Report',      src: 'Texas HIE',          date: 'Mar 22, 2026', fields: 4,  status: 'Reconciled',   statusTone: 'good', action: 'View',      actionVariant: 'secondary' },
-  { icon: '🩻', tone: 'violet', title: 'Bilateral knee X-Ray report',                        type: 'Radiology',           src: 'Riverside Imaging',  date: 'Feb 18, 2026', fields: 6,  status: 'Reconciled',   statusTone: 'good', action: 'View',      actionVariant: 'secondary' },
-  { icon: '🌐', tone: 'good',   title: 'Influenza vaccine — Riverside Pharmacy',             type: 'Immunization',        src: 'Texas HIE',          date: 'Oct 15, 2025', fields: 3,  status: 'Reconciled',   statusTone: 'good', action: 'View',      actionVariant: 'secondary' },
-];
+export type ExternalDataSummary = {
+  readonly connected: number;
+  readonly pending: number;
+};
 
 const ICON_TONE_CLASS: Readonly<Record<Tone, string>> = {
   good:   styles.iconGood   ?? '',
@@ -82,15 +75,19 @@ const ACTION_VARIANT_CLASS: Readonly<Record<ActionVariant, string>> = {
 
 type ExternalDataProps = {
   readonly boot: BootContext;
+  readonly sources: readonly SourceCard[];
+  readonly imports: readonly ImportRow[];
+  readonly summary: ExternalDataSummary;
 };
 
-export function ExternalData(_props: ExternalDataProps): JSX.Element {
+export function ExternalData({ sources, imports, summary }: ExternalDataProps): JSX.Element {
+  const metaLine = `${summary.connected} connected • ${summary.pending} pending review`;
   return (
     <>
       <header className={styles.head}>
         <div className={styles.title}>External Data Sources</div>
         <div className={styles.bullet}>•</div>
-        <div className={styles.meta}>3 connected • 1 pending review</div>
+        <div className={styles.meta}>{metaLine}</div>
         <div className={styles.spacer} />
         <button type="button" className={styles.pill}>
           <span>⟳</span>
@@ -104,7 +101,7 @@ export function ExternalData(_props: ExternalDataProps): JSX.Element {
 
       <main className={styles.body}>
         <section className={styles.sourceGrid}>
-          {SOURCES.map((s) => (
+          {sources.map((s) => (
             <article key={s.name} className={styles.sourceCard}>
               <div className={styles.sourceTop}>
                 <span className={`${styles.sourceIcon} ${ICON_TONE_CLASS[s.tone]}`}>
@@ -133,8 +130,8 @@ export function ExternalData(_props: ExternalDataProps): JSX.Element {
             <div className={styles.spacer} />
             <span className={styles.impLink}>View all →</span>
           </header>
-          {IMPORTS.map((im, i) => {
-            const rowClass = i === IMPORTS.length - 1
+          {imports.map((im, i) => {
+            const rowClass = i === imports.length - 1
               ? `${styles.impRow} ${styles.impRowLast}`
               : styles.impRow;
             return (

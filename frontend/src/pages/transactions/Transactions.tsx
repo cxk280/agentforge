@@ -3,9 +3,11 @@
 //
 // 1:1 port of the static PHP mock that previously lived at
 // /interface/patient_file/transaction/copilot_transactions.php — same KPI
-// strip, filter chip row, and transactions table. Demo-only data; no
-// network calls. The PHP wrapper still owns the navy top nav and the
-// patient demographics banner (header2).
+// strip, filter chip row, and transactions table. The PHP wrapper now
+// queries the billing + ar_activity + ar_session + insurance_companies
+// tables for the current pid, aggregates the four KPI totals, and JSON-
+// encodes a {kpis, rows} payload onto data-tx on #cp-root. We parse it in
+// index.tsx and hand it to this component.
 //
 // A handful of values were re-pulled from Figma on 2026-05-07 and the PHP
 // mock had drifted on a few of them — those drifts are corrected here:
@@ -24,7 +26,7 @@ import styles from './Transactions.module.css';
 
 type KpiTone = 'neutral' | 'good' | 'info' | 'warn';
 
-type Kpi = {
+export type Kpi = {
   readonly label: string;
   readonly value: string;
   readonly sub: string;
@@ -38,7 +40,7 @@ type FilterChip = {
 
 type TxType = 'charge' | 'payment' | 'adjustment';
 
-type TxRow = {
+export type TxRow = {
   readonly date: string;
   readonly type: TxType;
   readonly desc: string;
@@ -52,13 +54,6 @@ type TxRow = {
   readonly balRed?: boolean | undefined;
 };
 
-const KPIS: readonly Kpi[] = [
-  { label: 'Total Charges',  value: '$8,420.00', sub: 'Last 12 months', tone: 'neutral' },
-  { label: 'Insurance Paid', value: '$5,932.40', sub: '70% of charges', tone: 'good'    },
-  { label: 'Patient Paid',   value: '$1,184.00', sub: '14% of charges', tone: 'info'    },
-  { label: 'Outstanding',    value: '$1,303.60', sub: '16% — 60+ days', tone: 'warn' },
-];
-
 const FILTERS: readonly FilterChip[] = [
   { label: 'All',         active: true  },
   { label: 'Charges',     active: false },
@@ -67,26 +62,17 @@ const FILTERS: readonly FilterChip[] = [
   { label: 'Refunds',     active: false },
 ];
 
-const ROWS: readonly TxRow[] = [
-  { date: '04/12/2026', type: 'charge',     desc: 'Office visit, established, level 3', cpt: '99213', prov: 'Dr. Rivera', ins: '$152.00', pt: '$25.00', bal: '$0.00',  outstanding: false },
-  { date: '04/12/2026', type: 'payment',    desc: 'BCBS — claim #BC-99281',         cpt: '—', prov: '—',    ins: '$152.00', pt: '—', bal: '—', outstanding: false, insGreen: true },
-  { date: '02/18/2026', type: 'charge',     desc: 'Annual wellness visit (preventive)', cpt: '99396', prov: 'Dr. Rivera', ins: '$280.00', pt: '$0.00',  bal: '$0.00',  outstanding: false },
-  { date: '02/18/2026', type: 'payment',    desc: 'BCBS — claim #BC-99020',         cpt: '—', prov: '—',    ins: '$280.00', pt: '—', bal: '—', outstanding: false, insGreen: true },
-  { date: '02/18/2026', type: 'charge',     desc: 'CMP + CBC + HbA1c lab panel',        cpt: '80050', prov: 'Dr. Rivera', ins: '$184.00', pt: '$45.00', bal: '$0.00',  outstanding: false },
-  { date: '11/15/2025', type: 'charge',     desc: 'Office visit, established, level 2', cpt: '99212', prov: 'Dr. Rivera', ins: '$98.00',  pt: '$25.00', bal: '$98.00', outstanding: true },
-  { date: '08/22/2025', type: 'charge',     desc: 'Telehealth lab review',              cpt: '99214', prov: 'Dr. Chen',   ins: '$156.00', pt: '$25.00', bal: '$0.00',  outstanding: false },
-  { date: '08/22/2025', type: 'adjustment', desc: 'Contract write-off (BCBS)',          cpt: '—', prov: '—',    ins: '—', pt: '—', bal: '−$48.00', outstanding: false, balRed: true },
-];
-
 type TransactionsProps = {
   readonly boot: BootContext;
+  readonly kpis: readonly Kpi[];
+  readonly rows: readonly TxRow[];
 };
 
-export function Transactions(_props: TransactionsProps): JSX.Element {
+export function Transactions({ kpis, rows }: TransactionsProps): JSX.Element {
   return (
     <>
       <section className={styles.kpis}>
-        {KPIS.map((k) => (
+        {kpis.map((k) => (
           <div key={k.label} className={`${styles.kpi} ${kpiToneClass(k.tone)}`}>
             <div className={styles.kpiLabel}>{k.label}</div>
             <div className={styles.kpiValue}>{k.value}</div>
@@ -132,31 +118,39 @@ export function Transactions(_props: TransactionsProps): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((r, i) => (
-              <tr key={i}>
-                <td className={styles.colDate}>{r.date}</td>
-                <td className={styles.colType}>
-                  <span className={`${styles.typePill} ${typePillClass(r.type)}`}>
-                    {r.type.toUpperCase()}
-                  </span>
-                </td>
-                <td>
-                  {r.desc}
-                </td>
-                <td className={styles.colCpt}>{r.cpt}</td>
-                <td className={styles.colProv}>{r.prov}</td>
-                <td className={`${styles.colNum} ${r.insGreen ? styles.amtGreen : ''}`}>{r.ins}</td>
-                <td className={styles.colNum}>{r.pt}</td>
-                <td className={`${styles.colNum} ${r.outstanding ? styles.amtOrange : ''} ${r.balRed ? styles.amtRed : ''}`}>
-                  <span className={styles.balCell}>
-                    <span>{r.bal}</span>
-                    {r.outstanding && (
-                      <span className={styles.outPill}>OUTSTANDING</span>
-                    )}
-                  </span>
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={8} style={{ textAlign: 'center', color: '#8A91A1', padding: '32px 18px' }}>
+                  No transactions on file for this patient.
                 </td>
               </tr>
-            ))}
+            ) : (
+              rows.map((r, i) => (
+                <tr key={i}>
+                  <td className={styles.colDate}>{r.date}</td>
+                  <td className={styles.colType}>
+                    <span className={`${styles.typePill} ${typePillClass(r.type)}`}>
+                      {r.type.toUpperCase()}
+                    </span>
+                  </td>
+                  <td>
+                    {r.desc}
+                  </td>
+                  <td className={styles.colCpt}>{r.cpt}</td>
+                  <td className={styles.colProv}>{r.prov}</td>
+                  <td className={`${styles.colNum} ${r.insGreen === true ? styles.amtGreen ?? '' : ''}`}>{r.ins}</td>
+                  <td className={styles.colNum}>{r.pt}</td>
+                  <td className={`${styles.colNum} ${r.outstanding ? styles.amtOrange ?? '' : ''} ${r.balRed === true ? styles.amtRed ?? '' : ''}`}>
+                    <span className={styles.balCell}>
+                      <span>{r.bal}</span>
+                      {r.outstanding && (
+                        <span className={styles.outPill}>OUTSTANDING</span>
+                      )}
+                    </span>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </section>
