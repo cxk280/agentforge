@@ -52,3 +52,8 @@ docker/development-easy-redis/docker-compose.override.yml
 # first /search call when VOYAGE_API_KEY is set; kept out of git so
 # test runs (which inject a stub embedder) don't pollute the cache.
 copilot/agent/guidelines/seed_corpus_embeddings.json
+
+# Playwright test runner artifacts (frontend/e2e). Reports and traces
+# are regenerated on every run.
+frontend/playwright-report/
+frontend/test-results/
