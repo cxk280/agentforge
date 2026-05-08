@@ -5,21 +5,22 @@
 // card with tabs (Outbound / Inbound / Templates / Audit log), 4 KPI count
 // tiles, and a list of outbound/inbound queue rows.
 //
-// This is a 1:1 port of the PHP-rendered page previously at
-// /interface/patient_file/transaction/copilot_record_request.php. All data
-// is static demo data taken directly from the Figma mock — no DB queries,
-// no POST handler. The navy top-nav and patient demographics banner are
-// rendered by the parent shell, so this component only renders the page
-// body — pagehead + content area.
+// DB-backed: the PHP wrapper at copilot_record_request.php queries the
+// `transactions` + `lbt_data` tables for the current patient's records-
+// release queue, derives KPI counts, and pulls recipient names from the
+// `pharmacies` table (or `procedure_providers` as a fallback). The result
+// is JSON-encoded onto data-records on #cp-root and parsed by index.tsx,
+// which passes the typed payload to this component as the `records` prop.
 //
 // Verified against Figma node 74:2 on 2026-05-07.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './RecordRequest.module.css';
 
 type TabKey = 'outbound' | 'inbound' | 'templates' | 'audit';
 type Tone = 'warn' | 'good' | 'danger' | 'info';
+type Direction = 'out' | 'in';
 
 type RecordCheck = {
   readonly label: string;
@@ -32,14 +33,27 @@ type CountTile = {
   readonly tone: Tone | 'dark';
 };
 
-type QueueRow = {
-  readonly direction: 'out' | 'in';
+// Server-side queue row shape (mirrors the PHP query in copilot_record_request.php).
+export type RecordQueueRow = {
+  readonly direction: Direction;
   readonly dest: string;
   readonly sub: string;
   readonly sentLabel: string;
   readonly sentDate: string;
   readonly status: string;
   readonly tone: Tone;
+};
+
+export type RecordRequestPayload = {
+  readonly patientName: string;
+  readonly recipients: readonly string[];
+  readonly queue: readonly RecordQueueRow[];
+  readonly kpis: {
+    readonly active: number;
+    readonly awaiting: number;
+    readonly completed30: number;
+    readonly failed: number;
+  };
 };
 
 type TabDef = {
@@ -54,6 +68,8 @@ const TABS: readonly TabDef[] = [
   { key: 'audit',     label: 'Audit log' },
 ];
 
+// Compliance taxonomy — labels are static; the checked-state is the visual
+// default (matches the original PHP page).
 const RECORDS: readonly RecordCheck[] = [
   { label: 'Office visit notes',     checked: true  },
   { label: 'Lab results',            checked: true  },
@@ -65,95 +81,15 @@ const RECORDS: readonly RecordCheck[] = [
   { label: 'Substance use treatment', checked: false },
 ];
 
-const RECIPIENTS: readonly string[] = [
-  'Cardiology Associates of Austin (Dr. M. Sandoval)',
-  'Endocrine Specialists of TX (Dr. L. Park)',
-  'Imaging Center — Riverside',
-  "St. David's ED",
-  'Mercy Home Health',
-  'Patient (self)',
-];
-
-const COUNTS: readonly CountTile[] = [
-  { value: '12', label: 'Active',          tone: 'dark'   },
-  { value: '4',  label: 'Awaiting reply',  tone: 'warn'   },
-  { value: '7',  label: 'Completed (30d)', tone: 'good'   },
-  { value: '1',  label: 'Failed',          tone: 'danger' },
-];
-
-const QUEUE: readonly QueueRow[] = [
-  {
-    direction: 'out',
-    dest:      'Cardiology Associates of Austin',
-    sub:       'Dr. M. Sandoval • Fax',
-    sentLabel: 'Sent',
-    sentDate:  '04/30 14:22',
-    status:    'Awaiting reply',
-    tone:      'warn',
-  },
-  {
-    direction: 'out',
-    dest:      'Endocrine Specialists of TX',
-    sub:       'Dr. L. Park • Fax',
-    sentLabel: 'Sent',
-    sentDate:  '04/29 09:14',
-    status:    'Delivered',
-    tone:      'good',
-  },
-  {
-    direction: 'out',
-    dest:      'Imaging Center — Riverside',
-    sub:       'MRI Knee R, 03/15 study',
-    sentLabel: 'Sent',
-    sentDate:  '04/28 16:50',
-    status:    'Delivered',
-    tone:      'good',
-  },
-  {
-    direction: 'in',
-    dest:      "St. David's ED",
-    sub:       'Visit summary 03/22',
-    sentLabel: 'Received',
-    sentDate:  '04/27 10:02',
-    status:    'Imported',
-    tone:      'good',
-  },
-  {
-    direction: 'out',
-    dest:      'Patient (self)',
-    sub:       'Portal export — full chart',
-    sentLabel: 'Sent',
-    sentDate:  '04/26 11:30',
-    status:    'Acknowledged',
-    tone:      'good',
-  },
-  {
-    direction: 'out',
-    dest:      'Mercy Home Health',
-    sub:       'Care plan + meds',
-    sentLabel: 'Sent',
-    sentDate:  '04/25 08:15',
-    status:    'Awaiting reply',
-    tone:      'warn',
-  },
-  {
-    direction: 'out',
-    dest:      'Dr. P. Watson (PCP transfer)',
-    sub:       'Complete chart export',
-    sentLabel: 'Sent',
-    sentDate:  '04/22 13:00',
-    status:    'Failed — invalid fax',
-    tone:      'danger',
-  },
-];
-
 type RecordRequestProps = {
   readonly boot: BootContext;
+  readonly records: RecordRequestPayload;
 };
 
-export function RecordRequest(_props: RecordRequestProps): JSX.Element {
+export function RecordRequest({ records }: RecordRequestProps): JSX.Element {
   const [tab, setTab] = useState<TabKey>('outbound');
-  const [recipient, setRecipient] = useState<string>(RECIPIENTS[0] ?? '');
+  const recipients = records.recipients;
+  const [recipient, setRecipient] = useState<string>(recipients[0] ?? '');
   const [checks, setChecks] = useState<readonly boolean[]>(
     RECORDS.map((r) => r.checked),
   );
@@ -162,13 +98,33 @@ export function RecordRequest(_props: RecordRequestProps): JSX.Element {
     setChecks((prev) => prev.map((v, idx) => (idx === i ? !v : v)));
   };
 
+  // Tabs filter the queue: Outbound shows direction='out', Inbound shows
+  // direction='in', and Templates/Audit are empty placeholders (no DB
+  // backing for those views yet — same as the .bak which only honored
+  // outbound / inbound on the server).
+  const visibleQueue = useMemo<readonly RecordQueueRow[]>(() => {
+    if (tab === 'outbound') return records.queue.filter((q) => q.direction === 'out');
+    if (tab === 'inbound')  return records.queue.filter((q) => q.direction === 'in');
+    return [];
+  }, [tab, records.queue]);
+
+  const counts: readonly CountTile[] = [
+    { value: String(records.kpis.active),       label: 'Active',          tone: 'dark'   },
+    { value: String(records.kpis.awaiting),     label: 'Awaiting reply',  tone: 'warn'   },
+    { value: String(records.kpis.completed30),  label: 'Completed (30d)', tone: 'good'   },
+    { value: String(records.kpis.failed),       label: 'Failed',          tone: 'danger' },
+  ];
+
+  const metaSuffix = records.kpis.active === 1 ? '1 active' : `${records.kpis.active} active`;
+  const patientPrefix = records.patientName !== '' ? `${records.patientName} · ` : '';
+
   return (
     <>
       <header className={styles.pagehead}>
         <div className={styles.headInfo}>
           <span className={styles.title}>Records Release</span>
           <span className={styles.dot}>·</span>
-          <span className={styles.metaLight}>Outbound chart requests · 12 active</span>
+          <span className={styles.metaLight}>{patientPrefix}Outbound chart requests · {metaSuffix}</span>
         </div>
         <button type="button" className={styles.helpPill}>? Help</button>
       </header>
@@ -188,9 +144,13 @@ export function RecordRequest(_props: RecordRequestProps): JSX.Element {
                 value={recipient}
                 onChange={(e) => setRecipient(e.target.value)}
               >
-                {RECIPIENTS.map((r) => (
-                  <option key={r} value={r}>{r}</option>
-                ))}
+                {recipients.length === 0 ? (
+                  <option value="">— No recipients available —</option>
+                ) : (
+                  recipients.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))
+                )}
               </select>
               <span className={styles.selectCaret} aria-hidden="true">▾</span>
             </div>
@@ -285,8 +245,10 @@ export function RecordRequest(_props: RecordRequestProps): JSX.Element {
           </div>
 
           <div className={styles.counts}>
-            {COUNTS.map((c) => {
-              const valCls = c.tone === 'dark' ? styles.countV : `${styles.countV} ${styles[`countV_${c.tone}`] ?? ''}`;
+            {counts.map((c) => {
+              const valCls = c.tone === 'dark'
+                ? styles.countV
+                : `${styles.countV} ${styles[`countV_${c.tone}`] ?? ''}`;
               return (
                 <div key={c.label} className={styles.count}>
                   <span className={valCls}>{c.value}</span>
@@ -297,23 +259,27 @@ export function RecordRequest(_props: RecordRequestProps): JSX.Element {
           </div>
 
           <div className={styles.queue}>
-            {QUEUE.map((q, idx) => {
-              const pillCls = `${styles.pill} ${styles[`pill_${q.tone}`] ?? ''}`;
-              return (
-                <div key={`${q.dest}-${idx}`} className={styles.qRow}>
-                  <span className={styles.qIcon} aria-hidden="true">
-                    {q.direction === 'in' ? '📥' : '📤'}
-                  </span>
-                  <div className={styles.qInfo}>
-                    <div className={styles.qDest}>{q.dest}</div>
-                    <div className={styles.qSub}>{q.sub}</div>
-                    <div className={styles.qSent}>{q.sentLabel} {q.sentDate}</div>
+            {visibleQueue.length === 0 ? (
+              <div className={styles.qEmpty}>No record requests in this tab.</div>
+            ) : (
+              visibleQueue.map((q, idx) => {
+                const pillCls = `${styles.pill} ${styles[`pill_${q.tone}`] ?? ''}`;
+                return (
+                  <div key={`${q.dest}-${idx}`} className={styles.qRow}>
+                    <span className={styles.qIcon} aria-hidden="true">
+                      {q.direction === 'in' ? '📥' : '📤'}
+                    </span>
+                    <div className={styles.qInfo}>
+                      <div className={styles.qDest}>{q.dest}</div>
+                      <div className={styles.qSub}>{q.sub}</div>
+                      <div className={styles.qSent}>{q.sentLabel} {q.sentDate}</div>
+                    </div>
+                    <span className={pillCls}>{q.status}</span>
+                    <a className={styles.qView} href="#">View →</a>
                   </div>
-                  <span className={pillCls}>{q.status}</span>
-                  <a className={styles.qView} href="#">View →</a>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </section>
       </div>

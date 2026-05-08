@@ -339,3 +339,11 @@
   line-height: 1;
 }
 .qView:hover { text-decoration: underline; }
+
+/* Empty-state row when the active tab has no matching queue rows. */
+.qEmpty {
+  padding: 24px 8px;
+  text-align: center;
+  color: #8A91A1;
+  font-size: 12px;
+}

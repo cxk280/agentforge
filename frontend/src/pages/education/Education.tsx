@@ -1,18 +1,25 @@
 // Education — Figma "Screen 48 — Patient Education".
 //
 // 1:1 port of the PHP-rendered mock previously at
-// /interface/patient_file/education/copilot_education.php. The original page
-// did real reads (patient_data, lists, procedure_result) and real writes
-// (extended_log, onsite_messages); the React port is intentionally a static
-// demo per the Batch-5 migration plan — same visual structure, same demo
-// content, no DB. The navy top nav, demographics header2 banner and
-// patient-tabs ribbon are still owned by the outer PHP shell and are not
-// rendered here.
+// /interface/patient_file/education/copilot_education.php. The original
+// page did real reads (patient_data, lists, procedure_result) and real
+// writes (extended_log, onsite_messages); patient identity + the
+// "Suggested for …" banner are now driven from a server-side payload
+// (data-education on #cp-root) parsed in src/pages/education/index.tsx.
 //
-// State is held in React: category selection, search/level/format/source
-// filters, and per-card "selected" checkboxes. The "Print" / "Portal" /
-// "Preview" buttons are stubs (no-op) — wiring back to real endpoints is a
-// follow-up captured in the migration plan.
+// The handout catalog itself is still a TODO(real-data) stub: OpenEMR has
+// no patient_education_catalog table, and the document_templates table is
+// for fillable forms (HIPAA, insurance), not patient education content.
+// The .bak called this out explicitly: in production this would be a CMS
+// join or a dedicated catalog table. Until that exists we keep the static
+// catalog here, matching the Figma frame verbatim. The navy top nav,
+// demographics header2 banner and patient-tabs ribbon are still owned by
+// the outer PHP shell and are not rendered here.
+//
+// State held in React: category selection, search/level/format/source
+// filters, per-card "selected" checkboxes. "Print" / "Portal" / "Preview"
+// buttons are stubs (no-op) — wiring back to real endpoints (extended_log
+// + onsite_messages, like the .bak) is a follow-up.
 
 import { useMemo, useState } from 'react';
 import type { JSX } from 'react';
@@ -103,30 +110,87 @@ const CATEGORIES: readonly CategoryDef[] = [
   { key: 'proc', name: 'Procedure prep',    icon: '\u{1F4CB}' },
 ];
 
-// Demo patient identity (replaces the PHP-side `patient_data` lookup) —
-// matches the Figma's selected patient banner copy.
-const PATIENT_NAME = 'Margaret Chen';
-const SUGGESTION_DETAIL = 'E11.9 (T2DM) and recent A1C of 7.9%';
+// ── Server payload (parsed in index.tsx from data-education) ─────────
+
+export type EducationProblem = {
+  readonly title: string;
+  readonly diagnosis: string;     // raw form, e.g. "ICD10:E11.9"
+};
+
+export type EducationA1c = {
+  readonly value: number;         // % units
+  readonly date: string;          // YYYY-MM-DD (may be empty)
+};
+
+export type EducationPayload = {
+  readonly patientName: string;
+  readonly problems: readonly EducationProblem[];
+  readonly a1c: EducationA1c | null;
+};
 
 // ── Component ────────────────────────────────────────────────────────
 
 type EducationProps = {
   readonly boot: BootContext;
+  readonly education: EducationPayload;
 };
 
-export function Education(_props: EducationProps): JSX.Element {
-  // The Figma capture of Screen 48 shows Diabetes selected, the search box
-  // empty, level "5th grade", format "Handout", source "MedlinePlus", and
-  // 3 of the visible cards checked. We mirror that initial state so the
-  // first paint matches the design exactly.
-  const [cat, setCat] = useState<CategoryKey>('diab');
+export function Education({ education }: EducationProps): JSX.Element {
+  // Derive a "primary" patient context once from the server payload — used
+  // for the Suggested-for banner and as the default category if the chart
+  // has a diabetes problem (matches the .bak's behaviour).
+  const diabetesProblem = useMemo<EducationProblem | null>(() => {
+    for (const p of education.problems) {
+      const title = p.title.toLowerCase();
+      if (title.includes('diabetes')
+          || p.diagnosis.startsWith('ICD10:E11')
+          || p.diagnosis.startsWith('ICD10:E10')) {
+        return p;
+      }
+    }
+    return null;
+  }, [education.problems]);
+
+  const initialCat: CategoryKey = diabetesProblem !== null ? 'diab' : 'all';
+
+  const [cat, setCat] = useState<CategoryKey>(initialCat);
   const [q, setQ] = useState<string>('');
   const [level, setLevel] = useState<string>('');
   const [format, setFormat] = useState<string>('');
   const [source, setSource] = useState<string>('');
   const [selected, setSelected] = useState<ReadonlySet<string>>(
-    () => new Set<string>(['edu-diab-001', 'edu-diab-002', 'edu-diab-003']),
+    () => new Set<string>(),
   );
+
+  const patientName = education.patientName !== '' ? education.patientName : 'this patient';
+
+  // Build the suggestion-banner detail from the real chart. Mirrors the
+  // shape the .bak built ("E11.9 (T2DM) and recent A1C of 7.9%"); falls
+  // back to the first active problem when no diabetes / A1C is on file.
+  const suggestionDetail = useMemo<string>(() => {
+    const parts: string[] = [];
+    if (diabetesProblem !== null) {
+      const code = diabetesProblem.diagnosis.replace(/^ICD10:/, '');
+      const titleLower = diabetesProblem.title.toLowerCase();
+      let shortLabel = diabetesProblem.title;
+      if (titleLower.includes('type 2')) {
+        shortLabel = 'T2DM';
+      } else if (titleLower.includes('type 1')) {
+        shortLabel = 'T1DM';
+      }
+      parts.push(code !== '' ? `${code} (${shortLabel})` : shortLabel);
+    }
+    if (education.a1c !== null) {
+      parts.push(`recent A1C of ${formatA1c(education.a1c.value)}%`);
+    } else if (diabetesProblem === null && education.problems.length > 0) {
+      const first = education.problems[0]!;
+      const code = first.diagnosis.replace(/^ICD10:/, '');
+      parts.push(code !== '' ? `${code} (${first.title})` : first.title);
+    }
+    return parts.length > 0 ? parts.join(' and ') : 'their active conditions';
+  }, [diabetesProblem, education.a1c, education.problems]);
+
+  const hasPatientContext = education.patientName !== '' || education.problems.length > 0;
 
   const allSources = useMemo<readonly string[]>(() => {
     const seen = new Set<string>();
@@ -252,17 +316,30 @@ export function Education(_props: EducationProps): JSX.Element {
             />
           </div>
 
-          <div className={styles.suggest}>
-            <span className={styles.suggestStar}>&#10022;</span>
-            <span className={styles.suggestTxt}>
-              Suggested for <strong>{PATIENT_NAME}</strong>
-              {' — based on '}
-              {SUGGESTION_DETAIL}
-            </span>
-            <button type="button" className={styles.showAll} onClick={() => { setCat('diab'); setQ(''); }}>
-              Show all &rarr;
-            </button>
-          </div>
+          {hasPatientContext ? (
+            <div className={styles.suggest}>
+              <span className={styles.suggestStar}>&#10022;</span>
+              <span className={styles.suggestTxt}>
+                Suggested for <strong>{patientName}</strong>
+                {' — based on '}
+                {suggestionDetail}
+              </span>
+              <button
+                type="button"
+                className={styles.showAll}
+                onClick={() => { setCat(diabetesProblem !== null ? 'diab' : 'all'); setQ(''); }}
+              >
+                Show all &rarr;
+              </button>
+            </div>
+          ) : (
+            <div className={styles.suggest}>
+              <span className={styles.suggestStar}>&#10022;</span>
+              <span className={styles.suggestTxt}>
+                No patient selected — choose a patient to see condition-targeted handouts.
+              </span>
+            </div>
+          )}
 
           <div className={styles.grid}>
             {cards.length === 0 && (
@@ -432,4 +509,11 @@ function formatReviewed(iso: string): string {
   const year = parts[0] ?? '';
   const month = parts[1] ?? '';
   return `${month}/${year}`;
+}
+
+// Format an A1C value the same way the .bak did: one decimal place,
+// trim trailing ".0" so 7.0 → "7", 7.9 → "7.9".
+function formatA1c(value: number): string {
+  const fixed = value.toFixed(1);
+  return fixed.replace(/\.0$/, '');
 }
