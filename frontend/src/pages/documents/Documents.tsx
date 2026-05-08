@@ -174,7 +174,12 @@ export function Documents({ boot, liveDocs, copilotBackend }: DocumentsProps): J
       const data = (await resp.json().catch(() => ({}))) as { detail?: string; fact_count?: number };
       if (!resp.ok) throw new Error(data.detail ?? `HTTP ${resp.status}`);
       setExtract((s) => ({ ...s, [doc.id]: 'done' }));
-      setTimeout(() => { window.location.reload(); }, 700);
+      // Don't auto-reload — that would wipe the "Extracting…" state of any
+      // OTHER row whose extraction is still in flight (extractions can take
+      // 30-60s each, and the user may run several in parallel). The local
+      // 'done' state shows "✓ Extraction complete" immediately; the next
+      // manual page load picks up the cp_extraction_runs row from the
+      // server-side LEFT JOIN so the button stays disabled across visits.
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setExtract((s) => ({ ...s, [doc.id]: 'error' }));
@@ -283,18 +288,40 @@ export function Documents({ boot, liveDocs, copilotBackend }: DocumentsProps): J
                     state === 'extracting' ? 'Extracting…'
                     : extractDone           ? '✓ Extraction complete'
                     : 'Extract';
+                  // PDFs link to the bbox viewer (copilot_doc_viewer.php).
+                  // Non-PDFs link to OpenEMR's controller-based file retrieval
+                  // — same idiom as the pre-React PHP page.
+                  const pid = boot.patientId ?? 0;
+                  const href = d.isPdf
+                    ? `./copilot_doc_viewer.php?docref=${d.id}`
+                    : `/controller.php?document&retrieve&patient_id=${pid}&document_id=${d.id}&as_file=true&original_file=true`;
                   return (
                     <div key={d.id} className={styles.earlierRow} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                      <div className={styles.earlierIcon}>{d.isPdf ? '📄' : '📎'}</div>
-                      <div className={styles.earlierInfo}>
-                        <div className={styles.earlierTitle}>{d.name}</div>
-                        <div className={styles.earlierSub}>
-                          <span className={styles.catPill}>{d.mime}</span>
-                          <span style={{ marginLeft: 8 }}>doc #{d.id}</span>
+                      <a
+                        href={href}
+                        target={d.isPdf ? '_self' : '_blank'}
+                        rel={d.isPdf ? undefined : 'noopener noreferrer'}
+                        style={{
+                          display: 'flex', flex: 1, alignItems: 'center', gap: 12,
+                          textDecoration: 'none', color: 'inherit', minWidth: 0,
+                        }}
+                      >
+                        <div className={styles.earlierIcon}>{d.isPdf ? '📄' : '📎'}</div>
+                        <div className={styles.earlierInfo}>
+                          <div className={styles.earlierTitle}>{d.name}</div>
+                          <div className={styles.earlierSub}>
+                            <span className={styles.catPill}>{d.mime}</span>
+                            <span style={{ marginLeft: 8 }}>doc #{d.id}</span>
+                            {d.isPdf && (
+                              <span style={{ marginLeft: 8, color: '#1f3a68', fontWeight: 600 }}>
+                                → open with bbox viewer
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                      <div style={{ flex: 1 }} />
-                      <div className={styles.earlierDate}>{d.date}</div>
+                        <div style={{ flex: 1 }} />
+                        <div className={styles.earlierDate}>{d.date}</div>
+                      </a>
                       {d.isPdf && (
                         <button
                           type="button"
