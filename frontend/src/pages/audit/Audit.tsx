@@ -45,6 +45,23 @@ type AuditRow = {
   readonly altRow: boolean; // every other row in Figma uses #FAFBFC bg
 };
 
+// Server-side audit row shape (mirrors the wrapper's $auditRows[]).
+export type AuditRowFromServer = {
+  readonly id: number;
+  readonly ts: string;
+  readonly user: string;
+  readonly event: string;
+  readonly target: string;
+  readonly patient_id: number;
+  readonly success: boolean;
+  readonly tone: RiskTone;
+};
+
+export type AuditPayload = {
+  readonly rows: readonly AuditRowFromServer[];
+  readonly total7d: number;
+};
+
 type ContextItem = {
   readonly text: string;
   readonly ok: boolean;
@@ -131,14 +148,29 @@ const SECURITY_CONTEXT: readonly ContextItem[] = [
 
 type AuditProps = {
   readonly boot: BootContext;
+  readonly payload: AuditPayload;
 };
 
-export function Audit(_props: AuditProps): JSX.Element {
-  // Selected row drives the visual "active" highlight in the table. The
-  // detail card stays pinned to the locked-attempt incident from the Figma
-  // mock — a click changes the row highlight only, since this is a static
-  // demo. (Hooking the right-rail to the selection is a follow-up.)
-  const [selectedId, setSelectedId] = useState<string>(DEFAULT_SELECTED_ID);
+export function Audit({ payload }: AuditProps): JSX.Element {
+  // Live rows from the wrapper. Fall back to the demo set if the server
+  // returned nothing (so the Figma frame still renders cleanly). When live
+  // data is present, ignore the demo selection ids.
+  const liveRows: readonly AuditRow[] = payload.rows.map((r, i) => ({
+    id: `s${r.id}`,
+    ts: r.ts,
+    user: r.user,
+    event: r.event,
+    target: r.target,
+    tone: r.tone,
+    altRow: i % 2 === 1,
+  }));
+  const auditRows: readonly AuditRow[] = liveRows.length > 0 ? liveRows : AUDIT_ROWS;
+  const isLive = liveRows.length > 0;
+  const initialSelected = isLive ? auditRows[0]?.id ?? DEFAULT_SELECTED_ID : DEFAULT_SELECTED_ID;
+  const [selectedId, setSelectedId] = useState<string>(initialSelected);
+  const headerMetaText = isLive
+    ? `HIPAA-required activity log · ${payload.total7d.toLocaleString()} events in last 7 days`
+    : 'HIPAA-required activity log · 14,289 events in last 7 days';
 
   return (
     <>
@@ -146,7 +178,7 @@ export function Audit(_props: AuditProps): JSX.Element {
         <div className={styles.titleBlock}>
           <span className={styles.title}>Audit Log</span>
           <span className={styles.dot}>•</span>
-          <span className={styles.metaLight}>HIPAA-required activity log · 14,289 events in last 7 days</span>
+          <span className={styles.metaLight}>{headerMetaText}</span>
         </div>
         <div className={styles.spacer} />
         <button type="button" className={styles.exportBtn}>
@@ -185,7 +217,7 @@ export function Audit(_props: AuditProps): JSX.Element {
                 <div className={`${styles.thCell} ${styles.colDot}`} />
               </div>
               <div className={styles.tableBody}>
-                {AUDIT_ROWS.map((row) => {
+                {auditRows.map((row) => {
                   const isActive = row.id === selectedId;
                   const rowClasses = [
                     styles.row,

@@ -53,6 +53,67 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live audit data from the `log` table. Page is admin-scope (no pid filter).
+// We surface the most recent 50 events; filtering / paging / CSV stay
+// demo-mode until a follow-up wires the GET params end-to-end.
+// ---------------------------------------------------------------------------
+
+$auditRows = [];
+$total7d   = 0;
+
+$total7d = (int)(sqlQuery(
+    "SELECT COUNT(*) AS c FROM log WHERE date > NOW() - INTERVAL 7 DAY"
+)['c'] ?? 0);
+
+$rs = sqlStatement(
+    "SELECT id, date, event, user, patient_id, success, log_from, comments
+       FROM log
+      ORDER BY date DESC, id DESC
+      LIMIT 50"
+);
+
+while ($r = sqlFetchArray($rs)) {
+    $eventName = (string)($r['event'] ?? '');
+    $success   = (int)($r['success'] ?? 1);
+    // Coarse risk tone (mirrors the .bak heuristic).
+    $tone = 'good';
+    if ($success === 0) {
+        $tone = 'danger';
+    } elseif (in_array($eventName, ['delete_patient', 'security-access-denied', 'sign_epcs'], true)) {
+        $tone = 'danger';
+    } elseif (in_array($eventName, [
+        'login', 'logout', 'security-administration-update',
+        'security-administration-insert', 'export', 'print',
+    ], true)) {
+        $tone = 'warn';
+    }
+
+    $patientId = (int)($r['patient_id'] ?? 0);
+    $logFrom   = (string)($r['log_from'] ?? '');
+    $target    = $patientId > 0
+        ? "Patient #{$patientId}"
+        : ($logFrom !== '' ? $logFrom : '—');
+
+    $ts = strtotime((string)($r['date'] ?? '')) ?: time();
+    $auditRows[] = [
+        'id'         => (int)$r['id'],
+        'ts'         => date('m/d H:i:s', $ts),
+        'user'       => (string)($r['user'] ?? '—'),
+        'event'      => $eventName,
+        'target'     => $target,
+        'patient_id' => $patientId,
+        'success'    => $success === 1,
+        'tone'       => $tone,
+    ];
+}
+
+$auditPayload = [
+    'rows'    => $auditRows,
+    'total7d' => $total7d,
+];
+$auditJson = json_encode($auditPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,7 +161,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-audit="<?php echo attr($auditJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>
