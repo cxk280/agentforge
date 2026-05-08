@@ -13,8 +13,9 @@
 
 ### Added — Hybrid RAG over guideline corpus
 
-- **`POST /search`** — hybrid BM25 + (optional) Cohere Rerank over `copilot/agent/guidelines/seed_corpus.json` (12 hand-curated chunks across ADA, ACC/AHA, USPSTF, GINA, KDIGO).
-- **`copilot/agent/rag/retriever.py`** — pluggable shape so dense (Voyage-3 + pgvector) can swap in without changing `search()`.
+- **`POST /search`** — true hybrid sparse+dense retrieval over `copilot/agent/guidelines/seed_corpus.json` (12 hand-curated chunks across ADA, ACC/AHA, USPSTF, GINA, KDIGO). BM25-Okapi (`rank-bm25`) sparse leg ∪ Voyage-3 dense leg → Reciprocal Rank Fusion (k=60) → optional Cohere Rerank v3.5. Each result carries `bm25_score`, `dense_score`, `rrf_score`, `rerank_score`, and a `source` tag (`sparse` | `dense` | `both`); the response includes a `meta` block with `retrieval_mode`, `dense_enabled`, `fusion`, etc. — surfaced in the chat demo as a green "Hybrid · sparse + dense" pill (yellow "Sparse only" when `VOYAGE_API_KEY` is unset). [Dense leg landed 2026-05-08, in response to early-submission feedback that the rubric wanted true hybrid sparse+dense, not just BM25 + rerank.]
+- **`copilot/agent/rag/retriever.py`** — Voyage embeddings cached on disk at `guidelines/seed_corpus_embeddings.json` keyed by `(chunk_id, model, text_hash)` so a fresh container hydrates without re-spending Voyage budget. Cache invalidates automatically on chunk text change.
+- **`copilot/agent/test_retriever_hybrid.py`** — 6 unit tests stub Voyage to pin the hybrid contract (per-component scores, source tag, cache invalidation, sparse-only fallback) without burning real budget. Wired into CircleCI's new `agent-unit-test` job, which gates every agent-deploy job.
 
 ### Added — LangGraph multi-agent
 
