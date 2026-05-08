@@ -37,6 +37,14 @@ if (($_GET['confirm'] ?? '') !== '1') {
 
 header('Content-Type: text/plain; charset=utf-8');
 
+// `?reset_marker=1` clears the marker before checking it. Use this when
+// an earlier run set the marker but the import didn't actually apply
+// rows (e.g. the pre-fb23dfd71 seeder bug that skipped INSERTs).
+if (($_GET['reset_marker'] ?? '') === '1') {
+    sqlStatement("DELETE FROM globals WHERE gl_name = 'copilot_clinical_data_v1'");
+    echo "Marker cleared. Continuing with import.\n\n";
+}
+
 $marker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_clinical_data_v1'");
 if (!empty($marker['gl_value'])) {
     echo "Already imported (gl_value = {$marker['gl_value']}). Skipping.\n";
