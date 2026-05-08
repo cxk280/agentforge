@@ -24,6 +24,7 @@
 declare(strict_types=1);
 
 require_once(__DIR__ . "/../globals.php");
+require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -54,6 +55,78 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live patient cohort. Joins patient_data -> insurance_data (primary) ->
+// insurance_companies, plus subqueries for last-visit (form_encounter) and
+// primary diagnosis (lists.activity=1, type=medical_problem). HbA1c not
+// seeded — column shows "—". 7 filter dropdowns stay demo-mode.
+// ---------------------------------------------------------------------------
+
+function cp_pl_age_from_dob(string $dob): int
+{
+    if ($dob === '' || $dob === '0000-00-00') return 0;
+    $ts = strtotime($dob);
+    if ($ts === false) return 0;
+    return (int)floor((time() - $ts) / 86400 / 365.25);
+}
+
+$rows = [];
+$total = 0;
+
+$total = (int)(sqlQuery("SELECT COUNT(*) AS c FROM patient_data")['c'] ?? 0);
+
+$rs = sqlStatement(
+    "SELECT pd.pid, pd.fname, pd.lname, pd.DOB, pd.sex, pd.pubpid, pd.providerID,
+            u.fname AS uf, u.lname AS ul, u.title AS ut, u.username AS uu,
+            ic.name AS insurance_name,
+            (SELECT MAX(date) FROM form_encounter fe WHERE fe.pid = pd.pid) AS last_visit,
+            (SELECT diagnosis FROM lists l
+              WHERE l.pid = pd.pid AND l.type = 'medical_problem' AND l.activity = 1
+              ORDER BY l.id ASC LIMIT 1) AS dx
+       FROM patient_data pd
+       LEFT JOIN insurance_data id_pri
+              ON id_pri.pid = pd.pid AND id_pri.type = 'primary'
+       LEFT JOIN insurance_companies ic ON ic.id = id_pri.provider
+       LEFT JOIN users u ON u.id = pd.providerID
+      ORDER BY pd.lname, pd.fname
+      LIMIT 50"
+);
+while ($r = sqlFetchArray($rs)) {
+    $dob = (string)($r['DOB'] ?? '');
+    $age = cp_pl_age_from_dob($dob);
+    $sexRaw = strtolower(substr((string)($r['sex'] ?? ''), 0, 1));
+    $sex = $sexRaw === 'f' ? 'F' : 'M';
+
+    $lastVisitTs = strtotime((string)($r['last_visit'] ?? '')) ?: null;
+    $lastVisit   = $lastVisitTs !== null ? date('m/d/Y', $lastVisitTs) : '—';
+
+    $dxRaw = (string)($r['dx'] ?? '');
+    $dx = $dxRaw !== '' ? str_replace('ICD10:', '', $dxRaw) : '—';
+
+    $rows[] = [
+        'name'      => trim((string)($r['fname'] ?? '') . ' ' . (string)($r['lname'] ?? '')),
+        'mrn'       => '#' . str_pad((string)((int)($r['pid'] ?? 0)), 6, '0', STR_PAD_LEFT),
+        'dob'       => $dob !== '' && $dob !== '0000-00-00' ? date('m/d/Y', strtotime($dob) ?: time()) : '—',
+        'age'       => $age,
+        'sex'       => $sex,
+        'lastVisit' => $lastVisit,
+        'provider'  => cp_format_provider_name([
+            'username' => $r['uu'] ?? '', 'fname' => $r['uf'] ?? '',
+            'lname'    => $r['ul'] ?? '', 'title' => $r['ut'] ?? '',
+        ]),
+        'insurance' => (string)($r['insurance_name'] ?? '') !== '' ? (string)$r['insurance_name'] : '—',
+        'dx'        => $dx,
+        'hba1c'     => 0,
+        'tone'      => 'normal',
+    ];
+}
+
+$patientListPayload = [
+    'rows'  => $rows,
+    'total' => $total,
+];
+$patientListJson = json_encode($patientListPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,7 +170,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-patient-list="<?php echo attr($patientListJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

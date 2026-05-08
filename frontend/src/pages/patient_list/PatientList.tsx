@@ -29,6 +29,11 @@ type PatientRow = {
   readonly tone: Hba1cTone;
 };
 
+export type PatientListPayload = {
+  readonly rows: readonly PatientRow[];
+  readonly total: number;
+};
+
 type SidebarGroup = {
   readonly label: string;
   readonly items: readonly { readonly name: string; readonly active: boolean }[];
@@ -113,9 +118,15 @@ const TOTAL_LABEL = '1,847 patients matching filters · last refreshed 2 min ago
 
 type PatientListProps = {
   readonly boot: BootContext;
+  readonly payload: PatientListPayload;
 };
 
-export function PatientList(_props: PatientListProps): JSX.Element {
+export function PatientList({ payload }: PatientListProps): JSX.Element {
+  const liveRows = payload.rows;
+  const rowsToRender: readonly PatientRow[] = liveRows.length > 0 ? liveRows : ROWS;
+  const totalLabel = liveRows.length > 0
+    ? `${payload.total.toLocaleString()} ${payload.total === 1 ? 'patient' : 'patients'} matching filters · live`
+    : TOTAL_LABEL;
   return (
     <div className={styles.root}>
       <aside className={styles.side}>
@@ -144,7 +155,7 @@ export function PatientList(_props: PatientListProps): JSX.Element {
           <div className={styles.titleBlock}>
             <span className={styles.title}>Patient List</span>
             <span className={styles.dot}>·</span>
-            <span className={styles.subtitle}>{TOTAL_LABEL}</span>
+            <span className={styles.subtitle}>{totalLabel}</span>
           </div>
           <div className={styles.headSpacer} />
           <button type="button" className={styles.btnGhost}>
@@ -200,7 +211,7 @@ export function PatientList(_props: PatientListProps): JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {ROWS.map((r, i) => (
+              {rowsToRender.map((r, i) => (
                 <tr key={r.mrn} className={i % 2 === 1 ? styles.rowAlt : undefined}>
                   <td className={styles.tdChk}>
                     <span className={styles.checkbox} aria-hidden="true" />
