@@ -38,6 +38,18 @@ type MonthGroup = {
   readonly rows: readonly ResultRow[];
 };
 
+export type ResultsPayload = {
+  readonly months: readonly MonthGroup[];
+  readonly counts: {
+    readonly all: number;
+    readonly labs: number;
+    readonly imaging: number;
+    readonly procedures: number;
+    readonly documents: number;
+    readonly abnormal: number;
+  };
+};
+
 const MONTHS: readonly MonthGroup[] = [
   {
     label: 'April 2026',
@@ -132,19 +144,39 @@ const COUNTS_LINE = '18 lab results · 5 imaging studies · 4 documents';
 
 type PatientResultsProps = {
   readonly boot: BootContext;
+  readonly payload: ResultsPayload;
 };
 
-export function PatientResults(_props: PatientResultsProps): JSX.Element {
+export function PatientResults({ payload }: PatientResultsProps): JSX.Element {
   const [filter, setFilter] = useState<FilterKey>('all');
   const [view, setView] = useState<ViewMode>('timeline');
 
-  // Apply the active filter to the static demo data.
-  const filteredMonths: readonly MonthGroup[] = MONTHS
+  // Live months from the wrapper, demo otherwise.
+  const liveMonths = payload.months;
+  const sourceMonths: readonly MonthGroup[] = liveMonths.length > 0 ? liveMonths : MONTHS;
+
+  // Apply the active filter to the source data.
+  const filteredMonths: readonly MonthGroup[] = sourceMonths
     .map((m) => ({
       label: m.label,
       rows: m.rows.filter((r) => matchesFilter(r, filter)),
     }))
     .filter((m) => m.rows.length > 0);
+
+  // Live pill counts when present, otherwise the existing 27/18/5/2/2/6 demo.
+  const livePills: readonly PillSpec[] = liveMonths.length > 0
+    ? [
+        { key: 'all',        label: 'All',        count: payload.counts.all },
+        { key: 'labs',       label: 'Labs',       count: payload.counts.labs },
+        { key: 'imaging',    label: 'Imaging',    count: payload.counts.imaging },
+        { key: 'procedures', label: 'Procedures', count: payload.counts.procedures },
+        { key: 'documents',  label: 'Documents',  count: payload.counts.documents },
+        { key: 'abnormal',   label: 'Abnormal',   count: payload.counts.abnormal },
+      ]
+    : PILLS;
+  const liveCountsLine = liveMonths.length > 0
+    ? `${payload.counts.labs} lab results · ${payload.counts.imaging} imaging studies · ${payload.counts.documents} documents`
+    : COUNTS_LINE;
 
   return (
     <>
@@ -152,7 +184,7 @@ export function PatientResults(_props: PatientResultsProps): JSX.Element {
         <div className={styles.pageHeadInfo}>
           <span className={styles.pageTitle}>Results</span>
           <span className={styles.dot}>·</span>
-          <span className={styles.metaLight}>{COUNTS_LINE}</span>
+          <span className={styles.metaLight}>{liveCountsLine}</span>
         </div>
         <button type="button" className={styles.btnPrimary}>+ Order labs / imaging</button>
         <button type="button" className={styles.btnGhost}>? Help</button>
@@ -162,7 +194,7 @@ export function PatientResults(_props: PatientResultsProps): JSX.Element {
 
       <div className={styles.filter}>
         <div className={styles.pills}>
-          {PILLS.map((p) => {
+          {livePills.map((p) => {
             const active = filter === p.key;
             const pillCls = active
               ? `${styles.pill} ${styles.pillActive}`

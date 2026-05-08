@@ -44,6 +44,14 @@ type AccountRow = {
   readonly note: string;
 };
 
+export type AgingPayload = {
+  readonly kpis: readonly Kpi[];
+  readonly bucketTiles: readonly BucketTile[];
+  readonly bucketBarPcts: readonly { readonly key: BucketKey; readonly pct: number; readonly fill: string }[];
+  readonly accounts: readonly AccountRow[];
+  readonly totalAR: number;
+};
+
 // KPI strip — 5 tiles, exactly as drawn in Figma.
 type Kpi = {
   readonly label: string;
@@ -104,9 +112,15 @@ const ACCOUNTS: readonly AccountRow[] = [
 
 type AgingProps = {
   readonly boot: BootContext;
+  readonly payload: AgingPayload;
 };
 
-export function Aging(_props: AgingProps): JSX.Element {
+export function Aging({ payload }: AgingProps): JSX.Element {
+  const isLive = payload.totalAR > 0;
+  const kpis = isLive ? payload.kpis : KPIS;
+  const bucketTiles = isLive ? payload.bucketTiles : BUCKET_TILES;
+  const bucketBarPcts = isLive ? payload.bucketBarPcts : BUCKET_BAR_PCTS;
+  const accounts = isLive ? payload.accounts : ACCOUNTS;
   return (
     <>
       <header className={styles.pagehead}>
@@ -122,7 +136,7 @@ export function Aging(_props: AgingProps): JSX.Element {
       <main className={styles.content}>
         {/* 5-up KPI strip */}
         <section className={styles.kpiCard}>
-          {KPIS.map((k, i) => (
+          {kpis.map((k, i) => (
             <span key={k.label} className={styles.kpiSlot}>
               {i > 0 && <span className={styles.kpiDivider} aria-hidden="true" />}
               <span className={styles.kpi}>
@@ -137,7 +151,7 @@ export function Aging(_props: AgingProps): JSX.Element {
         <section className={styles.bucketCard}>
           <div className={styles.cardHead}>A/R BY AGING BUCKET</div>
           <div className={styles.bucketBar} aria-hidden="true">
-            {BUCKET_BAR_PCTS.map((seg) => (
+            {bucketBarPcts.map((seg) => (
               <span
                 key={seg.key}
                 className={styles.bucketBarSeg}
@@ -146,7 +160,7 @@ export function Aging(_props: AgingProps): JSX.Element {
             ))}
           </div>
           <div className={styles.bucketLegend}>
-            {BUCKET_TILES.map((t) => (
+            {bucketTiles.map((t) => (
               <div key={t.key} className={styles.bucketTile}>
                 <div className={styles.bucketTileLabelRow}>
                   <span className={`${styles.bucketDot} ${dotClass(t.tone)}`} aria-hidden="true" />
@@ -195,7 +209,7 @@ export function Aging(_props: AgingProps): JSX.Element {
           <section className={styles.acctCard}>
             <div className={styles.cardHead}>LARGEST OUTSTANDING ACCOUNTS</div>
             <div className={styles.acctList}>
-              {ACCOUNTS.map((a, i) => {
+              {accounts.map((a, i) => {
                 const rowClass = i % 2 === 1
                   ? `${styles.acctRow} ${styles.acctRowAlt}`
                   : styles.acctRow;

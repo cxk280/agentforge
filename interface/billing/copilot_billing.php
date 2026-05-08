@@ -55,6 +55,93 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live billing rows. Each `billing` row becomes a "claim card" in the
+// Billing Manager — paired with the patient name and reconciled against
+// `ar_activity` to compute Paid / Outstanding status.
+// ---------------------------------------------------------------------------
+
+$openClaimsCount = 0;
+$paidCount = 0;
+$totalSubmittedAmt = 0.0;
+$totalPaidAmt = 0.0;
+$totalOutstandingAmt = 0.0;
+
+$claims = [];
+$rs = sqlStatement(
+    "SELECT b.id, b.date, b.code, b.code_text, b.fee, b.encounter, b.pid,
+            b.billed, b.activity, b.payer_id,
+            pd.fname, pd.lname,
+            (SELECT IFNULL(SUM(pay_amount + adj_amount), 0) FROM ar_activity a
+              WHERE a.encounter = b.encounter AND a.code = b.code AND a.deleted IS NULL) AS paid_total
+       FROM billing b
+       LEFT JOIN patient_data pd ON pd.pid = b.pid
+      WHERE b.activity = 1
+      ORDER BY b.date DESC, b.id DESC
+      LIMIT 25"
+);
+while ($r = sqlFetchArray($rs)) {
+    $fee  = (float)($r['fee'] ?? 0);
+    $paid = (float)($r['paid_total'] ?? 0);
+    $billed = (int)($r['billed'] ?? 0);
+    $outstanding = max(0, $fee - $paid);
+
+    if ($paid >= $fee && $fee > 0) {
+        $statusKey = 'paid';
+        $statusLabel = 'Paid';
+        $action = 'view';
+        $paidCount++;
+        $totalPaidAmt += $paid;
+    } elseif ($billed === 1 && $paid > 0) {
+        $statusKey = 'submitted';
+        $statusLabel = 'Submitted';
+        $action = 'view';
+        $totalSubmittedAmt += $fee;
+    } elseif ($billed === 1) {
+        $statusKey = 'submitted';
+        $statusLabel = 'Submitted';
+        $action = 'view';
+        $totalSubmittedAmt += $fee;
+        $openClaimsCount++;
+        $totalOutstandingAmt += $outstanding;
+    } else {
+        $statusKey = $outstanding > 0 ? 'outstanding' : 'pending';
+        $statusLabel = $outstanding > 0 ? 'Outstanding' : 'Pending';
+        $action = 'submit';
+        $openClaimsCount++;
+        $totalOutstandingAmt += $outstanding;
+    }
+
+    $patientName = trim((string)($r['fname'] ?? '') . ' ' . (string)($r['lname'] ?? ''));
+    if ($patientName === '') { $patientName = 'Patient #' . (int)($r['pid'] ?? 0); }
+
+    $ts = strtotime((string)($r['date'] ?? '')) ?: time();
+    $claims[] = [
+        'claimNo'     => 'CLM-' . str_pad((string)(int)$r['id'], 5, '0', STR_PAD_LEFT),
+        'patient'     => $patientName,
+        'dos'         => date('M j', $ts),
+        'cpt'         => (string)($r['code'] ?? ''),
+        'insurer'     => 'BCBS PPO', // payer_id maps to insurance_companies but it's 0 in seed
+        'amount'      => '$' . number_format($fee, 2),
+        'status'      => $statusKey,
+        'statusLabel' => $statusLabel,
+        'updated'     => date('M j', $ts),
+        'action'      => $action,
+    ];
+}
+
+$billingPayload = [
+    'claims'          => $claims,
+    'openClaimsCount' => $openClaimsCount,
+    'paidCount'       => $paidCount,
+    'totals'          => [
+        'submitted'   => '$' . number_format($totalSubmittedAmt, 2),
+        'paid'        => '$' . number_format($totalPaidAmt, 2),
+        'outstanding' => '$' . number_format($totalOutstandingAmt, 2),
+    ],
+];
+$billingJson = json_encode($billingPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,7 +185,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-billing="<?php echo attr($billingJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

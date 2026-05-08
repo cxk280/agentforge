@@ -40,6 +40,10 @@ type InventoryRow = {
   readonly lastDispensed: string;
 };
 
+export type InventoryPayload = {
+  readonly rows: readonly InventoryRow[];
+};
+
 // Verbatim demo data from Figma Screen 60 (node 109:2). Twelve rows.
 const ROWS: readonly InventoryRow[] = [
   { id: 1,  drug: 'Influenza vaccine 2025-26', form: 'Quadrivalent IM', ndc: '60702-1234-1',  schedule: '',     lot: 'SF26-491',  exp: '03/15/2027', expTone: 'plain', onHand: '248',   onHandTone: 'plain', reorder: '100',   location: 'Vaccine fridge B',  lastDispensed: '04/30/2026' },
@@ -82,10 +86,12 @@ const STATUS_OPTS   = ['In stock', 'All stock', 'Out of stock', 'Low'] as const;
 
 type InventoryProps = {
   readonly boot: BootContext;
+  readonly payload: InventoryPayload;
 };
 
-export function Inventory(_props: InventoryProps): JSX.Element {
+export function Inventory({ payload }: InventoryProps): JSX.Element {
   const [tab, setTab] = useState<TabKey>('active');
+  const allRows: readonly InventoryRow[] = payload.rows.length > 0 ? payload.rows : ROWS;
 
   return (
     <>
@@ -169,7 +175,7 @@ export function Inventory(_props: InventoryProps): JSX.Element {
             </tr>
           </thead>
           <tbody>
-            {ROWS.map((r, idx) => {
+            {allRows.map((r, idx) => {
               const rowClass = idx % 2 === 1 ? `${styles.tr} ${styles.trAlt}` : styles.tr;
               return (
                 <tr key={r.id} className={rowClass}>

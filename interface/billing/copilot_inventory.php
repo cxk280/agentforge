@@ -54,6 +54,72 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live drug_inventory rows. Joined to drugs for the display name +
+// ndc_number + form. Past-expiration / low-stock tones are derived in PHP
+// so the React side renders straight from the typed payload.
+// ---------------------------------------------------------------------------
+
+$inventoryRows = [];
+$rs = sqlStatement(
+    "SELECT di.inventory_id, di.drug_id, di.lot_number, di.expiration,
+            di.manufacturer, di.on_hand, di.warehouse_id,
+            d.name, d.ndc_number, d.form, d.size, d.unit, d.reorder_point,
+            d.related_code
+       FROM drug_inventory di
+       LEFT JOIN drugs d ON d.drug_id = di.drug_id
+      WHERE di.destroy_date IS NULL
+      ORDER BY d.name ASC, di.lot_number ASC"
+);
+$now = time();
+$soon = strtotime('+30 days', $now) ?: $now;
+while ($r = sqlFetchArray($rs)) {
+    $name = trim((string)($r['name'] ?? ''));
+    if ($name === '') { continue; }
+
+    $expRaw = (string)($r['expiration'] ?? '');
+    $expTs  = $expRaw !== '' ? strtotime($expRaw) : false;
+    $expDisplay = $expTs !== false ? date('m/d/Y', $expTs) : '—';
+    $expTone = 'plain';
+    if ($expTs !== false) {
+        if ($expTs < $now) {
+            $expTone = 'past';
+        } elseif ($expTs < $soon) {
+            $expTone = 'warn';
+        }
+    }
+
+    $onHand = (int)($r['on_hand'] ?? 0);
+    $reorder = (int)($r['reorder_point'] ?? 0);
+    $onHandTone = $onHand <= $reorder ? 'warn' : 'plain';
+
+    $form = (string)($r['form'] ?? '');
+    if ($form === '0' || $form === '') { $form = 'Tablet / Capsule'; }
+    $location = (string)($r['warehouse_id'] ?? '');
+    if ($location === '' || $location === 'main') { $location = 'Med room A'; }
+
+    $inventoryRows[] = [
+        'id'         => (int)$r['inventory_id'],
+        'drug'       => $name,
+        'form'       => $form,
+        'ndc'        => (string)($r['ndc_number'] ?? '') !== '' ? (string)$r['ndc_number'] : '—',
+        'schedule'   => '',
+        'lot'        => (string)($r['lot_number'] ?? '') !== '' ? (string)$r['lot_number'] : '—',
+        'exp'        => $expDisplay,
+        'expTone'    => $expTone,
+        'onHand'     => (string)$onHand,
+        'onHandTone' => $onHandTone,
+        'reorder'    => $reorder > 0 ? (string)$reorder : '—',
+        'location'   => $location,
+        'lastDispensed' => '—',
+    ];
+}
+
+$inventoryPayload = [
+    'rows' => $inventoryRows,
+];
+$inventoryJson = json_encode($inventoryPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,7 +163,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-inventory="<?php echo attr($inventoryJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

@@ -40,6 +40,17 @@ type Claim = {
   readonly action: ActionKind;
 };
 
+export type BillingPayload = {
+  readonly claims: readonly Claim[];
+  readonly openClaimsCount: number;
+  readonly paidCount: number;
+  readonly totals: {
+    readonly submitted: string;
+    readonly paid: string;
+    readonly outstanding: string;
+  };
+};
+
 // ── Demo data — verbatim from Figma node 56:2 (Screen 27) ───────────
 
 type Kpi = {
@@ -84,12 +95,20 @@ function matchesFilter(filter: FilterKey, claim: Claim): boolean {
 
 type BillingProps = {
   readonly boot: BootContext;
+  readonly payload: BillingPayload;
 };
 
-export function Billing(_props: BillingProps): JSX.Element {
+export function Billing({ payload }: BillingProps): JSX.Element {
   const [filter, setFilter] = useState<FilterKey>('all');
 
-  const visibleRows = CLAIMS.filter((c) => matchesFilter(filter, c));
+  // Live data when present, demo otherwise.
+  const liveClaims = payload.claims;
+  const allClaims: readonly Claim[] = liveClaims.length > 0 ? liveClaims : CLAIMS;
+  const visibleRows = allClaims.filter((c) => matchesFilter(filter, c));
+  const openCount = liveClaims.length > 0 ? payload.openClaimsCount : 128;
+  const subtitle = liveClaims.length > 0
+    ? `${openCount} open claim${openCount === 1 ? '' : 's'} • ${payload.totals.outstanding} outstanding`
+    : '128 open claims • 14 awaiting submission';
 
   return (
     <>
@@ -97,7 +116,7 @@ export function Billing(_props: BillingProps): JSX.Element {
         <div className={styles.titleBlock}>
           <span className={styles.title}>Billing Manager</span>
           <span className={styles.dot}>•</span>
-          <span className={styles.subtitle}>128 open claims • 14 awaiting submission</span>
+          <span className={styles.subtitle}>{subtitle}</span>
         </div>
         <div className={styles.spacer} />
         <button className={styles.btnGhost} type="button">
