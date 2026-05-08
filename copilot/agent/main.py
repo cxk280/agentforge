@@ -237,10 +237,18 @@ async def health():
 
 @app.get("/version")
 async def version():
-    """Returns a build marker so we can verify which code is actually running."""
+    """Returns build markers so we can verify which code is actually running.
+
+    `git_commit_sha` is auto-populated by Railway for GitHub-source services
+    (RAILWAY_GIT_COMMIT_SHA env var). CircleCI's deploy-promotion jobs poll
+    /version until this field matches $CIRCLE_SHA1 — that's the only way to
+    know Railway has finished the auto-redeploy and is no longer routing
+    traffic to the previous container.
+    """
     return {
         "build_marker": _BUILD_MARKER,
         "build_rev": os.environ.get("BUILD_REV", "unknown"),
+        "git_commit_sha": os.environ.get("RAILWAY_GIT_COMMIT_SHA", "unknown"),
     }
 
 

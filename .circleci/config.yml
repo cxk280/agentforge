@@ -1,56 +1,65 @@
 # AgentForge CI/CD pipeline.
 #
-# Two parallel deploy lanes — one per Railway service we care about:
+# Deploy mechanism: GitHub-source Railway services. Each Railway service
+# (copilot-agent + openemr × dev/qa/prod) is connected to this repo and
+# watches a per-env branch:
 #
-#   copilot-agent (FastAPI):
-#     unit-test → deploy-agent-{env} → eval-{smoke|full}-agent-{env} → hold → next env
-#     `railway up --service copilot-agent --path-as-root .` from copilot/agent/
+#     dev  → master   (auto-deploys on every master push)
+#     qa   → qa       (CI promotes via `git push origin <sha>:qa`)
+#     prod → prod     (CI promotes via `git push origin <sha>:prod`)
 #
-#   openemr (PHP app):
-#     unit-test → deploy-openemr-{env} → smoke-openemr-{env} → hold → next env
-#     `railway up --service openemr` from the repo root
-#
-# Both lanes share unit-test as their pre-deploy gate (same Copilot
-# isolated PHPUnit suite). Each env's hold-{env} approval requires
-# BOTH lanes' verifications to pass before opening — so a broken
-# agent OR a broken OpenEMR will block QA/Prod promotion equally.
+# CI's role is to gate promotions — never to deploy directly. The old
+# `railway up` model let any workstation token sidestep CI; switching
+# to GitHub-source + branch-watch closes that door. See
+# project_branch_protection_lockdown memory for the full motivation.
 #
 # Stages:
-#   1. unit-test                 — isolated PHPUnit Copilot suite. Both lanes.
-#   1b. agent-unit-test          — Python unit tests for the agent (PHI redaction
-#                                  + hybrid retriever contract). Gates the agent
-#                                  lane only — openemr deploys don't depend on
-#                                  agent Python code.
-#   2. deploy-agent-{env}        — agent: railway up against the env's project token.
-#   3. eval-smoke-agent-dev      — 5-case smoke against dev's agent (~$0.05).
-#   4. deploy-openemr-{env}      — openemr: railway up against the env's project token.
-#   5. smoke-openemr-{env}       — wait for login, re-run copilot_enable_api.php,
-#                                  smoke-test FHIR endpoint with admin/pass.
-#   6. hold-qa, hold-prod        — manual approval gates after BOTH lanes
-#                                  pass their previous-env verifications.
-#   7. eval-full-agent-{qa,prod} — full 50-case eval against the deployed agent.
+#   1.  unit-test                 — isolated PHPUnit Copilot suite. Both lanes.
+#   1b. agent-unit-test           — Python unit tests for the agent (PHI redaction
+#                                   + hybrid retriever contract). Gates the agent
+#                                   lane only — openemr deploys don't depend on
+#                                   agent Python code.
+#   2.  eval-smoke-agent-dev      — 5-case smoke against dev's agent (~$0.05).
+#                                   No explicit dev deploy step: master push
+#                                   auto-deploys dev's Railway services in
+#                                   parallel; the eval first polls /version
+#                                   until git_commit_sha matches CIRCLE_SHA1.
+#   3.  smoke-openemr-dev         — wait for login + re-run copilot_enable_api.php
+#                                   (the REGISTERED/REFRESHED marker doubles as
+#                                   "fork code is deployed" proof).
+#   4.  hold-qa, hold-prod        — manual approval gates after BOTH lane's
+#                                   previous-env verifications pass.
+#   5.  promote-{qa,prod}         — single git push that triggers BOTH Railway
+#                                   services' auto-deploy on the env branch.
+#   6.  eval-full-agent-{qa,prod} — full 50-case eval; threshold 46/50.
+#                                   Polls /version for SHA match before evaluating.
+#   7.  smoke-openemr-{qa,prod}   — same shape as dev, against the env's openemr.
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
-#   ANTHROPIC_API_KEY              — for Haiku judge in evals
-#   LANGFUSE_PUBLIC_KEY            — for Langfuse Datasets uploads
-#   LANGFUSE_SECRET_KEY
-#   LANGFUSE_HOST
-#   RAILWAY_TOKEN_DEV              — Railway project token scoped to dev
-#   RAILWAY_TOKEN_QA               — Railway project token scoped to qa
-#   RAILWAY_TOKEN_PROD             — Railway project token scoped to prod
-#   OE_USER_DEPLOY                 — OpenEMR admin username for smoke (default: admin)
-#   OE_PASS_DEPLOY                 — OpenEMR admin password for smoke (default: pass)
+#   ANTHROPIC_API_KEY        — for Haiku judge in evals
+#   GITHUB_DEPLOY_TOKEN      — GitHub PAT with `repo` scope (or fine-grained
+#                              with content:write on this repo + qa/prod
+#                              branches). CI uses it to push master HEAD to
+#                              qa/prod branches. Branch protection should
+#                              restrict push to this token's identity.
+#   OE_USER_DEPLOY           — OpenEMR admin username for smoke (default: admin)
+#   OE_PASS_DEPLOY           — OpenEMR admin password for smoke (default: pass)
 #
-# Token scoping: Railway project tokens can be scoped per-environment via
-# the Railway dashboard. Generate one per env so a Dev compromise can't
-# touch Prod.
+# No longer used (lockdown 2026-05-08):
+#   RAILWAY_TOKEN_DEV / QA / PROD — replaced by git-push promotion. Revoke
+#                                   the Railway project tokens once you've
+#                                   verified this pipeline is the only
+#                                   deploy path.
+#   LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST — see
+#                                   the run-evals command for why we strip
+#                                   these instead of using them.
 #
-# Why openemr deploys aren't risky to the MySQL volume: redeploying the
-# `openemr` service rebuilds the OpenEMR container only. The MySQL
-# service is a separate Railway service with its own volume; this
-# pipeline never touches it. The OpenEMR container's bind-mount
-# volumes (sites/, public/themes/, public/assets/, vendor/, node_modules/)
-# survive redeploy too. See project_railway_deploy_2026-04-30 memory.
+# Why openemr deploys aren't risky to the MySQL volume: pushing to an env
+# branch rebuilds the openemr container only. The MySQL service is a
+# separate Railway service with its own volume; this pipeline never
+# touches it. The OpenEMR container's bind-mount volumes (sites/,
+# public/themes/, public/assets/, vendor/, node_modules/) survive redeploy
+# too. See project_railway_deploy_2026-04-30 memory.
 
 version: 2.1
 
@@ -62,7 +71,7 @@ executors:
     docker:
       - image: cimg/python:3.13
     resource_class: small
-  railway:
+  base:
     docker:
       - image: cimg/base:stable
     resource_class: small
@@ -82,56 +91,66 @@ executors:
 
 # ─── Reusable command bundles ────────────────────────────────────────────
 commands:
-  install-railway-cli:
-    description: "Install the Railway CLI"
-    steps:
-      - run:
-          name: Install Railway CLI
-          command: |
-            curl -fsSL https://railway.com/install.sh | sh
-            export PATH="$HOME/.railway/bin:$PATH"
-            echo 'export PATH="$HOME/.railway/bin:$PATH"' >> "$BASH_ENV"
-            railway --version
-
-  railway-deploy:
-    description: "Deploy a service to a Railway environment"
+  promote-to-env-branch:
+    description: |
+      Push the current commit to a target env branch (qa/prod).
+      Railway services watching that branch auto-deploy on push.
     parameters:
-      service:
+      env_branch:
         type: string
-      env_token:
-        type: env_var_name
-      service_path:
+    steps:
+      - checkout
+      - run:
+          name: Push HEAD → << parameters.env_branch >>
+          command: |
+            if [ -z "${GITHUB_DEPLOY_TOKEN:-}" ]; then
+              echo "✗ GITHUB_DEPLOY_TOKEN not set — cannot promote." >&2
+              echo "  Add a GitHub PAT (repo scope) as a CircleCI project env var." >&2
+              exit 1
+            fi
+            # Push the SHA (not a branch ref) so a stray master move
+            # mid-pipeline can't sneak a different commit into qa/prod.
+            git push \
+              "https://x-access-token:${GITHUB_DEPLOY_TOKEN}@github.com/cxk280/agentforge.git" \
+              "${CIRCLE_SHA1}:refs/heads/<< parameters.env_branch >>"
+            echo "✓ Pushed ${CIRCLE_SHA1} → << parameters.env_branch >>"
+
+  wait-for-agent-sha:
+    description: |
+      Poll the agent's /version endpoint until git_commit_sha matches
+      CIRCLE_SHA1. This is how we know Railway has finished its
+      auto-deploy and is no longer routing traffic to the previous
+      container. /version reads RAILWAY_GIT_COMMIT_SHA, which Railway
+      populates per build for GitHub-source services.
+    parameters:
+      base_url:
         type: string
-        default: "."
-      use_path_as_root:
-        type: boolean
-        default: false
+      timeout_seconds:
+        type: integer
+        default: 900
     steps:
       - run:
-          name: Deploy << parameters.service >>
-          # Tee the deploy output to a per-service log so the deploy
-          # job can publish it as an artifact for later debugging.
-          #
-          # `--ci` (non-interactive, waits for build + rollout) NOT
-          # `--detach` (queues build, returns immediately). Caught
-          # 2026-05-07: with `--detach`, deploy-agent-* would report
-          # success while Railway was still building; the next
-          # downstream job (smoke / eval) would hit the PREVIOUS
-          # image. Pipeline 76's eval-full-agent-qa scored 47/50 with
-          # adversarial-empty-message ✗ even though the empty-message
-          # fix was on the deployed commit — the fix wasn't actually
-          # rolled out yet because `--detach` had returned early.
+          name: Wait for << parameters.base_url >> /version SHA = $CIRCLE_SHA1
+          no_output_timeout: << parameters.timeout_seconds >>s
           command: |
-            mkdir -p /tmp/deploy-logs
-            export RAILWAY_TOKEN="${<< parameters.env_token >>}"
-            cd << parameters.service_path >>
-            if [ "<< parameters.use_path_as_root >>" = "true" ]; then
-              railway up --service << parameters.service >> --path-as-root . --ci \
-                2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
-            else
-              railway up --service << parameters.service >> --ci \
-                2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
-            fi
+            DEADLINE=$(($(date +%s) + << parameters.timeout_seconds >>))
+            EXPECTED="${CIRCLE_SHA1}"
+            BASE="<< parameters.base_url >>"
+            while true; do
+              ACTUAL=$(curl -sS "$BASE/version" 2>/dev/null \
+                | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('git_commit_sha','unknown'))" 2>/dev/null \
+                || echo "unknown")
+              if [ "$ACTUAL" = "$EXPECTED" ]; then
+                echo "✓ $BASE deployed at $EXPECTED"
+                break
+              fi
+              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                echo "✗ Timeout: expected $EXPECTED, last seen $ACTUAL" >&2
+                exit 1
+              fi
+              echo "  waiting… last_seen=${ACTUAL:0:7} expected=${EXPECTED:0:7}"
+              sleep 30
+            done
 
   wait-for-url:
     description: "Poll a URL until it returns 200, with timeout"
@@ -377,76 +396,42 @@ jobs:
     executor: python
     steps:
       - checkout
-      - run:
-          name: Set Anthropic + Langfuse env (from CircleCI project vars)
-          command: |
-            echo "ANTHROPIC_API_KEY+LANGFUSE_* must be set as CircleCI project envs."
+      - wait-for-agent-sha:
+          base_url: "https://copilot-agent-dev.up.railway.app"
       - run-evals:
           endpoint: "https://copilot-agent-dev.up.railway.app/chat"
           smoke: true
           min_pass: 4
 
-  deploy-agent-dev:
-    executor: railway
+  promote-qa:
+    executor: base
     steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: copilot-agent
-          env_token: RAILWAY_TOKEN_DEV
-          service_path: copilot/agent
-          use_path_as_root: true
-      - wait-for-url:
-          url: "https://copilot-agent-dev.up.railway.app/health"
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: railway-dev
-
-  deploy-agent-qa:
-    executor: railway
-    steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: copilot-agent
-          env_token: RAILWAY_TOKEN_QA
-          service_path: copilot/agent
-          use_path_as_root: true
-      - wait-for-url:
-          url: "https://copilot-agent-qa.up.railway.app/health"
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: railway-qa
+      - promote-to-env-branch:
+          env_branch: qa
 
   eval-full-agent-qa:
     executor: python
     steps:
       - checkout
+      - wait-for-agent-sha:
+          base_url: "https://copilot-agent-qa.up.railway.app"
       - run-evals:
           endpoint: "https://copilot-agent-qa.up.railway.app/chat"
           smoke: false
           min_pass: 46
 
-  deploy-agent-prod:
-    executor: railway
+  promote-prod:
+    executor: base
     steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: copilot-agent
-          env_token: RAILWAY_TOKEN_PROD
-          service_path: copilot/agent
-          use_path_as_root: true
-      - wait-for-url:
-          url: "https://copilot-agent-production-41de.up.railway.app/health"
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: railway-prod
+      - promote-to-env-branch:
+          env_branch: prod
 
   eval-full-agent-prod:
     executor: python
     steps:
       - checkout
+      - wait-for-agent-sha:
+          base_url: "https://copilot-agent-production-41de.up.railway.app"
       - run-evals:
           endpoint: "https://copilot-agent-production-41de.up.railway.app/chat"
           smoke: false
@@ -454,67 +439,35 @@ jobs:
 
   # ─── OpenEMR lane ────────────────────────────────────────────────────
   #
-  # Mirrors the agent lane env-by-env. `railway up` from the repo root
-  # (no --path-as-root) so Railway uses the root Dockerfile that
-  # extends openemr/openemr:flex. Each deploy is followed by a smoke
-  # job that waits for login and runs the API-enable housekeeping.
+  # No deploy-openemr-* jobs anymore — Railway's GitHub-source services
+  # auto-deploy on env-branch push. The smoke jobs themselves wait for
+  # login.php to come back up + run copilot_enable_api as a fork-code
+  # liveness check. The "REGISTERED" / "REFRESHED" marker is what proves
+  # our fork is what's serving requests; if Railway is still routing to
+  # the previous container it'll still 200 on login.php but the smoke's
+  # admin POST will fail because the new client_id/secret hasn't taken
+  # effect yet.
   #
-  # Per the project_railway_deploy_2026-04-30 memory: never set
-  # EASY_DEV_MODE on prod openemr (entrypoint rsync loop), keep
-  # OE_PASS=pass on each env, and don't touch MySQL services.
-
-  deploy-openemr-dev:
-    executor: railway
-    steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_DEV
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: openemr-dev
+  # Per project_railway_deploy_2026-04-30 memory: never set EASY_DEV_MODE
+  # on prod openemr (entrypoint rsync loop), keep OE_PASS=pass on each
+  # env, and don't touch MySQL services.
 
   smoke-openemr-dev:
-    executor: railway
+    executor: base
     steps:
       - checkout
       - openemr-smoke:
           base_url: "https://openemr-dev-59c5.up.railway.app"
 
-  deploy-openemr-qa:
-    executor: railway
-    steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_QA
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: openemr-qa
-
   smoke-openemr-qa:
-    executor: railway
+    executor: base
     steps:
       - checkout
       - openemr-smoke:
           base_url: "https://openemr-qa.up.railway.app"
 
-  deploy-openemr-prod:
-    executor: railway
-    steps:
-      - checkout
-      - install-railway-cli
-      - railway-deploy:
-          service: openemr
-          env_token: RAILWAY_TOKEN_PROD
-      - store_artifacts:
-          path: /tmp/deploy-logs
-          destination: openemr-prod
-
   smoke-openemr-prod:
-    executor: railway
+    executor: base
     steps:
       - checkout
       - openemr-smoke:
@@ -524,62 +477,47 @@ jobs:
 workflows:
   test-deploy-promote:
     jobs:
-      # ── Unit tests gate both deploy lanes ──────────────────────
-      # Run the isolated PHPUnit Copilot suite once per push; both
-      # the agent lane and the openemr lane require it. The agent
-      # lane additionally requires agent-unit-test (Python: PHI
-      # redaction + hybrid retriever contract).
+      # ── Unit tests gate every promotion ────────────────────────
+      # Isolated PHPUnit Copilot suite + Python agent unit tests.
       - unit-test
       - agent-unit-test
 
-      # ── Agent lane: dev ────────────────────────────────────────
-      - deploy-agent-dev:
+      # ── Dev verification (no deploy step — master push auto-
+      #    deploys both Railway dev services in parallel) ────────
+      - eval-smoke-agent-dev:
           requires: [unit-test, agent-unit-test]
           filters:
             branches:
               only: master
-      - eval-smoke-agent-dev:
-          requires: [deploy-agent-dev]
-
-      # ── OpenEMR lane: dev ──────────────────────────────────────
-      - deploy-openemr-dev:
+      - smoke-openemr-dev:
           requires: [unit-test]
           filters:
             branches:
               only: master
-      - smoke-openemr-dev:
-          requires: [deploy-openemr-dev]
 
-      # ── QA gate: BOTH lanes' dev-side checks must pass ─────────
+      # ── QA gate: BOTH lanes' dev verifications must pass ──────
       - hold-qa:
           type: approval
           requires: [eval-smoke-agent-dev, smoke-openemr-dev]
 
-      # ── Agent lane: qa ─────────────────────────────────────────
-      - deploy-agent-qa:
+      # ── QA promotion: single git push to qa branch triggers
+      #    BOTH Railway services' auto-deploy ──────────────────
+      - promote-qa:
           requires: [hold-qa]
       - eval-full-agent-qa:
-          requires: [deploy-agent-qa]
-
-      # ── OpenEMR lane: qa ───────────────────────────────────────
-      - deploy-openemr-qa:
-          requires: [hold-qa]
+          requires: [promote-qa]
       - smoke-openemr-qa:
-          requires: [deploy-openemr-qa]
+          requires: [promote-qa]
 
-      # ── Prod gate: BOTH lanes' qa-side checks must pass ────────
+      # ── Prod gate: BOTH lanes' QA verifications must pass ────
       - hold-prod:
           type: approval
           requires: [eval-full-agent-qa, smoke-openemr-qa]
 
-      # ── Agent lane: prod ───────────────────────────────────────
-      - deploy-agent-prod:
+      # ── Prod promotion ──────────────────────────────────────
+      - promote-prod:
           requires: [hold-prod]
       - eval-full-agent-prod:
-          requires: [deploy-agent-prod]
-
-      # ── OpenEMR lane: prod ─────────────────────────────────────
-      - deploy-openemr-prod:
-          requires: [hold-prod]
+          requires: [promote-prod]
       - smoke-openemr-prod:
-          requires: [deploy-openemr-prod]
+          requires: [promote-prod]
