@@ -25,6 +25,7 @@
 declare(strict_types=1);
 
 require_once(__DIR__ . "/../globals.php");
+require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -55,6 +56,227 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live cross-patient queue of pending reviews.
+//
+// One queue row per procedure_report whose review_status is unset or not
+// 'reviewed'. We keep the FIRST procedure_result on each report (smallest
+// procedure_result_id) so the row's value/units summarize the whole report
+// — a clinician landing on the queue wants the headline, not every
+// secondary analyte. The detail pane (right side of the page) re-fetches
+// the trend for the selected report's primary result.
+// ---------------------------------------------------------------------------
+
+function cp_pending_bucket(string $orderType, string $abnormal): string
+{
+    $abn = strtolower(trim($abnormal));
+    if (str_contains($abn, 'crit') || $abn === 'critical') {
+        return 'lab'; // critical readings still belong to the lab bucket;
+                      // the page exposes a separate "Critical" pivot pill.
+    }
+    $t = strtolower(trim($orderType));
+    if (str_contains($t, 'imag') || str_contains($t, 'rad')) { return 'imaging'; }
+    if (str_contains($t, 'doc'))                              { return 'doc'; }
+    return 'lab';
+}
+
+function cp_pending_status(string $abnormal): array
+{
+    $abn = strtolower(trim($abnormal));
+    if (str_contains($abn, 'crit')) { return ['Critical', 'danger']; }
+    if (in_array($abn, ['high', 'low', 'abn', 'abnormal'], true) || str_starts_with($abn, 'a')) {
+        return ['Abnormal', 'warn'];
+    }
+    return ['Routine', 'info'];
+}
+
+function cp_pending_when(string $iso): string
+{
+    $t = strtotime($iso);
+    if ($t === false) { return ''; }
+    $delta = time() - $t;
+    if ($delta < 60)            { return 'just now'; }
+    if ($delta < 3600)          { return (int)floor($delta / 60) . 'm ago'; }
+    if ($delta < 86400)         { return (int)floor($delta / 3600) . 'h ago'; }
+    if ($delta < 86400 * 30)    { return (int)floor($delta / 86400) . 'd ago'; }
+    return date('m/d/y', $t);
+}
+
+function cp_pending_arrow(string $abnormal): string
+{
+    $abn = strtolower(trim($abnormal));
+    if ($abn === 'high' || $abn === 'h')                   { return ' (↑)'; }
+    if ($abn === 'low' || $abn === 'l')                    { return ' (↓)'; }
+    if (str_contains($abn, 'crit'))                        { return ' (↑↑)'; }
+    return '';
+}
+
+$listSql = "
+    SELECT
+        pr.procedure_result_id,
+        pr.result_code,
+        pr.result_text,
+        pr.result,
+        pr.units,
+        pr.range,
+        pr.abnormal,
+        rep.procedure_report_id,
+        rep.review_status,
+        rep.report_status,
+        COALESCE(rep.date_collected, rep.date_report) AS report_date,
+        po.procedure_order_id,
+        po.procedure_order_type,
+        po.patient_id,
+        po.provider_id,
+        pd.fname,
+        pd.lname,
+        pd.pubpid
+    FROM procedure_result pr
+    JOIN procedure_report rep ON rep.procedure_report_id = pr.procedure_report_id
+    JOIN procedure_order po   ON po.procedure_order_id   = rep.procedure_order_id
+    JOIN patient_data pd      ON pd.pid                  = po.patient_id
+    WHERE (rep.review_status IS NULL OR rep.review_status <> 'reviewed')
+      AND pr.procedure_result_id = (
+          SELECT MIN(pr2.procedure_result_id)
+            FROM procedure_result pr2
+           WHERE pr2.procedure_report_id = pr.procedure_report_id
+      )
+    ORDER BY COALESCE(rep.date_collected, rep.date_report) DESC,
+             pr.procedure_result_id DESC
+";
+
+$queue = [];
+$counts = ['all' => 0, 'lab' => 0, 'imaging' => 0, 'doc' => 0, 'msg' => 0, 'critical' => 0];
+$providerCache = [];
+$providerHits = [];
+
+$rs = sqlStatement($listSql);
+while ($r = sqlFetchArray($rs)) {
+    $bucket = cp_pending_bucket((string)$r['procedure_order_type'], (string)$r['abnormal']);
+    $abn    = strtolower((string)$r['abnormal']);
+    $isCrit = str_contains($abn, 'crit');
+
+    [$statusLabel, $statusTone] = cp_pending_status((string)$r['abnormal']);
+
+    $providerId = (int)($r['provider_id'] ?? 0);
+    if ($providerId > 0 && !isset($providerCache[$providerId])) {
+        $u = sqlQuery(
+            "SELECT username, fname, lname, title FROM users WHERE id = ?",
+            [$providerId]
+        );
+        $providerCache[$providerId] = cp_format_provider_name($u ?: null);
+    }
+    if ($providerId > 0) {
+        $providerHits[$providerId] = ($providerHits[$providerId] ?? 0) + 1;
+    }
+
+    $valueRaw   = trim((string)$r['result']);
+    $units      = trim((string)$r['units']);
+    $valueDisp  = $valueRaw === '' ? '—'
+                : ($units !== '' ? $valueRaw . ' ' . $units : $valueRaw);
+    $valueDisp .= cp_pending_arrow((string)$r['abnormal']);
+
+    $patientName = trim((string)$r['fname'] . ' ' . (string)$r['lname']);
+    if ($patientName === '') { $patientName = 'Patient #' . (int)$r['patient_id']; }
+    $testName = trim((string)$r['result_text']);
+    if ($testName === '') { $testName = trim((string)$r['result_code']) ?: '—'; }
+
+    $icon = $bucket === 'imaging' ? '🩻' : ($bucket === 'doc' ? '📄' : '🧪');
+
+    $queue[] = [
+        'id'            => 'rep-' . (int)$r['procedure_report_id'],
+        'reportId'      => (int)$r['procedure_report_id'],
+        'resultId'      => (int)$r['procedure_result_id'],
+        'orderId'       => (int)$r['procedure_order_id'],
+        'patientId'     => (int)$r['patient_id'],
+        'providerId'    => $providerId,
+        'bucket'        => $bucket,
+        'icon'          => $icon,
+        'title'         => $patientName . ' · ' . $testName,
+        'sub'           => $valueDisp,
+        'statusLabel'   => $statusLabel,
+        'statusTone'    => $statusTone,
+        'when'          => cp_pending_when((string)$r['report_date']),
+        'preChecked'    => $statusTone !== 'plain',
+        'critical'      => $isCrit,
+        // Detail-pane payload (per row, no extra round trip).
+        'patientName'   => $patientName,
+        'pubpid'        => (string)$r['pubpid'],
+        'testName'      => $testName,
+        'resultCode'    => (string)$r['result_code'],
+        'resultValue'   => $valueRaw,
+        'units'         => $units,
+        'range'         => trim((string)$r['range']),
+        'abnormal'      => (string)$r['abnormal'],
+        'reportDate'    => (string)$r['report_date'],
+        'providerName'  => $providerId > 0 ? ($providerCache[$providerId] ?? '—') : '—',
+    ];
+
+    $counts['all']++;
+    $counts[$bucket] = ($counts[$bucket] ?? 0) + 1;
+    if ($isCrit) { $counts['critical']++; }
+}
+
+// Per-row Last-N trend: last 3 prior values for the same patient + result_code,
+// oldest→newest, with the row's own value appended. Skipped for empty result
+// codes (e.g. imaging with prose results) since trend isn't meaningful.
+foreach ($queue as &$row) {
+    $code = $row['resultCode'];
+    if ($code === '' || !is_numeric(preg_replace('/^[<>≤≥]+/', '', trim($row['resultValue'])))) {
+        $row['trend'] = [];
+        $row['priorValue'] = null;
+        $row['priorDate']  = null;
+        continue;
+    }
+    $tRs = sqlStatement(
+        "SELECT pr.result, COALESCE(rep.date_collected, rep.date_report, pr.date) AS d
+           FROM procedure_result pr
+           JOIN procedure_report rep ON rep.procedure_report_id = pr.procedure_report_id
+           JOIN procedure_order  po  ON po.procedure_order_id   = rep.procedure_order_id
+          WHERE po.patient_id = ?
+            AND pr.result_code = ?
+            AND pr.procedure_result_id <> ?
+          ORDER BY COALESCE(rep.date_collected, rep.date_report, pr.date) DESC
+          LIMIT 3",
+        [$row['patientId'], $code, $row['resultId']]
+    );
+    $priors = [];
+    while ($p = sqlFetchArray($tRs)) {
+        $priors[] = ['v' => (string)$p['result'], 'd' => (string)$p['d']];
+    }
+    $trend = [];
+    foreach (array_reverse($priors) as $p) { $trend[] = $p['v']; }
+    $trend[] = $row['resultValue'];
+    $row['trend'] = $trend;
+    $row['priorValue'] = $priors !== [] ? $priors[0]['v'] : null;
+    $row['priorDate']  = $priors !== [] ? $priors[0]['d'] : null;
+}
+unset($row);
+
+// "Dr. Rivera · 18 results, 4 documents, 2 messages awaiting sign-off" line.
+$topProvider = '';
+if ($providerHits !== []) {
+    arsort($providerHits);
+    $topId = (int)array_key_first($providerHits);
+    $topProvider = $providerCache[$topId] ?? '';
+}
+$resultCount   = $counts['lab'];
+$imagingCount  = $counts['imaging'];
+$docCount      = $counts['doc'];
+$summaryParts = [];
+if ($resultCount > 0)  { $summaryParts[] = $resultCount . ' result'  . ($resultCount === 1 ? '' : 's'); }
+if ($imagingCount > 0) { $summaryParts[] = $imagingCount . ' imaging'; }
+if ($docCount > 0)     { $summaryParts[] = $docCount . ' document'  . ($docCount === 1 ? '' : 's'); }
+$summaryTail = $summaryParts === [] ? 'queue empty' : implode(', ', $summaryParts) . ' awaiting sign-off';
+$headerSummary = ($topProvider !== '' ? $topProvider . ' · ' : '') . $summaryTail;
+
+$pendingPayload = [
+    'queue'         => $queue,
+    'counts'        => $counts,
+    'headerSummary' => $headerSummary,
+];
+$pendingJson = json_encode($pendingPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,7 +320,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-pending="<?php echo attr($pendingJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

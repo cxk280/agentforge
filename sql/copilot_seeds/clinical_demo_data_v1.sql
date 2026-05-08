@@ -47,20 +47,29 @@ VALUES
 -- ─────────────────────────────────────────────────────────────────────
 -- procedure_report: one report per order (1:1 for the demo).
 -- ─────────────────────────────────────────────────────────────────────
+-- Four reports start in 'preliminary' / 'unreviewed' so the cross-patient
+-- Pending Review queue (Screen 35) has live items to act on. Each is an
+-- abnormal headline result a clinician would actually need to sign:
+--   90001 — Ted, HbA1c 7.9 (high)         → critical-ish, unreviewed
+--   90004 — Ted, HbA1c 7.4 (high) earlier → routine-abnormal, unreviewed
+--   90005 — Nora, TSH 6.8 (high)          → unreviewed
+--   90008 — Farrah, LDL 128 (high)        → unreviewed
+-- The remaining 6 reports stay 'final'/'reviewed' so the queue shows a
+-- realistic mix instead of "everything pending".
 INSERT IGNORE INTO `procedure_report`
   (procedure_report_id, procedure_order_id, procedure_order_seq,
    date_collected, date_report, source, specimen_num, report_status, review_status)
 VALUES
-  (90001, 90001, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'final', 'reviewed'),
-  (90002, 90002, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'final', 'reviewed'),
-  (90003, 90003, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'final', 'reviewed'),
-  (90004, 90004, 1, '2024-07-17 11:15:00', '2024-07-18 09:00:00', 5, 'SP-T1-2407', 'final', 'reviewed'),
-  (90005, 90005, 1, '2024-10-08 11:15:00', '2024-10-09 13:00:00', 5, 'SP-N8-2410', 'final', 'reviewed'),
-  (90006, 90006, 1, '2024-10-08 11:15:00', '2024-10-09 13:00:00', 5, 'SP-N8-2410', 'final', 'reviewed'),
-  (90007, 90007, 1, '2024-02-14 10:15:00', '2024-02-15 11:00:00', 5, 'SP-N8-2402', 'final', 'reviewed'),
-  (90008, 90008, 1, '2024-11-14 08:45:00', '2024-11-15 10:00:00', 5, 'SP-F5-2411', 'final', 'reviewed'),
-  (90009, 90009, 1, '2024-11-14 08:45:00', '2024-11-15 10:00:00', 5, 'SP-F5-2411', 'final', 'reviewed'),
-  (90010, 90010, 1, '2024-10-30 09:30:00', '2024-11-01 16:00:00', 5, 'IMG-T1-2410', 'final', 'reviewed');
+  (90001, 90001, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'preliminary', 'unreviewed'),
+  (90002, 90002, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'final',       'reviewed'),
+  (90003, 90003, 1, '2024-10-30 09:30:00', '2024-10-31 14:00:00', 5, 'SP-T1-2410', 'final',       'reviewed'),
+  (90004, 90004, 1, '2024-07-17 11:15:00', '2024-07-18 09:00:00', 5, 'SP-T1-2407', 'preliminary', 'unreviewed'),
+  (90005, 90005, 1, '2024-10-08 11:15:00', '2024-10-09 13:00:00', 5, 'SP-N8-2410', 'preliminary', 'unreviewed'),
+  (90006, 90006, 1, '2024-10-08 11:15:00', '2024-10-09 13:00:00', 5, 'SP-N8-2410', 'final',       'reviewed'),
+  (90007, 90007, 1, '2024-02-14 10:15:00', '2024-02-15 11:00:00', 5, 'SP-N8-2402', 'final',       'reviewed'),
+  (90008, 90008, 1, '2024-11-14 08:45:00', '2024-11-15 10:00:00', 5, 'SP-F5-2411', 'preliminary', 'unreviewed'),
+  (90009, 90009, 1, '2024-11-14 08:45:00', '2024-11-15 10:00:00', 5, 'SP-F5-2411', 'final',       'reviewed'),
+  (90010, 90010, 1, '2024-10-30 09:30:00', '2024-11-01 16:00:00', 5, 'IMG-T1-2410', 'final',      'reviewed');
 
 -- ─────────────────────────────────────────────────────────────────────
 -- procedure_result: the actual values clinicians read on the lab pages.

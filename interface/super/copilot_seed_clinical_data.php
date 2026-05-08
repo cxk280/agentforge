@@ -45,9 +45,49 @@ if (($_GET['reset_marker'] ?? '') === '1') {
     echo "Marker cleared. Continuing with import.\n\n";
 }
 
+// ---------------------------------------------------------------------------
+// One-time pending-review backfill — flip 4 of the seeded procedure_report
+// rows into 'unreviewed'/'preliminary' state so the cross-patient Pending
+// Review queue (Screen 35) has live items in already-seeded DBs.
+//
+// The seed file now inserts these 4 ids in unreviewed state, which only
+// helps fresh installs (INSERT IGNORE skips existing rows). This block
+// retro-updates already-seeded rows — guarded by a separate marker AND by
+// a state check so a clinician who has manually signed any of these is
+// not silently un-signed. Runs BEFORE the v1-marker early-exit so deployed
+// envs that already imported v1 still pick this up on the next visit.
+// ---------------------------------------------------------------------------
+$pendingMarker = sqlQuery(
+    "SELECT gl_value FROM globals WHERE gl_name = 'copilot_clinical_data_v1_pending'"
+);
+if (empty($pendingMarker['gl_value'])) {
+    $flippedTotal = 0;
+    foreach ([90001, 90004, 90005, 90008] as $rid) {
+        $row = sqlQuery(
+            "SELECT review_status FROM procedure_report WHERE procedure_report_id = ?",
+            [$rid]
+        );
+        $rs = strtolower(trim((string)($row['review_status'] ?? '')));
+        if ($rs === 'reviewed') {
+            sqlStatement(
+                "UPDATE procedure_report
+                    SET review_status = 'unreviewed', report_status = 'preliminary'
+                  WHERE procedure_report_id = ? AND review_status = 'reviewed'",
+                [$rid]
+            );
+            $flippedTotal++;
+        }
+    }
+    sqlStatement(
+        "INSERT INTO globals (gl_name, gl_index, gl_value) VALUES ('copilot_clinical_data_v1_pending', 0, ?)",
+        [date('c')]
+    );
+    echo "Pending-Review backfill: flipped $flippedTotal report row(s) to 'unreviewed' / 'preliminary'.\n";
+}
+
 $marker = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'copilot_clinical_data_v1'");
 if (!empty($marker['gl_value'])) {
-    echo "Already imported (gl_value = {$marker['gl_value']}). Skipping.\n";
+    echo "Already imported (gl_value = {$marker['gl_value']}). Skipping main import.\n";
     echo "If you really need to re-run: DELETE FROM globals WHERE gl_name='copilot_clinical_data_v1'\n";
     exit;
 }
@@ -121,6 +161,8 @@ echo "\nDone. Applied $applied INSERT statements (errors: $errors).\n";
 echo "Marker set: gl_name='copilot_clinical_data_v1' gl_value=" . date('c') . "\n";
 echo "\nVisit:\n";
 echo "  - Patient Results (per patient)\n";
+echo "  - Lab Overview (per patient)\n";
+echo "  - Pending Review (cross-patient)\n";
 echo "  - Aging Report\n";
 echo "  - Billing Manager\n";
 echo "  - Inventory\n";
