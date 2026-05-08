@@ -6,64 +6,53 @@
 // component renders only the page body (page header, filter row, table,
 // pager).
 //
-// 1:1 static port of the PHP-rendered mock previously at
-// /interface/patient_file/encounter/copilot_visit_history.php (preserved
-// at copilot_visit_history.php.bak). Data is hardcoded from Figma node
-// 73:2 — no DB, no API. Filter selects, search input, Open/kebab buttons,
-// pager links and the Export action are all visual-only stubs. Wiring to
-// real /apis/copilot/encounters endpoints is a follow-up.
-//
-// Today's date in this mock is 02/18/2026 — Margaret Chen, MRN #004821,
-// 42 total encounters across her chart.
-//
-// File loosely groups: types, demo data, page component, sub-components.
-// Status-pill rendering lives in <StatusPill>; the dropdown trigger that
-// shows "label" + "value" stacked lives in <FilterDropdown>.
+// Data is now live: the wrapper at copilot_visit_history.php joins
+// form_encounter -> users -> openemr_postcalendar_categories for the
+// active patient and JSON-encodes the payload onto data-history. Filter
+// dropdowns and search input are React local state; they filter the
+// already-loaded rows client-side. The pre-React PHP mock is preserved
+// at copilot_visit_history.php.bak.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './VisitHistory.module.css';
 
 type StatusKey = 'signed' | 'in_progress' | 'billed';
+type DateRangeKey = '12mo' | '6mo' | '3mo' | 'all';
+type StatusFilterKey = 'all' | 'signed' | 'in_progress' | 'billed';
 
-type Visit = {
+const PAGE_SIZE = 11;
+
+export type VisitRow = {
+  readonly id: number;
+  readonly encounter: number;
   readonly date: string;
   readonly time: string;
   readonly type: string;
+  readonly typeId: number;
   readonly provider: string;
+  readonly providerId: number;
   readonly reason: string;
   readonly duration: string;
   readonly status: StatusKey;
   readonly billed: boolean;
 };
 
-type DateRangeKey = '12mo' | '6mo' | '3mo' | 'all';
-type VisitTypeKey = 'all' | 'office' | 'annual' | 'tele' | 'acute' | 'diabetes' | 'procedure';
-type ProviderKey = 'all' | 'rivera' | 'chen' | 'patel';
-type StatusFilterKey = 'all' | 'signed' | 'in_progress' | 'billed';
+export type VisitTypeOpt = { readonly id: number; readonly name: string };
+export type ProviderOpt = { readonly id: number; readonly name: string };
+
+export type VisitHistoryPayload = {
+  readonly rows: readonly VisitRow[];
+  readonly totalAll: number;
+  readonly visitTypeOpts: readonly VisitTypeOpt[];
+  readonly providerOpts: readonly ProviderOpt[];
+};
 
 const DATE_RANGE_LABELS: Readonly<Record<DateRangeKey, string>> = {
   '12mo': 'Last 12 months',
   '6mo':  'Last 6 months',
   '3mo':  'Last 3 months',
   all:    'All time',
-};
-
-const VISIT_TYPE_LABELS: Readonly<Record<VisitTypeKey, string>> = {
-  all:       'All types',
-  office:    'Office Visit',
-  annual:    'Annual Physical',
-  tele:      'Telehealth',
-  acute:     'Acute / Same-day',
-  diabetes:  'Diabetes Follow-up',
-  procedure: 'Procedure',
-};
-
-const PROVIDER_LABELS: Readonly<Record<ProviderKey, string>> = {
-  all:    'All providers',
-  rivera: 'Dr. E. Rivera',
-  chen:   'Dr. K. Chen',
-  patel:  'Dr. R. Patel',
 };
 
 const STATUS_LABELS: Readonly<Record<StatusFilterKey, string>> = {
@@ -73,47 +62,61 @@ const STATUS_LABELS: Readonly<Record<StatusFilterKey, string>> = {
   billed:      'Billed',
 };
 
-// Hardcoded demo data lifted directly from the Figma frame (Screen 30).
-const VISITS: readonly Visit[] = [
-  { date: '02/18/2026', time: '9:00 AM',  type: 'Annual Physical',     provider: 'Dr. E. Rivera', reason: 'Annual physical, DM2 review',  duration: '30 min', status: 'signed', billed: true },
-  { date: '11/15/2025', time: '10:30 AM', type: 'Diabetes Follow-up',  provider: 'Dr. E. Rivera', reason: '3-mo A1C check, med titration', duration: '20 min', status: 'signed', billed: true },
-  { date: '08/22/2025', time: '2:15 PM',  type: 'Telehealth',          provider: 'Dr. K. Chen',   reason: 'Lab review, no-show f/u',       duration: '15 min', status: 'signed', billed: true },
-  { date: '05/03/2025', time: '11:00 AM', type: 'Acute / Same-day',    provider: 'Dr. R. Patel',  reason: 'URI symptoms, fever 100.2',     duration: '15 min', status: 'signed', billed: true },
-  { date: '02/12/2025', time: '9:00 AM',  type: 'Annual Physical',     provider: 'Dr. E. Rivera', reason: 'Annual exam, screening labs',   duration: '30 min', status: 'signed', billed: true },
-  { date: '10/04/2024', time: '3:30 PM',  type: 'Acute / Same-day',    provider: 'Dr. R. Patel',  reason: 'URI, prescribed Augmentin',     duration: '15 min', status: 'signed', billed: true },
-  { date: '07/16/2024', time: '10:00 AM', type: 'Procedure',           provider: 'Dr. K. Chen',   reason: 'Knee joint injection, R',       duration: '25 min', status: 'signed', billed: true },
-  { date: '04/02/2024', time: '11:30 AM', type: 'Diabetes Follow-up',  provider: 'Dr. E. Rivera', reason: '3-mo follow-up, A1C 7.2',       duration: '20 min', status: 'signed', billed: true },
-  { date: '01/18/2024', time: '9:30 AM',  type: 'Office Visit',        provider: 'Dr. E. Rivera', reason: 'BP recheck, med adjustment',    duration: '15 min', status: 'signed', billed: true },
-  { date: '11/02/2023', time: '2:00 PM',  type: 'Telehealth',          provider: 'Dr. K. Chen',   reason: 'Refill request, brief check-in', duration: '10 min', status: 'signed', billed: true },
-  { date: '08/14/2023', time: '10:30 AM', type: 'Annual Physical',     provider: 'Dr. E. Rivera', reason: 'Annual exam',                   duration: '30 min', status: 'signed', billed: true },
-];
-
-const TOTAL_ENCOUNTERS = 42;
-const SHOW_FROM = 1;
-const SHOW_TO = 11;
-const TOTAL_PAGES = 4;
-
 type VisitHistoryProps = {
   readonly boot: BootContext;
+  readonly payload: VisitHistoryPayload;
 };
 
-export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
-  const [dateRange,  setDateRange]  = useState<DateRangeKey>('12mo');
-  const [visitType,  setVisitType]  = useState<VisitTypeKey>('all');
-  const [provider,   setProvider]   = useState<ProviderKey>('all');
+export function VisitHistory({ payload }: VisitHistoryProps): JSX.Element {
+  const [dateRange,  setDateRange]  = useState<DateRangeKey>('all');
+  const [visitTypeId,setVisitTypeId]= useState<string>('all');
+  const [providerId, setProviderId] = useState<string>('all');
   const [status,     setStatus]     = useState<StatusFilterKey>('all');
   const [search,     setSearch]     = useState<string>('');
   const [page,       setPage]       = useState<number>(1);
 
   const clearFilters = (): void => {
-    setDateRange('12mo');
-    setVisitType('all');
-    setProvider('all');
+    setDateRange('all');
+    setVisitTypeId('all');
+    setProviderId('all');
     setStatus('all');
     setSearch('');
+    setPage(1);
   };
 
-  const headerSubtitle = `${TOTAL_ENCOUNTERS} encounters · all-time`;
+  const filteredRows = useMemo<readonly VisitRow[]>(() => {
+    const q = search.trim().toLowerCase();
+    const now = Date.now();
+    const cutoff = (() => {
+      if (dateRange === 'all') return null;
+      const months = dateRange === '12mo' ? 12 : dateRange === '6mo' ? 6 : 3;
+      return now - months * 30 * 24 * 60 * 60 * 1000;
+    })();
+    return payload.rows.filter((r) => {
+      if (q !== '') {
+        const hay = `${r.reason} ${r.provider} ${r.type}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      if (visitTypeId !== 'all' && String(r.typeId) !== visitTypeId) return false;
+      if (providerId !== 'all' && String(r.providerId) !== providerId) return false;
+      if (status !== 'all' && r.status !== status) return false;
+      if (cutoff !== null) {
+        const ts = parseDate(r.date);
+        if (ts !== null && ts < cutoff) return false;
+      }
+      return true;
+    });
+  }, [payload.rows, search, dateRange, visitTypeId, providerId, status]);
+
+  const totalFiltered = filteredRows.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const showFrom = totalFiltered === 0 ? 0 : ((safePage - 1) * PAGE_SIZE) + 1;
+  const showTo = Math.min(safePage * PAGE_SIZE, totalFiltered);
+  const visibleRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const headerSubtitle =
+    `${payload.totalAll} ${payload.totalAll === 1 ? 'encounter' : 'encounters'} · ${DATE_RANGE_LABELS[dateRange]}`;
 
   return (
     <>
@@ -142,7 +145,7 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
               id="vhSearch"
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
               placeholder="Search by reason, provider, or notes..."
             />
           </label>
@@ -150,30 +153,54 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
           <FilterDropdown
             label="Date range"
             value={DATE_RANGE_LABELS[dateRange]}
-            options={DATE_RANGE_LABELS}
+            options={[
+              { id: 'all',  name: 'All time' },
+              { id: '12mo', name: 'Last 12 months' },
+              { id: '6mo',  name: 'Last 6 months' },
+              { id: '3mo',  name: 'Last 3 months' },
+            ]}
             current={dateRange}
-            onChange={setDateRange}
+            onChange={(v) => { setDateRange(v as DateRangeKey); setPage(1); }}
           />
           <FilterDropdown
             label="Visit type"
-            value={VISIT_TYPE_LABELS[visitType]}
-            options={VISIT_TYPE_LABELS}
-            current={visitType}
-            onChange={setVisitType}
+            value={
+              visitTypeId === 'all'
+                ? 'All types'
+                : payload.visitTypeOpts.find((o) => String(o.id) === visitTypeId)?.name ?? 'All types'
+            }
+            options={[
+              { id: 'all', name: 'All types' },
+              ...payload.visitTypeOpts.map((o) => ({ id: String(o.id), name: o.name })),
+            ]}
+            current={visitTypeId}
+            onChange={(v) => { setVisitTypeId(v); setPage(1); }}
           />
           <FilterDropdown
             label="Provider"
-            value={PROVIDER_LABELS[provider]}
-            options={PROVIDER_LABELS}
-            current={provider}
-            onChange={setProvider}
+            value={
+              providerId === 'all'
+                ? 'All providers'
+                : payload.providerOpts.find((o) => String(o.id) === providerId)?.name ?? 'All providers'
+            }
+            options={[
+              { id: 'all', name: 'All providers' },
+              ...payload.providerOpts.map((o) => ({ id: String(o.id), name: o.name })),
+            ]}
+            current={providerId}
+            onChange={(v) => { setProviderId(v); setPage(1); }}
           />
           <FilterDropdown
             label="Status"
             value={STATUS_LABELS[status]}
-            options={STATUS_LABELS}
+            options={[
+              { id: 'all',         name: 'All' },
+              { id: 'signed',      name: 'Signed' },
+              { id: 'in_progress', name: 'In progress' },
+              { id: 'billed',      name: 'Billed' },
+            ]}
             current={status}
-            onChange={setStatus}
+            onChange={(v) => { setStatus(v as StatusFilterKey); setPage(1); }}
           />
 
           <button type="button" className={styles.clear} onClick={clearFilters}>
@@ -197,26 +224,25 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
               </tr>
             </thead>
             <tbody>
-              {VISITS.map((v, i) => (
-                <tr key={i}>
+              {visibleRows.length === 0 ? (
+                <tr><td colSpan={9} className={styles.empty}>No encounters match the current filters.</td></tr>
+              ) : visibleRows.map((v) => (
+                <tr key={v.id}>
                   <td className={styles.cellDate}>{v.date}</td>
                   <td className={styles.cellTime}>{v.time}</td>
                   <td className={styles.cellType}>{v.type}</td>
                   <td className={styles.cellProv}>{v.provider}</td>
                   <td className={styles.cellReason}>{v.reason}</td>
                   <td className={styles.cellDur}>{v.duration}</td>
+                  <td><StatusPill status={v.status} /></td>
                   <td>
-                    <StatusPill status={v.status} />
-                  </td>
-                  <td>
-                    {v.billed ? (
-                      <span className={styles.pillBilled}>Billed</span>
-                    ) : (
-                      <span className={styles.dash}>—</span>
-                    )}
+                    {v.billed
+                      ? <span className={styles.pillBilled}>Billed</span>
+                      : <span className={styles.dash}>—</span>}
                   </td>
                   <td className={styles.cellOpen}>
-                    <a className={styles.openLink} href="#" onClick={(e) => e.preventDefault()}>
+                    <a className={styles.openLink}
+                       href={`/interface/patient_file/encounter/copilot_encounter.php?eid=${v.id}`}>
                       Open <span aria-hidden>→</span>
                     </a>
                     <button
@@ -237,23 +263,21 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
 
         <div className={styles.footer}>
           <div className={styles.footerLeft}>
-            Showing {SHOW_FROM}-{SHOW_TO} of {TOTAL_ENCOUNTERS}
+            Showing {showFrom}-{showTo} of {totalFiltered}
           </div>
           <div className={styles.pager}>
             <button
               type="button"
-              className={`${styles.pagerNav} ${page === 1 ? styles.pagerNavDisabled : ''}`}
-              disabled={page === 1}
+              className={`${styles.pagerNav} ${safePage === 1 ? styles.pagerNavDisabled : ''}`}
+              disabled={safePage === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
             >
               ‹ Prev
             </button>
-            {Array.from({ length: TOTAL_PAGES }, (_, idx) => {
+            {Array.from({ length: totalPages }, (_, idx) => {
               const n = idx + 1;
-              const active = n === page;
-              const cls = active
-                ? `${styles.pg} ${styles.pgActive}`
-                : styles.pg;
+              const active = n === safePage;
+              const cls = active ? `${styles.pg} ${styles.pgActive}` : styles.pg;
               return (
                 <button
                   key={n}
@@ -268,9 +292,9 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
             })}
             <button
               type="button"
-              className={`${styles.pagerNav} ${page === TOTAL_PAGES ? styles.pagerNavDisabled : ''}`}
-              disabled={page === TOTAL_PAGES}
-              onClick={() => setPage((p) => Math.min(TOTAL_PAGES, p + 1))}
+              className={`${styles.pagerNav} ${safePage === totalPages ? styles.pagerNavDisabled : ''}`}
+              disabled={safePage === totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             >
               Next ›
             </button>
@@ -281,9 +305,7 @@ export function VisitHistory(_props: VisitHistoryProps): JSX.Element {
   );
 }
 
-type StatusPillProps = {
-  readonly status: StatusKey;
-};
+type StatusPillProps = { readonly status: StatusKey };
 
 function StatusPill({ status }: StatusPillProps): JSX.Element {
   if (status === 'signed') {
@@ -300,21 +322,16 @@ function StatusPill({ status }: StatusPillProps): JSX.Element {
   return <span className={styles.pillWarn}>In progress</span>;
 }
 
-type FilterDropdownProps<K extends string> = {
+type DDOption = { readonly id: string; readonly name: string };
+type FilterDropdownProps = {
   readonly label: string;
   readonly value: string;
-  readonly options: Readonly<Record<K, string>>;
-  readonly current: K;
-  readonly onChange: (next: K) => void;
+  readonly options: readonly DDOption[];
+  readonly current: string;
+  readonly onChange: (next: string) => void;
 };
 
-function FilterDropdown<K extends string>({
-  label,
-  value,
-  options,
-  current,
-  onChange,
-}: FilterDropdownProps<K>): JSX.Element {
+function FilterDropdown({ label, value, options, current, onChange }: FilterDropdownProps): JSX.Element {
   return (
     <div className={styles.dd}>
       <span className={styles.ddLbl}>{label}</span>
@@ -322,13 +339,18 @@ function FilterDropdown<K extends string>({
       <select
         className={styles.ddSelect}
         value={current}
-        onChange={(e) => onChange(e.target.value as K)}
+        onChange={(e) => onChange(e.target.value)}
         aria-label={label}
       >
-        {(Object.entries(options) as Array<[K, string]>).map(([key, lbl]) => (
-          <option key={key} value={key}>{lbl}</option>
-        ))}
+        {options.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}
       </select>
     </div>
   );
+}
+
+function parseDate(mmddyyyy: string): number | null {
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(mmddyyyy);
+  if (!m) return null;
+  const [, mm, dd, yyyy] = m;
+  return new Date(`${yyyy}-${mm}-${dd}T00:00:00`).getTime();
 }
