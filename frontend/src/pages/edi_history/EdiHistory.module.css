@@ -1,0 +1,286 @@
+/*
+ * EdiHistory — page-specific styles. Verified against Figma node 145:2
+ * (Screen 67 — EDI History) on 2026-05-07. Same archetype as the Electronic
+ * Reports page (single-card KPI strip + filter pills + table).
+ */
+
+/* ── Page header ──────────────────────────────────────────────────────── */
+.header {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.titleBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 14px;
+  line-height: 1;
+}
+.subtitle {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 16px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #00787A; }
+
+/* ── Content column ──────────────────────────────────────────────────── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip — single white card with 5 slots ──────────────────────── */
+.kpiCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  display: flex;
+  align-items: stretch;
+  height: 70px;
+  padding: 0 0;
+}
+.kpiSlot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 18px;
+  justify-content: center;
+}
+.kpiSep {
+  width: 1px;
+  background: #E4E5E8;
+  margin: 14px 0;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.kpiSub {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.valNavy   { color: #0D1B2A; }
+.valGreen  { color: #1F8C4D; }
+.valOrange { color: #FA8C33; }
+.valRed    { color: #D93838; }
+
+/* ── Filter pill bar ─────────────────────────────────────────────────── */
+.filterBar {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+}
+.pillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pillBtn:hover { background: #F5F6F7; }
+.pillBtnActive {
+  background: #E6F4F4;
+  color: #008C8C;
+  border-color: #008C8C;
+  font-weight: 600;
+}
+.pillBtnActive:hover { background: #D5EDED; }
+
+.pillCt {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+}
+.pillCtActive { color: #008C8C; }
+
+.dateDropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 12px;
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dateDropdown:hover { background: #F5F6F7; }
+.caret { color: #8A91A1; font-size: 9px; }
+
+/* ── Table ───────────────────────────────────────────────────────────── */
+.tableCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: inherit;
+}
+.th {
+  background: #F5F6F7;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  padding: 10px 16px;
+  border-bottom: 1px solid #E4E5E8;
+  white-space: nowrap;
+}
+.td {
+  padding: 12px 16px;
+  font-size: 12px;
+  color: #4F5763;
+  border-bottom: 0.5px solid #E4E5E8;
+  vertical-align: middle;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.rowAlt { background: #FAFBFC; }
+.tdId { color: #0D1B2A; font-weight: 600; }
+.tdMuted { color: #8A91A1; }
+.tdCount { color: #0D1B2A; font-weight: 600; }
+.dirText { margin-left: 6px; }
+.dirOut { color: #008C8C; font-weight: 500; }
+.dirIn  { color: #4785D9; font-weight: 500; }
+
+.typeChip {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.table tbody tr:last-child .td { border-bottom: none; }
+
+.emptyRow {
+  text-align: center;
+  padding: 24px;
+  font-size: 12px;
+  color: #8A91A1;
+}
+
+/* ── Status pills ────────────────────────────────────────────────────── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pillAccepted { background: #E6F5EC; color: #1F8C4D; }
+.pillReceived { background: #E8F0F8; color: #4785D9; }
+.pillAck      { background: #E6F4F4; color: #008C8C; }
+.pillPending  { background: #FFF1E3; color: #FA8C33; }
+.pillFailed   { background: #FFE3E3; color: #D93838; }
+
+/* ── Actions ─────────────────────────────────────────────────────────── */
+.actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.actLink {
+  font-size: 11px;
+  font-weight: 500;
+  color: #008C8C;
+  text-decoration: none;
+  cursor: pointer;
+}
+.actLink:hover { text-decoration: underline; }
+.actSep { color: #8A91A1; font-size: 11px; }

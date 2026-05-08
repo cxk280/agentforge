@@ -493,7 +493,7 @@
                         "label": "Posting Payments",
                         "menu_id": "eob",
                         "target": "bil",
-                        "url": "/interface/billing/sl_eob_search.php",
+                        "url": "/interface/billing/copilot_posting_payments.php",
                         "children": [],
                         "requirement": 0,
                         "global_req": "enable_posting",
@@ -507,7 +507,7 @@
                         "label": "EDI History",
                         "menu_id": "edi0",
                         "target": "edi",
-                        "url": "/interface/billing/edih_view.php",
+                        "url": "/interface/billing/copilot_edi_history.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -520,7 +520,7 @@
                         "label": "Claim File Tracker",
                         "menu_id": "biltrk0",
                         "target": "biltrk",
-                        "url": "/interface/billing/billing_tracker.php",
+                        "url": "/interface/billing/copilot_claim_file_tracker.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [

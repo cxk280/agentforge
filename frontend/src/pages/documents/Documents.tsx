@@ -98,7 +98,9 @@ export function Documents({ boot }: DocumentsProps): JSX.Element {
     setUpload({ kind: 'uploading' });
     const fd = new FormData();
     fd.append('file', file);
-    if (boot.csrf) fd.append('csrf', boot.csrf);
+    // OpenEMR CsrfUtils::verifyCsrfToken reads the field as csrf_token_form
+    // (see interface/patient_file/documents/copilot_documents_upload.php).
+    if (boot.csrf) fd.append('csrf_token_form', boot.csrf);
     try {
       const resp = await fetch('./copilot_documents_upload.php', {
         method: 'POST',

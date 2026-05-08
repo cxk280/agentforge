@@ -97,15 +97,50 @@ type Win = Window & {
   navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
   activateTabByName?: (name: string, hideOthers?: boolean) => void;
   webroot_url?: string;
+  patient_data_view_model?: new (
+    pname: string,
+    pid: number,
+    pubpid: string,
+    strDob: string,
+    provider: string,
+    insurance: string,
+    allergies: unknown[],
+  ) => unknown;
+  app_view_model?: {
+    application_data?: {
+      patient?: (v?: unknown) => unknown;
+    };
+  };
 };
 
-function openDemographics(pid: number): void {
+// Pre-populate the parent shell's patient observable from data we already
+// have on the row, so the banner renders content immediately instead of
+// waiting 6-10 seconds for demographics.php to load + populate. Demographics
+// will replace this stub with the full record once it lands.
+function preheatPatient(p: RosterPatient, parent: Win, top: Win): void {
+  const Ctor = parent.patient_data_view_model ?? top.patient_data_view_model;
+  const set = parent.app_view_model?.application_data?.patient
+    ?? top.app_view_model?.application_data?.patient;
+  if (typeof Ctor !== 'function' || typeof set !== 'function') return;
+  // Banner reads pname (Last, First) for the title, pubpid stripped of '#',
+  // str_dob for the DOB line, provider for the bottom-row meta.
+  const pubpid = p.mrn.replace(/^#/, '');
+  const dob = p.dob || 'N/A';
+  try {
+    const stub = new Ctor(p.name, p.pid, pubpid, dob, p.providerName, p.insurance, []);
+    set(stub);
+  } catch (_) { /* observable unavailable yet — fall through */ }
+}
+
+function openDemographics(p: RosterPatient): void {
   const self = window as Win;
   const parent = (self.parent !== self ? self.parent : self) as Win;
   const top = (self.top !== null && self.top !== self ? self.top : self) as Win;
 
+  preheatPatient(p, parent, top);
+
   const webroot = parent.webroot_url ?? top.webroot_url ?? self.webroot_url ?? '';
-  const url = `${webroot}/interface/patient_file/summary/demographics.php?set_pid=${pid}`;
+  const url = `${webroot}/interface/patient_file/summary/demographics.php?set_pid=${p.pid}`;
 
   const navigateTab = parent.navigateTab ?? top.navigateTab;
   const activateTabByName = parent.activateTabByName ?? top.activateTabByName;
@@ -151,9 +186,9 @@ export function Finder({ roster }: FinderProps): JSX.Element {
     });
   }, [roster, query, onlyActive, onlyMyPanel, onlyRecent, insActive, currentUserId]);
 
-  const onRowClick = (pid: number): void => {
-    setSelectedPid(pid);
-    openDemographics(pid);
+  const onRowClick = (p: RosterPatient): void => {
+    setSelectedPid(p.pid);
+    openDemographics(p);
   };
 
   const toggleFilter = (key: FilterKey): void => {
@@ -246,11 +281,11 @@ export function Finder({ roster }: FinderProps): JSX.Element {
                   className={rowCls}
                   role="button"
                   tabIndex={0}
-                  onClick={() => onRowClick(p.pid)}
+                  onClick={() => onRowClick(p)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      onRowClick(p.pid);
+                      onRowClick(p);
                     }
                   }}
                   title={`Open ${p.name}`}
