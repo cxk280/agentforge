@@ -1,0 +1,135 @@
+/*
+ * Issues — page-specific styles. Values verified against Figma node 38:2
+ * (Screen 17 — Issues) on 2026-05-07. Global scaffolding (html/body resets,
+ * body bg color, Inter font, and #cp-root sizing) lives in the PHP wrapper at
+ * copilot_issues.php — this file owns only Issues-component styles.
+ */
+
+/* ── Header bar (full width) ─────────────────────────────────────────── */
+.head {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.title  { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta   { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+
+.seg {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 4px;
+  display: inline-flex; align-items: center;
+}
+.opt {
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 12px; font-weight: 500;
+  line-height: 1;
+  color: #4F5763;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.optActive {
+  background: #FFFFFF;
+  color: #008C8C;
+}
+
+.addBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px; font-weight: 600;
+  line-height: 1;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+}
+.addBtn:hover { background: #00787A; }
+.plus { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── Body ─────────────────────────────────────────────────────────────── */
+.body {
+  padding: 20px 24px 32px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+.grpCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.grpHead {
+  height: 52px;
+  padding: 0 22px;
+  display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+.dotWarn   { background: #FA8C33; }
+.dotDanger { background: #D93838; }
+.dotGood   { background: #33A666; }
+.grpTitle { font-size: 14px; font-weight: 600; color: #0D1B2A; line-height: 1; }
+.grpCount {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px; font-weight: 600;
+  color: #4F5763;
+  line-height: 1.4;
+}
+
+.row {
+  height: 56px;
+  padding: 0 22px;
+  border-bottom: 0.5px solid #E4E5E8;
+  display: flex; align-items: center; gap: 16px;
+}
+.rowLast { border-bottom: none; }
+
+.icd {
+  background: #F5F6F7;
+  border-radius: 4px;
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #4F5763;
+  display: inline-flex; align-items: center;
+  flex: 0 0 auto;
+}
+.rowInfo  { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rowTitle { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1.2; }
+.rowSub   { font-size: 11px; color: #8A91A1; line-height: 1.2; }
+.rowSpacer { flex: 1; }
+
+.sevPill {
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+}
+.sevWarn { background: rgba(250, 140, 51, 0.14); color: #FA8C33; }
+.sevGood { background: rgba(51, 166, 102, 0.14);  color: #33A666; }
+
+.kebab {
+  color: #8A91A1; font-weight: 700; font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.kebab:hover { color: #4F5763; }

@@ -1,0 +1,319 @@
+/*
+ * Documents — page-specific styles. Values verified against Figma node 36:2
+ * (Screen 15 — Documents) on 2026-05-07. Notable corrections vs. the
+ * pre-migration PHP mock:
+ *   - Imaging tag color is #8561c7 (purple) in Figma; the PHP had #4785D9.
+ *   - Recent thumbnails: framed mini-doc with a dark first line + 4 lighter
+ *     lines (PHP had 3 long bare lines).
+ *   - Recent card category-pill sits in the body (above title), not on the
+ *     thumbnail; Figma uses tinted backgrounds, not white.
+ *   - Earlier-row icon tile is tinted by document kind (lab/imaging/clinical/
+ *     insurance/rx); PHP used a flat #F5F6F7 for all rows.
+ *
+ * Global scaffolding (html/body resets, body bg, font, #cp-root sizing) lives
+ * in the PHP wrapper at copilot_documents.php — this file owns only
+ * Documents-component styles.
+ */
+
+/* ── Header bar ─────────────────────────────────────────────────────────── */
+.head {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+
+.pill {
+  background: #F5F6F7;
+  border: none;
+  border-radius: 999px;
+  padding: 0 14px;
+  height: 36px;
+  font-size: 12px;
+  color: #8A91A1;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.pill:hover { background: #ECEEF1; }
+.pillIcon { color: #8A91A1; font-size: 12px; line-height: 1; }
+
+.upload {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.upload:hover { background: #00787A; }
+.uploadIcon { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── Two-column body ────────────────────────────────────────────────────── */
+.body {
+  display: flex;
+  align-items: stretch;
+  min-height: calc(100vh - 60px);
+}
+
+.side {
+  width: 240px;
+  flex: 0 0 auto;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 16px 0 24px;
+  display: flex;
+  flex-direction: column;
+}
+.sideHead {
+  height: 28px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+.cat {
+  height: 36px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+.cat:hover { background: #FAFBFC; }
+.catIcon { font-size: 14px; line-height: 1; flex: 0 0 14px; color: #0D1B2A; }
+.catLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+}
+.catCount {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+}
+.catActive { background: rgba(0, 140, 140, 0.08); }
+.catActive .catLabel { color: #008C8C; font-weight: 600; }
+.catActive .catCount { color: #008C8C; }
+
+/* ── Right column ───────────────────────────────────────────────────────── */
+.main {
+  flex: 1;
+  min-width: 0;
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Section divider — small uppercase label + horizontal hairline. */
+.sectionRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.sectionRule {
+  flex: 1;
+  height: 1px;
+  background: #E4E5E8;
+}
+
+/* ── Recent grid (4 cards) ──────────────────────────────────────────────── */
+.recentGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.recentCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.thumb {
+  background: #F5F6F7;
+  padding: 24px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* Mini "document" — small white card with 5 line stubs. */
+.thumbDoc {
+  width: 110px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+.thumbLineHard {
+  height: 4px;
+  width: 64px;
+  border-radius: 2px;
+  background: #E4E5E8;
+  display: block;
+}
+.thumbLine {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(228, 229, 232, 0.6);
+  display: block;
+}
+
+.recentBody {
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+.catPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  line-height: 1.4;
+}
+.catPill_lab      { background: rgba(71, 133, 217, 0.14);  color: #4785D9; }
+.catPill_clinical { background: rgba(0, 140, 140, 0.14);   color: #008C8C; }
+.catPill_imaging  { background: rgba(133, 97, 199, 0.14);  color: #8561C7; }
+.catPill_referral { background: rgba(250, 140, 51, 0.14);  color: #FA8C33; }
+
+.recentTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.recentMeta {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.4;
+}
+
+/* ── Earlier list ───────────────────────────────────────────────────────── */
+.earlierCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.earlRow {
+  height: 64px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.earlRowLast { border-bottom: none; }
+
+.earlIcon {
+  height: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: #0D1B2A;
+  flex: 0 0 auto;
+}
+.earlIcon_lab       { background: rgba(71, 133, 217, 0.14); }
+.earlIcon_imaging   { background: rgba(133, 97, 199, 0.14); }
+.earlIcon_clinical  { background: rgba(0, 140, 140, 0.14); }
+.earlIcon_insurance { background: rgba(138, 145, 161, 0.14); }
+.earlIcon_rx        { background: rgba(0, 140, 140, 0.14); }
+
+.earlInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.earlTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.earlSub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.4;
+}
+.earlCatPill {
+  background: #F5F6F7;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.4;
+}
+.earlSpacer { flex: 1; }
+.earlDate { font-size: 12px; color: #4F5763; line-height: 1; }
+.earlSize {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+  min-width: 56px;
+  text-align: right;
+}
+.earlKebab {
+  color: #8A91A1;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.earlKebab:hover { color: #4F5763; }

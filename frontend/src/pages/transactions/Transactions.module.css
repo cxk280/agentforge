@@ -1,0 +1,198 @@
+/*
+ * Transactions — page-specific styles. Values verified against Figma node
+ * 37:2 (Screen 16 — Transactions, file kj4MWNr8mpjZ2wVg1PbS0F) on
+ * 2026-05-07. Drifts in the legacy PHP mock have been corrected here:
+ *   - KPI card radius 10 → 12, "Insurance Paid" green #1F8C4D → #33A666,
+ *     "Total Charges" value #0D1B2A → #4F5763
+ *   - Filter "All" chip uses translucent teal background, not solid
+ *     #E6F4F4
+ *   - Type pills colored per Figma (teal CHARGE, green PAYMENT, orange
+ *     ADJUSTMENT) instead of the PHP grey/green/orange variant
+ *   - Outstanding-row balance is bold orange, with the chip on the same
+ *     cell instead of inline next to the description
+ *
+ * Global resets, body bg color, Inter font, and #cp-root sizing live in
+ * the PHP wrapper at copilot_transactions.php.
+ */
+
+/* ── KPI strip ─────────────────────────────────────────────────────── */
+.kpis {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 20px 24px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.kpi {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+.kpiValue {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.kpiSub {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.toneNeutral .kpiValue { color: #4F5763; }
+.toneGood    .kpiValue { color: #33A666; }
+.toneInfo    .kpiValue { color: #4785D9; }
+.toneWarn    .kpiValue { color: #FA8C33; }
+
+/* ── Filter row ────────────────────────────────────────────────────── */
+.filters {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filterLabel {
+  font-size: 12px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+  margin-right: 4px;
+}
+.chip {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: inherit;
+}
+.chip:hover { border-color: #C7CBD2; }
+.chipActive {
+  border-color: #008C8C;
+  /* Figma: rgba(0,140,140,0.1) over #FFFFFF */
+  background: rgba(0, 140, 140, 0.1);
+  color: #008C8C;
+}
+.spacer { flex: 1; }
+.pill {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.pill:hover { background: #F5F6F7; }
+
+/* ── Table ─────────────────────────────────────────────────────────── */
+.tableWrap { padding: 20px 24px; }
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table thead th {
+  background: #F5F6F7;
+  color: #8A91A1;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-align: left;
+  padding: 12px 18px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table tbody td {
+  padding: 16px 18px;
+  border-bottom: 1px solid #E4E5E8;
+  font-size: 12px;
+  color: #0D1B2A;
+  vertical-align: middle;
+  font-weight: 500;
+}
+.table tbody tr:last-child td { border-bottom: none; }
+
+.colDate { width: 110px; color: #4F5763; }
+.colType { width: 120px; }
+.colCpt  { width: 72px; color: #4F5763; font-size: 11px; }
+.colProv { width: 120px; color: #0D1B2A; font-weight: 400; }
+.colNum  { width: 110px; text-align: right; }
+
+/* ── Type pills ────────────────────────────────────────────────────── */
+.typePill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.typeCharge {
+  background: rgba(0, 140, 140, 0.14);
+  color: #008C8C;
+}
+.typePayment {
+  background: rgba(51, 166, 102, 0.14);
+  color: #33A666;
+}
+.typeAdjustment {
+  background: rgba(250, 140, 51, 0.14);
+  color: #FA8C33;
+}
+
+/* ── Amount + outstanding markers ─────────────────────────────────── */
+.amtGreen { color: #33A666; font-weight: 500; }
+.amtRed { color: #D93838; font-weight: 600; }
+.amtOrange { color: #FA8C33; font-weight: 700; }
+
+.balCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.outPill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  background: rgba(250, 140, 51, 0.14);
+  color: #FA8C33;
+  line-height: 1;
+}

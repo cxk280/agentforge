@@ -1,0 +1,244 @@
+/*
+ * Report — page-specific styles. Values verified against Figma node 35:2
+ * (Screen 14 — Report) on 2026-05-07. Mirrors the prior PHP mock 1:1; the
+ * PHP-mock CSS was already on-spec, so no drift corrections were needed
+ * relative to the Figma source.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_report.php — this
+ * file owns only Report-component styles.
+ */
+
+/* ── Toolbar (full width — header rule) ─────────────────────────────── */
+.toolbar {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  height: 52px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+
+.seg {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+}
+.segOpt {
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  color: #4F5763;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+.segOptActive {
+  background: #FFFFFF;
+  color: #008C8C;
+}
+
+.spacer { flex: 1; }
+
+.pill {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #0D1B2A;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.pillLabel { font-weight: 500; color: #4F5763; }
+.pillCaret { font-size: 10px; color: #8A91A1; }
+.print {
+  padding: 7px 14px;
+  gap: 6px;
+  cursor: pointer;
+}
+.print:hover { background: #F5F6F7; }
+
+.pdfBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.pdfBtn:hover { background: #00787A; }
+
+/* ── Document container (centered paper) ────────────────────────────── */
+.stage {
+  background: #F5F6F7;
+  padding: 24px;
+  display: flex;
+  justify-content: center;
+  min-height: calc(100vh - 52px);
+}
+.paper {
+  background: #FFFFFF;
+  border-radius: 4px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+  width: 880px;
+  padding: 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Letterhead */
+.letterhead { display: flex; flex-direction: column; gap: 8px; }
+.letterheadTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: #008C8C;
+  flex: 0 0 auto;
+}
+.name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1.1;
+}
+.addr {
+  font-size: 10px;
+  color: #8A91A1;
+  line-height: 1.1;
+}
+.doctitle {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: #0D1B2A;
+  letter-spacing: 1px;
+  line-height: 1.1;
+}
+.gen {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.rule {
+  margin-top: 8px;
+  height: 2px;
+  background: #0D1B2A;
+  width: 752px;
+}
+
+/* Section heading */
+.section { display: flex; flex-direction: column; gap: 6px; }
+.head {
+  font-size: 12px;
+  font-weight: 700;
+  color: #008C8C;
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+
+/* Patient block */
+.patBox {
+  background: #F5F6F7;
+  border-radius: 6px;
+  padding: 12px 16px;
+  width: 752px;
+  display: flex;
+  gap: 32px;
+}
+.col { display: flex; flex-direction: column; gap: 4px; }
+.nm { font-size: 14px; font-weight: 700; color: #0D1B2A; line-height: 1.1; }
+.sub { font-size: 11px; color: #8A91A1; line-height: 1.2; }
+.ins { font-size: 12px; font-weight: 500; color: #0D1B2A; line-height: 1.2; }
+
+/* Allergies block */
+.allergyBox {
+  background: rgba(217, 56, 56, 0.05);
+  border: 1px solid rgba(217, 56, 56, 0.30);
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #0D1B2A;
+  line-height: 1.3;
+}
+
+/* Tables (problems / meds) */
+.table {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 0.5px solid #E4E5E8;
+  gap: 12px;
+  height: 36px;
+}
+.row:last-child { border-bottom: none; }
+.med {
+  height: 42px;
+  padding: 10px 16px;
+  gap: 8px;
+}
+.icd {
+  background: #F5F6F7;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+  color: #4F5763;
+  line-height: 1.4;
+  flex: 0 0 auto;
+}
+.icdName {
+  font-size: 12px;
+  font-weight: 500;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.flex { flex: 1; }
+.meta {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+}
+
+.medName  { font-size: 12px; font-weight: 600; color: #0D1B2A; line-height: 1; }
+.medDose  { font-size: 12px; font-weight: 500; color: #008C8C; line-height: 1; }
+.medSep   { font-size: 14px; color: #8A91A1; line-height: 1; }
+.medFreq  { font-size: 11px; color: #4F5763; line-height: 1; }
+.medRefill { font-size: 10px; color: #8A91A1; line-height: 1; }

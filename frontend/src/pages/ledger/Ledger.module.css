@@ -1,0 +1,148 @@
+/*
+ * Ledger — page-specific styles. Values verified against Figma node 39:2
+ * (Screen 18 — Ledger) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_ledger.php — this
+ * file owns only Ledger-component styles.
+ */
+
+/* ── Summary banner ─────────────────────────────────────────────────────── */
+.banner {
+  background: #0D1B2A;
+  color: #FFFFFF;
+  padding: 18px 24px;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.balance { display: flex; flex-direction: column; gap: 4px; }
+.label {
+  font-size: 10px; font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+.balanceVal {
+  font-size: 30px; font-weight: 700;
+  line-height: 1.1;
+  display: flex; align-items: baseline; gap: 6px;
+}
+.usd {
+  font-size: 12px; font-weight: 500;
+  color: rgba(255, 255, 255, 0.55);
+}
+.sub {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1;
+  margin-top: 4px;
+}
+
+.aging { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.buckets {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  column-gap: 12px;
+  max-width: 520px;
+}
+.bucketCol { display: flex; flex-direction: column; gap: 2px; }
+.bucketTop {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1;
+}
+.bucketAmt {
+  font-size: 12px; font-weight: 600;
+  color: #FFFFFF;
+  line-height: 1;
+}
+.bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  overflow: hidden;
+  display: flex;
+  max-width: 520px;
+  margin-top: 4px;
+}
+.seg {
+  height: 100%;
+  background: #FA8C33;
+}
+.seg4 { background: #D93838; }
+
+.actions { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.priBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px; font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.priBtn:hover { background: #00787A; }
+.secBtn {
+  background: rgba(255, 255, 255, 0.06);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13px; font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.secBtn:hover { background: rgba(255, 255, 255, 0.10); }
+
+/* ── Ledger table ───────────────────────────────────────────────────────── */
+.tableWrap { padding: 20px 24px 32px; }
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.table thead th {
+  background: #F5F6F7;
+  color: #8A91A1;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 0.6px;
+  text-align: left;
+  padding: 10px 14px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table tbody td {
+  padding: 14px 14px;
+  border-bottom: 1px solid #E4E5E8;
+  font-size: 12px;
+  color: #0D1B2A;
+  vertical-align: middle;
+}
+.table tbody tr:last-child td { border-bottom: none; }
+.rowOut td { background: #FFF8EE; }
+
+.colDate { width: 96px; color: #4F5763; font-weight: 500; }
+.colTx { width: 80px; color: #8A91A1; font-size: 11px; font-weight: 500; letter-spacing: 0.2px; }
+.colAmt { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
+.creditAmt { color: #1F8C4D; font-weight: 600; }
+.colBal { width: 110px; text-align: right; font-weight: 700; color: #0D1B2A; font-variant-numeric: tabular-nums; }
+.colIns { width: 180px; color: #4F5763; }
+
+.outPill {
+  display: inline-flex; align-items: center;
+  margin-left: 10px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 9px; font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(250, 140, 51, 0.14);
+  color: #FA8C33;
+  border: 1px solid rgba(250, 140, 51, 0.4);
+  line-height: 1;
+}
