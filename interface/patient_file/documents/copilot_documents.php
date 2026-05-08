@@ -63,6 +63,58 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live-document list — preserves the behavior of the pre-React PHP page
+// (copilot_documents.php.bak). Same JOIN to cp_extraction_runs, same
+// "LIVE — uploaded on this chart" section over the static recent/earlier
+// list. React renders this list with Extract / Delete row actions; the
+// extract POSTs to the agent backend, the delete POSTs to
+// copilot_documents_delete.php (untouched action handler).
+// ---------------------------------------------------------------------------
+$activePid = (int)$patientId;
+$liveDocs  = [];
+if ($activePid > 0) {
+    $rs = sqlStatement(
+        "SELECT d.id, d.name, d.mimetype, d.date,
+                MAX(CASE WHEN r.status = 'success' THEN 1 ELSE 0 END) AS has_extracted
+           FROM documents d
+           LEFT JOIN cp_extraction_runs r ON r.document_id = d.id
+          WHERE d.foreign_id = ? AND d.deleted = 0
+          GROUP BY d.id, d.name, d.mimetype, d.date
+          ORDER BY d.date DESC, d.id DESC
+          LIMIT 12",
+        [$activePid]
+    );
+    while ($r = sqlFetchArray($rs)) {
+        $name      = (string)($r['name'] ?? "Document #{$r['id']}");
+        $mime      = (string)($r['mimetype'] ?? 'application/octet-stream');
+        $isPdf     = stripos($mime, 'pdf') !== false;
+        $nameLower = strtolower($name);
+        $guessType = (strpos($nameLower, 'lab') !== false || strpos($nameLower, 'cmp') !== false ||
+                      strpos($nameLower, 'panel') !== false || strpos($nameLower, 'a1c') !== false)
+            ? 'lab_pdf'
+            : ((strpos($nameLower, 'intake') !== false || strpos($nameLower, 'history') !== false)
+                ? 'intake_form'
+                : ((strpos($nameLower, 'med') !== false || strpos($nameLower, 'rx') !== false)
+                    ? 'medication_list'
+                    : 'lab_pdf'));
+        $liveDocs[] = [
+            'id'           => (int)$r['id'],
+            'name'         => $name,
+            'mime'         => $mime,
+            'date'         => $r['date'] ? substr((string)$r['date'], 0, 10) : '',
+            'isPdf'        => $isPdf,
+            'docType'      => $guessType,
+            'hasExtracted' => (int)($r['has_extracted'] ?? 0) === 1,
+        ];
+    }
+}
+
+// Agent backend URL — same source order as interface/copilot/index.php.
+$copilotBackend = $GLOBALS['copilot_backend_url']
+    ?? (getenv('COPILOT_BACKEND_URL') ?: 'http://localhost:8400');
+$copilotBackend = rtrim((string)$copilotBackend, '/');
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -106,7 +158,9 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-copilot-backend="<?php echo attr($copilotBackend); ?>"
+     data-live-docs="<?php echo attr((string)json_encode($liveDocs)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

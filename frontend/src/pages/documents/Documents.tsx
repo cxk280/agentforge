@@ -68,8 +68,21 @@ const EARLIER: readonly EarlierRow[] = [
   { icon: '💊', iconKind: 'rx',        title: 'Rx — Lisinopril 5mg → 10mg', cat: 'Prescription',   src: 'Dr. Rivera',         date: 'Apr 1, 2025',  size: '18 KB' },
 ];
 
+// Server-side row shape from copilot_documents.php's liveDocs query.
+export type LiveDoc = {
+  readonly id: number;
+  readonly name: string;
+  readonly mime: string;
+  readonly date: string;
+  readonly isPdf: boolean;
+  readonly docType: string;
+  readonly hasExtracted: boolean;
+};
+
 type DocumentsProps = {
   readonly boot: BootContext;
+  readonly liveDocs: readonly LiveDoc[];
+  readonly copilotBackend: string;
 };
 
 type UploadState =
@@ -78,9 +91,15 @@ type UploadState =
   | { kind: 'done'; docId: number }
   | { kind: 'error'; message: string };
 
-export function Documents({ boot }: DocumentsProps): JSX.Element {
+type ExtractState = 'idle' | 'extracting' | 'done' | 'error';
+
+export function Documents({ boot, liveDocs, copilotBackend }: DocumentsProps): JSX.Element {
   const fileRef = useRef<HTMLInputElement>(null);
   const [upload, setUpload] = useState<UploadState>({ kind: 'idle' });
+  // Per-row extract status, keyed by docId.
+  const [extract, setExtract] = useState<Record<number, ExtractState>>({});
+  // Locally-deleted doc ids, hidden until next reload.
+  const [deleted, setDeleted] = useState<ReadonlySet<number>>(new Set());
 
   const onUploadClick = (): void => {
     if (!boot.patientId) {
@@ -120,6 +139,10 @@ export function Documents({ boot }: DocumentsProps): JSX.Element {
         throw new Error(data.error ?? `HTTP ${resp.status}`);
       }
       setUpload({ kind: 'done', docId: Number(data.doc_id ?? 0) });
+      // Reload the iframe so the wrapper re-runs the liveDocs query and
+      // the just-uploaded row appears with its Extract button. Match the
+      // pre-React PHP behavior (window.location.reload after upload).
+      setTimeout(() => { window.location.reload(); }, 600);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setUpload({ kind: 'error', message });
@@ -134,6 +157,67 @@ export function Documents({ boot }: DocumentsProps): JSX.Element {
     upload.kind === 'uploading' ? 'Uploading…'
     : upload.kind === 'done'    ? `✓ Uploaded #${upload.docId}`
     : 'Upload';
+
+  const onExtract = async (doc: LiveDoc): Promise<void> => {
+    if (!boot.patientId || !copilotBackend) return;
+    setExtract((s) => ({ ...s, [doc.id]: 'extracting' }));
+    try {
+      const resp = await fetch(`${copilotBackend}/extract`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          patient_id: boot.patientId,
+          doc_type: doc.docType,
+          document_id: doc.id,
+        }),
+      });
+      const data = (await resp.json().catch(() => ({}))) as { detail?: string; fact_count?: number };
+      if (!resp.ok) throw new Error(data.detail ?? `HTTP ${resp.status}`);
+      setExtract((s) => ({ ...s, [doc.id]: 'done' }));
+      setTimeout(() => { window.location.reload(); }, 700);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setExtract((s) => ({ ...s, [doc.id]: 'error' }));
+      window.alert(`Extraction failed: ${message}`);
+    }
+  };
+
+  const onDelete = async (doc: LiveDoc): Promise<void> => {
+    const ok = window.confirm(
+      `Delete "${doc.name}" and any extracted facts derived from it?\n\nThis cannot be undone.`,
+    );
+    if (!ok) return;
+    try {
+      const fd = new FormData();
+      fd.append('docref', String(doc.id));
+      if (boot.csrf) fd.append('csrf_token_form', boot.csrf);
+      const resp = await fetch('./copilot_documents_delete.php', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin',
+      });
+      const data = (await resp.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!resp.ok || data.ok === false) {
+        throw new Error(data.error ?? `HTTP ${resp.status}`);
+      }
+      setDeleted((s) => {
+        const next = new Set(s);
+        next.add(doc.id);
+        return next;
+      });
+      // If we just deleted the last live row, reload to refresh the
+      // empty-state messaging from the server.
+      const remaining = liveDocs.filter((d) => !deleted.has(d.id) && d.id !== doc.id);
+      if (remaining.length === 0) {
+        setTimeout(() => { window.location.reload(); }, 300);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      window.alert(`Delete failed: ${message}`);
+    }
+  };
+
+  const visibleLive = liveDocs.filter((d) => !deleted.has(d.id));
 
   return (
     <>
@@ -188,6 +272,73 @@ export function Documents({ boot }: DocumentsProps): JSX.Element {
         </aside>
 
         <main className={styles.main}>
+          {visibleLive.length > 0 && (
+            <>
+              <SectionLabel>LIVE — uploaded on this chart</SectionLabel>
+              <div className={styles.earlierCard} style={{ marginBottom: 16 }}>
+                {visibleLive.map((d) => {
+                  const state = extract[d.id] ?? 'idle';
+                  const extractDone = d.hasExtracted || state === 'done';
+                  const extractBtnLabel =
+                    state === 'extracting' ? 'Extracting…'
+                    : extractDone           ? '✓ Extraction complete'
+                    : 'Extract';
+                  return (
+                    <div key={d.id} className={styles.earlierRow} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div className={styles.earlierIcon}>{d.isPdf ? '📄' : '📎'}</div>
+                      <div className={styles.earlierInfo}>
+                        <div className={styles.earlierTitle}>{d.name}</div>
+                        <div className={styles.earlierSub}>
+                          <span className={styles.catPill}>{d.mime}</span>
+                          <span style={{ marginLeft: 8 }}>doc #{d.id}</span>
+                        </div>
+                      </div>
+                      <div style={{ flex: 1 }} />
+                      <div className={styles.earlierDate}>{d.date}</div>
+                      {d.isPdf && (
+                        <button
+                          type="button"
+                          disabled={state === 'extracting' || extractDone}
+                          onClick={() => onExtract(d)}
+                          style={{
+                            background: extractDone ? '#2d7a4f' : '#008C8C',
+                            color: '#FFFFFF',
+                            border: 'none',
+                            borderRadius: 999,
+                            padding: '6px 12px',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            cursor: extractDone ? 'default' : 'pointer',
+                            opacity: extractDone ? 0.95 : 1,
+                          }}
+                          title={extractDone ? 'Extraction already complete for this document.' : undefined}
+                        >
+                          {extractBtnLabel}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => onDelete(d)}
+                        style={{
+                          background: '#FFFFFF',
+                          color: '#a01d1d',
+                          border: '1px solid #d6a3a3',
+                          borderRadius: 999,
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                        }}
+                        title="Delete this document and any extracted facts derived from it. Cannot be undone."
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
           <SectionLabel>RECENT</SectionLabel>
           <div className={styles.recentGrid}>
             {RECENT.map((r) => (
