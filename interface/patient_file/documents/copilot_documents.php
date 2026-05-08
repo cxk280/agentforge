@@ -57,8 +57,11 @@ $jsHref       = is_array($entry) && isset($entry['file']) ? '/public/build/' . $
 $cssHrefs     = is_array($entry) && isset($entry['css']) && is_array($entry['css']) ? $entry['css'] : [];
 
 $session     = SessionWrapperFactory::getInstance()->getActiveSession();
-$authUserId  = (string)($_SESSION['authUserID'] ?? '');
-$patientId   = (string)($_SESSION['pid'] ?? '');
+// Use the OpenEMR session wrapper (not $_SESSION directly) — globals.php
+// runs a read_and_close session, so $_SESSION values can be empty by the
+// time the wrapper file reads them. The wrapper queries the live store.
+$authUserId  = (string)($session->get('authUserID') ?? '');
+$patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
 ?><!DOCTYPE html>
 <html lang="en">

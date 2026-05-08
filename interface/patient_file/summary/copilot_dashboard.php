@@ -44,8 +44,8 @@ $jsHref       = is_array($entry) && isset($entry['file']) ? '/public/build/' . $
 $cssHrefs     = is_array($entry) && isset($entry['css']) && is_array($entry['css']) ? $entry['css'] : [];
 
 $session     = SessionWrapperFactory::getInstance()->getActiveSession();
-$authUserId  = (string)($_SESSION['authUserID'] ?? '');
-$patientId   = (string)($_SESSION['pid'] ?? '');
+$authUserId  = (string)($session->get('authUserID') ?? '');
+$patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
 ?><!DOCTYPE html>
 <html lang="en">
