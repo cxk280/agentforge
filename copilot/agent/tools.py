@@ -216,15 +216,17 @@ async def get_conditions(patient_id: str) -> dict:
 # ---------------------------------------------------------------------------
 
 async def search_guidelines(patient_id: str, query: str, top_k: int = 5) -> dict:
-    """W2: hybrid BM25 + (optional) Cohere Rerank over the clinical-guideline
-    corpus. Returns up to top_k snippets with source metadata so the
-    agent can quote them with the citation contract intact.
+    """W2: hybrid sparse+dense retrieval over the clinical-guideline
+    corpus — BM25 + Voyage embeddings fused via Reciprocal Rank Fusion,
+    with optional Cohere Rerank on top. Returns up to top_k snippets
+    with source metadata + per-component scores so the agent can quote
+    them with the citation contract intact.
 
     The patient_id arg is enforced by the agent loop but not used for
     the corpus query — guideline retrieval is patient-agnostic.
     """
     try:
-        from rag.retriever import search as rag_search
+        from rag.retriever import search_with_meta
     except ImportError:
         return {
             "patient_id": patient_id,
@@ -233,10 +235,12 @@ async def search_guidelines(patient_id: str, query: str, top_k: int = 5) -> dict
             "error": "RAG retriever module not available",
         }
     top_k = max(1, min(int(top_k or 5), 20))
+    bundle = search_with_meta(query, top_k=top_k)
     return {
         "patient_id": patient_id,
         "query": query,
-        "results": rag_search(query, top_k=top_k),
+        "results": bundle["results"],
+        "retrieval": bundle["meta"],
     }
 
 
@@ -480,12 +484,14 @@ TOOL_SCHEMAS = [
     {
         "name": "search_guidelines",
         "description": (
-            "W2: hybrid BM25 + Cohere-rerank over a curated clinical-guideline "
-            "corpus (ADA Standards of Care, ACC/AHA hypertension, USPSTF, "
-            "GINA asthma, KDIGO CKD). Use when the user's question turns on "
-            "what guidelines say (e.g. \"what's the A1c target?\", \"is "
-            "metformin appropriate at this eGFR?\"). Returns up to top_k "
-            "evidence chunks; cite source_id + page in the reply."
+            "W2: hybrid sparse+dense retrieval (BM25 + Voyage embeddings, "
+            "fused via RRF, optionally reranked by Cohere) over a curated "
+            "clinical-guideline corpus (ADA Standards of Care, ACC/AHA "
+            "hypertension, USPSTF, GINA asthma, KDIGO CKD). Use when the "
+            "user's question turns on what guidelines say (e.g. \"what's "
+            "the A1c target?\", \"is metformin appropriate at this "
+            "eGFR?\"). Returns up to top_k evidence chunks; cite source_id "
+            "+ page in the reply."
         ),
         "input_schema": {
             "type": "object",

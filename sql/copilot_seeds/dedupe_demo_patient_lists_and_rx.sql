@@ -1,10 +1,17 @@
 -- Dedupe demo-patient lists + prescriptions.
 --
--- Why: copilot_seed_demo_patients.php was re-run after the idempotency
--- marker (globals.copilot_demo_patients_v1) was cleared. Because the
--- dump regenerates UUIDs and lets MySQL auto-increment ids, INSERT
--- IGNORE did not protect against re-insertion, leaving 3x copies of
--- every (lists / prescriptions) row for pids 1, 5, 8. patient_data,
+-- DEPRECATED 2026-05-07: demo_patients_v1.sql was regenerated from the
+-- deduped local dev DB on this date, so this script is a no-op against
+-- any environment seeded from the current dump. Kept for one cycle in
+-- case dev/qa/prod are running on the pre-regeneration dump and need
+-- to be reconciled before their next reseed. Safe to delete after
+-- dev/qa/prod have been reseeded from demo_patients_v1.sql.
+--
+-- Why (historic): copilot_seed_demo_patients.php was re-run after the
+-- idempotency marker (globals.copilot_demo_patients_v1) was cleared.
+-- Because the dump regenerated UUIDs and let MySQL auto-increment ids,
+-- INSERT IGNORE did not protect against re-insertion, leaving 3x copies
+-- of every (lists / prescriptions) row for pids 1, 5, 8. patient_data,
 -- form_encounter, form_vitals, immunizations were unaffected.
 --
 -- Strategy: keep MIN(id) per logical key, delete the rest. Idempotent —

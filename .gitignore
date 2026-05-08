@@ -47,3 +47,8 @@ tmp-phpstan/*
 docker/development-easy/docker-compose.override.yml
 docker/development-easy-light/docker-compose.override.yml
 docker/development-easy-redis/docker-compose.override.yml
+
+# Hybrid retriever's on-disk Voyage embedding cache. Regenerated on
+# first /search call when VOYAGE_API_KEY is set; kept out of git so
+# test runs (which inject a stub embedder) don't pollute the cache.
+copilot/agent/guidelines/seed_corpus_embeddings.json

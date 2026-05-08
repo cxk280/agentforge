@@ -11,6 +11,9 @@ slowapi>=0.1.9
 newrelic>=10.0.0
 # Week 2 — hybrid RAG over guideline corpus
 rank-bm25>=0.2.2
+# Voyage AI dense embeddings for the dense leg of hybrid retrieval.
+# Imported lazily; degrades to sparse-only when VOYAGE_API_KEY is unset.
+voyageai>=0.3.0
 # Cohere is optional at runtime — imported lazily only when COHERE_API_KEY is set
 cohere>=5.10.0
 # Week 2 — multi-agent orchestration (supervisor + workers)

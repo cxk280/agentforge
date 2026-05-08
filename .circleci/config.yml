@@ -17,6 +17,10 @@
 #
 # Stages:
 #   1. unit-test                 — isolated PHPUnit Copilot suite. Both lanes.
+#   1b. agent-unit-test          — Python unit tests for the agent (PHI redaction
+#                                  + hybrid retriever contract). Gates the agent
+#                                  lane only — openemr deploys don't depend on
+#                                  agent Python code.
 #   2. deploy-agent-{env}        — agent: railway up against the env's project token.
 #   3. eval-smoke-agent-dev      — 5-case smoke against dev's agent (~$0.05).
 #   4. deploy-openemr-{env}      — openemr: railway up against the env's project token.
@@ -334,6 +338,41 @@ jobs:
           path: /tmp/test-results
           destination: phpunit
 
+  agent-unit-test:
+    # Python unit tests for the FastAPI agent. Runs on every push, gates
+    # the agent deploy lane. Adding test files? Drop them at
+    # copilot/agent/test_*.py — the unittest discover below picks them up
+    # automatically.
+    #
+    # Why install rank-bm25 explicitly: the hybrid retriever imports it
+    # at module import time. Voyage SDK is NOT installed — the test
+    # injects a fake voyageai module before importing the retriever, so
+    # the dense path is exercised without burning real Voyage budget.
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install agent test deps
+          command: |
+            python -m pip install --upgrade pip
+            # Pin to the runtime-only deps the tests actually exercise
+            # (BM25 + rerank fallback). Heavy deps like newrelic /
+            # langfuse aren't needed and would slow CI.
+            pip install rank-bm25
+      - run:
+          name: Run Python unit tests
+          command: |
+            mkdir -p /tmp/test-results/agent
+            cd copilot/agent
+            python -m unittest discover \
+              --start-directory . \
+              --pattern 'test_*.py' \
+              --verbose \
+              2>&1 | tee /tmp/test-results/agent/unittest-output.txt
+      - store_artifacts:
+          path: /tmp/test-results/agent
+          destination: agent-unit-test
+
   eval-smoke-agent-dev:
     executor: python
     steps:
@@ -487,12 +526,15 @@ workflows:
     jobs:
       # ── Unit tests gate both deploy lanes ──────────────────────
       # Run the isolated PHPUnit Copilot suite once per push; both
-      # the agent lane and the openemr lane require it.
+      # the agent lane and the openemr lane require it. The agent
+      # lane additionally requires agent-unit-test (Python: PHI
+      # redaction + hybrid retriever contract).
       - unit-test
+      - agent-unit-test
 
       # ── Agent lane: dev ────────────────────────────────────────
       - deploy-agent-dev:
-          requires: [unit-test]
+          requires: [unit-test, agent-unit-test]
           filters:
             branches:
               only: master

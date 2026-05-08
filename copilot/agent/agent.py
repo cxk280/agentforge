@@ -251,6 +251,22 @@ async def _execute_tools(
             "success": success,
             "error_type": error_type,
         }
+        # Surface non-PHI retrieval metadata so the demo UI can label the
+        # hybrid-retrieval stack inline. Only the retrieval block is
+        # forwarded — the actual evidence chunks stay in the tool_result
+        # payload that the model consumes.
+        if (
+            block.name == "search_guidelines"
+            and isinstance(result, dict)
+            and isinstance(result.get("retrieval"), dict)
+        ):
+            outcome["retrieval"] = result["retrieval"]
+            outcome["result_count"] = len(result.get("results", []))
+            outcome["result_sources"] = {
+                r.get("chunk_id"): r.get("source")
+                for r in result.get("results", [])
+                if r.get("chunk_id")
+            }
         return tool_result, outcome
 
     pairs = await asyncio.gather(*[call_one(b) for b in tool_blocks])

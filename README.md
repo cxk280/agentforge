@@ -60,7 +60,7 @@ This is a **fork of OpenEMR** with three layered pieces of new work:
    each backed by a shared archetype CSS file
    (`public/copilot-archetype.css`). The redesign is screen-faithful
    to the Figma reference.
-3. **Eval suite** (`copilot/agent/evals/`) — 25 golden + labeled
+3. **Eval suite** (`copilot/agent/evals/`) — 53 golden + labeled
    cases scored by Claude Haiku 4.5 as judge, results uploaded to
    Langfuse Datasets. Runs against the production agent.
 
@@ -162,6 +162,166 @@ A complete view-by-view inventory is in
 
 ---
 
+## Tool calling
+
+The Co-Pilot agent uses **Anthropic-native tool use** (Claude's
+`tool_use` / `tool_result` content blocks) — the model decides which
+tool to call, the agent dispatches it locally, and the loop continues
+until the model emits `stop_reason="end_turn"`. There's no LangChain
+or hand-rolled function-calling planner in the W1 hot path; the
+single-loop is in `copilot/agent/agent.py` and is ~120 lines start to
+finish. The W2 LangGraph path (`graph.py`) wraps the same single-loop
+inside a Sonnet-4.6 supervisor + worker graph, but every leaf still
+calls Claude with the same tool schemas.
+
+### Declared tools
+
+All schemas live in `copilot/agent/tools.py::TOOL_SCHEMAS` and are
+sent verbatim on every model request. Six are W1, two are W2.
+
+| Tool | Backed by | Returns |
+|---|---|---|
+| `get_patient_summary` | `GET /Patient/{id}` + `Condition` + `AllergyIntolerance` | demographics, active conditions, allergies |
+| `get_medications` | `GET /MedicationRequest?patient={id}` | active prescriptions |
+| `get_recent_labs` | `GET /Observation?patient={id}&category=laboratory` | newest-first lab observations |
+| `get_vitals` | `GET /Observation?patient={id}&category=vital-signs` | BP / HR / temp / weight / BMI / O2 sat |
+| `get_visit_history` | `GET /Encounter?patient={id}` | encounters newest-first |
+| `get_conditions` | `GET /Condition?patient={id}` | all problem-list entries (active + historical) |
+| `search_guidelines` *(W2)* | `rag.retriever.search_with_meta()` | guideline chunks from hybrid sparse+dense retrieval |
+| `get_extracted_facts` *(W2)* | `cp_extracted_facts` ⨝ `cp_extraction_citations` | structured facts from uploaded PDFs with bbox citations |
+
+### Dispatch flow
+
+```
+client → /chat/stream
+   ↓
+agent.run_agent_stream()
+   ↓
+  loop:
+    Anthropic Messages API (tool_use enabled, schemas attached)
+    ↓
+    stop_reason == "end_turn"  →  yield {type: "done"}
+    stop_reason == "tool_use"  →  for each tool_use block:
+                                    yield {type: "tool_start", name}
+                                    TOOL_DISPATCH[name](**inputs)
+                                    yield {type: "tool_end", ...}
+                                  feed tool_result blocks back, continue
+```
+
+`patient_id` is **server-injected** on every tool call — the model
+cannot redirect a tool to a different patient by hallucinating an ID
+in the args. This is the W1 authorization invariant; it didn't change
+for W2.
+
+### What the demo UI sees (NDJSON event stream)
+
+```
+{"type":"tool_start","name":"get_recent_labs"}
+{"type":"tool_end","name":"get_recent_labs","success":true,"error_type":null}
+{"type":"delta","text":"The most recent A1C..."}
+{"type":"done","history_length":7}
+```
+
+For `search_guidelines` specifically, `tool_end` now also carries a
+**`retrieval` metadata block** plus `result_count` and `result_sources`:
+
+```jsonc
+{
+  "type": "tool_end",
+  "name": "search_guidelines",
+  "success": true,
+  "error_type": null,
+  "result_count": 5,
+  "result_sources": {"ada-2024-glycemic-target-most": "both", "...": "dense"},
+  "retrieval": {
+    "retrieval_mode":  "hybrid_sparse_dense",
+    "sparse_model":    "bm25-okapi",
+    "dense_model":     "voyage-3",
+    "dense_enabled":   true,
+    "fusion":          "rrf",
+    "rrf_k":           60,
+    "rerank_enabled":  false,
+    "contributors":    ["both", "dense"],
+    "corpus_size":     12
+  }
+}
+```
+
+The chat demo (`copilot/agent/static/chat.html` + `chat.js`) renders
+this as an inline pill — green `Hybrid · sparse + dense` when the
+dense leg is live, yellow `Sparse only` when only BM25 ran. Reviewers
+can verify the dense layer fired without inspecting architecture
+notes; this was added 2026-05-07 in response to early-submission
+feedback.
+
+### Tool-result shape: hybrid retrieval
+
+`search_guidelines` now returns:
+
+```jsonc
+{
+  "patient_id": "1",
+  "query": "what's the blood sugar target?",
+  "results": [
+    {
+      "chunk_id":      "ada-2024-glycemic-target-most",
+      "source_type":   "GuidelineChunk",
+      "source_id":     "ada-standards-of-care-2024",
+      "source_title":  "ADA Standards of Medical Care in Diabetes 2024",
+      "source_url":    "https://diabetesjournals.org/...",
+      "section":       "6. Glycemic Goals",
+      "page":          6,
+      "quote":         "An A1C goal of less than 7% is reasonable for...",
+      "score":         0.0325,        // final (rerank if used, else rrf)
+      "bm25_score":    6.7056,
+      "dense_score":   0.9941,        // null when VOYAGE_API_KEY unset
+      "rrf_score":     0.032522,
+      "rerank_score":  null,          // populated when COHERE_API_KEY set
+      "source":        "both"         // "sparse" | "dense" | "both"
+    }
+  ],
+  "retrieval": { /* same meta block as above */ }
+}
+```
+
+The model only consumes `quote`, `source_id`, `source_url`, `section`,
+and `page` — those satisfy the citation contract. The score block is
+purely for the demo UI, `/search` API clients, and evals; the model
+itself is not asked to reason over scores.
+
+### W2 LangGraph path (`/chat/graph`)
+
+Same six FHIR tools + same two W2 tools, but called by **worker
+nodes** instead of the bare single-loop. The supervisor decides
+whether `intake_extractor` and/or `evidence_retriever` should fire
+before handing control to `final_answer`. When `evidence_retriever`
+runs, it emits a dedicated `retrieval_hit` SSE event with the same
+metadata shape `tool_end` uses — so the chat UI's hybrid pill works
+on both paths uniformly.
+
+### Reliability
+
+- **Patient-scope guardrail.** The active `patient_id` is forced by
+  `_execute_tools` after the model returns its `tool_use` args, so
+  cross-patient queries are structurally impossible.
+- **Per-tool spans + redaction.** Every tool call is wrapped in a
+  Langfuse span (`span_tool_call`); the span output records only
+  `success`, `error_type`, and `result_keys` — never values, never
+  PHI.
+- **Graceful retrieval degradation.** Hybrid retrieval falls back to
+  BM25-only when `VOYAGE_API_KEY` is unset; the agent never 500s on
+  a missing optional secret. The fallback is reported as
+  `dense_enabled=false` in the retrieval block so it's still
+  observable.
+- **Tested.** The hybrid sparse+dense contract (per-component scores,
+  `source` tag, cache invalidation, fallback metadata) is pinned by
+  `copilot/agent/test_retriever_hybrid.py` (6 cases). The
+  CircleCI `agent-unit-test` job runs that suite plus
+  `test_phi_redaction.py` on every push and gates
+  `deploy-agent-{dev,qa,prod}`.
+
+---
+
 ## Week 2 — Multimodal Evidence Agent
 
 > Graders should be able to run the W2 core flow without guessing.
@@ -170,7 +330,7 @@ A complete view-by-view inventory is in
 Week 2 extends the Week 1 agent in three directions: it can now
 **see** real clinical documents (lab PDFs, intake forms, external
 medication lists), **route** work across an inspectable supervisor +
-worker graph, and **prove** quality with a 50-case eval suite that
+worker graph, and **prove** quality with a 53-case eval suite that
 gates every PR.
 
 ### What's new in W2 vs the W1 baseline
@@ -179,12 +339,12 @@ gates every PR.
 |---|---|
 | Document ingestion (lab + intake + medication-list PDFs → strict-schema JSON) | `copilot/agent/ingest/` |
 | Sample PDFs covering 3 lab + 2 intake + 2 med-list layouts | `copilot/agent/ingest/test_fixtures/samples/` |
-| Hybrid RAG over a curated guideline corpus (ADA / ACC-AHA / USPSTF / GINA / KDIGO) | `copilot/agent/rag/` + `copilot/agent/guidelines/seed_corpus.json` |
+| True hybrid sparse+dense RAG over a curated guideline corpus (BM25 + Voyage-3 → RRF → optional Cohere rerank) | `copilot/agent/rag/retriever.py` + `copilot/agent/guidelines/seed_corpus.json` |
 | LangGraph supervisor + intake_extractor + evidence_retriever + critic + final_answer | `copilot/agent/graph.py` |
 | New agent tools: `search_guidelines`, `get_extracted_facts` (visible to /chat directly) | `copilot/agent/tools.py` |
 | Click-to-source bbox-overlay PDF viewer | `interface/patient_file/documents/copilot_doc_viewer.php` |
 | Documents tab live data → bbox viewer link | `interface/patient_file/documents/copilot_documents.php` |
-| 50-case eval suite with deterministic-first rubrics + per-rubric booleans | `copilot/agent/evals/` |
+| 53-case eval suite with deterministic-first rubrics + per-rubric booleans (incl. semantic-only cases targeting the dense retrieval leg) | `copilot/agent/evals/` |
 | `gate.py` + `.github/workflows/agent-evals.yml` PR-blocking eval gate | required check on `master` (enable via branch protection) |
 | Cost / latency report generator | `copilot/agent/cost_table.py` + `scripts/cost_latency_report.py` |
 | Lab-trend SVG sparkline endpoint | `GET /copilot/lab-trend/{patient_id}?test_name=…` |
@@ -246,8 +406,10 @@ After running the seeder (`/interface/super/copilot_seed_demo_data.php?confirm=1
 
 - `POST /extract` — run extraction on an uploaded PDF
   (`{patient_id, doc_type, document_id|file_path}`)
-- `POST /search` — hybrid RAG over the guideline corpus
-  (`{query, top_k}`)
+- `POST /search` — hybrid sparse+dense RAG over the guideline corpus
+  (`{query, top_k}`). Response includes a `meta` block with
+  `retrieval_mode`, `sparse_model`, `dense_model`, `dense_enabled`,
+  `fusion`, `contributors`, and `corpus_size`.
 - `POST /chat/graph` — multi-agent LangGraph path (parallel to W1's
   `/chat/stream`); accepts `pending_doc_uploads` to drive
   intake_extractor mid-conversation
@@ -467,13 +629,25 @@ edits aren't clobbered. Run once per environment:
 
 ```
 GET /interface/super/copilot_seed_demo_data.php?confirm=1
+GET /interface/super/copilot_seed_demo_patients.php?confirm=1
 ```
 
-This adds: 8 provider/staff users, 4 facilities, 4 pharmacies,
-10 drugs, 6 office notes, 7 documents, 5 immunizations. The
-underlying OpenEMR demo dataset already has 14 patients, 32
-prescriptions, ~80k audit log entries, etc. — those are
-preserved.
+The first call adds: 8 provider/staff users, 4 facilities, 4
+pharmacies, 10 drugs, 6 office notes, 7 documents.
+
+The second call imports the demo patient cohort from
+`sql/copilot_seeds/demo_patients_v1.sql`: **5 patients** —
+pids 1, 4, 5, 8, 17 (Ted Shaw, Eduardo Perez, Farrah Rolle, Nora
+Cohen, Jim Moses) — plus their encounters, vitals, problems,
+prescriptions, and immunizations. The dump is deduped at source
+(regenerated 2026-05-07).
+
+> Earlier deployments seeded a wider 15-patient cohort that
+> included unused OpenEMR demo-stock patients (pids 2, 3, 6, 7,
+> 9-15). To bring an existing dev/qa/prod env into parity with the
+> current dump, apply `sql/copilot_seeds/cleanup_pre_v1_demo_patients.sql`
+> once. It's idempotent (no-op on already-clean envs) and only
+> deletes from the six tables the dump touches.
 
 ### 5. Run the Co-Pilot agent (optional)
 
@@ -481,10 +655,19 @@ preserved.
 cd copilot/agent
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
+# Hybrid retrieval: BM25 always on. Dense leg activates when VOYAGE_API_KEY
+# is set (Voyage-3 embeddings). Optional Cohere rerank when COHERE_API_KEY
+# is set. Without either, /search and search_guidelines degrade gracefully
+# to sparse-only and report dense_enabled=false in their meta block.
+export VOYAGE_API_KEY=...           # optional, enables the dense leg
+export COHERE_API_KEY=...           # optional, enables rerank on top
 uvicorn main:app --reload
 ```
 
-Agent listens on http://localhost:8000.
+Agent listens on http://localhost:8000. The chat demo (`/static/chat.html`)
+renders a `Hybrid · sparse + dense` pill inline on every retrieval — the
+pill is yellow (`Sparse only`) when `VOYAGE_API_KEY` is unset, green when
+the dense leg is live.
 
 ---
 
@@ -511,15 +694,38 @@ Installs a hook that runs the Copilot suite before every push.
 Bypass with `COPILOT_SKIP_PRE_PUSH=1` or `git push --no-verify`
 (intentionally awkward — failures should be fixed, not skipped).
 
+### Agent unit tests (Python)
+
+```bash
+cd copilot/agent
+pip install rank-bm25
+python -m unittest discover --pattern 'test_*.py'
+```
+
+Two suites: `test_phi_redaction.py` (13 cases pinning the log-scrubber
+regex) and `test_retriever_hybrid.py` (6 cases pinning the hybrid
+sparse+dense contract — that dense activates when `VOYAGE_API_KEY` is
+set, results carry `bm25_score`/`dense_score`/`rrf_score`, the disk
+cache invalidates on chunk text mutation, and the sparse-only fallback
+keeps `/search` healthy when Voyage isn't configured). Both run on
+every push via the CircleCI `agent-unit-test` job, which gates
+`deploy-agent-{dev,qa,prod}`.
+
 ### Agent evals
 
-See `copilot/agent/evals/README.md`. 25 cases — a mix of `strict`
+See `copilot/agent/evals/README.md`. 53 cases — a mix of `strict`
 (deterministic substring grading) and `labeled` (Claude Haiku 4.5
 rubric-graded). Results uploaded to Langfuse Datasets
-(`copilot-golden-v1`). Runs against the production agent.
+(`copilot-golden-v1`). Runs against the production agent. Includes
+three semantic-only cases (`guideline-semantic-*`) that target the
+dense retrieval leg by asking paraphrases the corpus doesn't contain
+verbatim ("blood sugar target" → A1C, "reduced kidney function" →
+eGFR thresholds, "how low should BP be" → <130/80).
 
-**Current baseline: 24/25 passed, avg score 0.92** (run captured in
-`copilot/agent/evals/baseline.txt`).
+**Last full-suite baseline: 24/25 passed, avg score 0.92** on the
+prior 25-case set (`copilot/agent/evals/baseline.txt`); a fresh
+baseline against the expanded 53-case set will be captured on the
+next CI run after the dense-retrieval changes settle.
 
 ```bash
 cd copilot/agent/evals
@@ -528,7 +734,7 @@ export ANTHROPIC_API_KEY=...
 export LANGFUSE_PUBLIC_KEY=...
 export LANGFUSE_SECRET_KEY=...
 export LANGFUSE_HOST=...
-python run_evals.py            # full 25-case run
+python run_evals.py            # full 53-case run
 python run_evals.py --smoke    # 5-case smoke for pre-push
 ```
 
@@ -541,9 +747,19 @@ copilot/
 ├── agent/                    # FastAPI Co-Pilot agent
 │   ├── main.py               # /chat + /chat/stream endpoints, session store
 │   ├── agent.py              # Anthropic loop + tool dispatch
-│   ├── tools.py              # FHIR-backed retrieval tools
+│   ├── tools.py              # FHIR-backed retrieval tools + W2 RAG/extraction tools
+│   ├── graph.py              # W2 LangGraph supervisor + worker nodes
 │   ├── observability.py      # Langfuse instrumentation
 │   ├── fhir_client.py        # OpenEMR FHIR adapter
+│   ├── rag/
+│   │   └── retriever.py      # Hybrid BM25 + Voyage-3 + RRF + Cohere
+│   ├── guidelines/
+│   │   ├── seed_corpus.json
+│   │   └── seed_corpus_embeddings.json   # disk-cached Voyage vectors
+│   ├── ingest/               # PDF extraction pipeline (W2)
+│   ├── static/               # chat.html + chat.js demo UI
+│   ├── test_phi_redaction.py # 13 cases — log-scrubber regex
+│   ├── test_retriever_hybrid.py  # 6 cases — hybrid sparse+dense contract
 │   └── evals/                # Golden + labeled set + harness
 │       ├── cases.json
 │       ├── run_evals.py

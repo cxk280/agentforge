@@ -195,8 +195,45 @@ const TOOL_LABELS = {
   get_vitals:          'vitals',
   get_visit_history:   'visit history',
   get_conditions:      'conditions',
+  search_guidelines:   'guidelines',
+  get_extracted_facts: 'document facts',
 };
 function toolLabel(name) { return TOOL_LABELS[name] || name; }
+
+// Render an inline "retrieval card" so the dense+sparse hybrid stack is
+// visible in the demo. Triggered by tool_end (W1 single-loop path) and
+// retrieval_hit (W2 graph path).
+function appendRetrievalCard(meta) {
+  if (!meta) return;
+  const msgs = document.getElementById('messages');
+  const div  = document.createElement('div');
+  div.className = 'msg assistant retrieval-card';
+
+  const mode = meta.retrieval_mode || (meta.dense_enabled ? 'hybrid_sparse_dense' : 'sparse_only');
+  const modeLabel = mode === 'hybrid_sparse_dense' ? 'Hybrid · sparse + dense' : 'Sparse only';
+  const sparse = meta.sparse_model || 'bm25-okapi';
+  const dense  = meta.dense_model  || (meta.dense_enabled ? 'voyage-3' : 'disabled');
+  const fusion = meta.fusion === 'rrf' ? `RRF (k=${meta.rrf_k ?? 60})` : '—';
+  const rerank = meta.rerank_enabled ? 'Cohere rerank' : 'no rerank';
+  const contributors = (meta.contributors && meta.contributors.length)
+    ? meta.contributors.join(' + ')
+    : (meta.dense_enabled ? 'sparse + dense' : 'sparse');
+
+  div.innerHTML = `
+    <div class="ai-label">Retrieval</div>
+    <div class="bubble retrieval-bubble">
+      <div class="retrieval-row">
+        <span class="retrieval-pill mode-${escapeHtml(mode)}">${escapeHtml(modeLabel)}</span>
+        <span class="retrieval-pill">sparse: ${escapeHtml(sparse)}</span>
+        <span class="retrieval-pill">dense: ${escapeHtml(dense)}</span>
+        <span class="retrieval-pill">fusion: ${escapeHtml(fusion)}</span>
+        <span class="retrieval-pill">${escapeHtml(rerank)}</span>
+      </div>
+      <div class="retrieval-sub">contributors: ${escapeHtml(contributors)} · corpus ${meta.corpus_size ?? '?'} chunks</div>
+    </div>`;
+  msgs.appendChild(div);
+  scrollToBottom();
+}
 
 function appendError(text, retryHandler) {
   const msgs = document.getElementById('messages');
@@ -363,6 +400,14 @@ async function send(text) {
         } else if (evt.type === 'tool_end') {
           activeTools = Math.max(0, activeTools - 1);
           if (activeTools === 0) setTypingStatus('Reading results…');
+          // W1 path: search_guidelines tool returns retrieval metadata.
+          if (evt.name === 'search_guidelines' && evt.retrieval) {
+            appendRetrievalCard(evt.retrieval);
+          }
+        } else if (evt.type === 'retrieval_hit') {
+          // W2 graph path: evidence_retriever_node emits retrieval_hit
+          // directly with the same metadata shape.
+          appendRetrievalCard(evt);
         } else if (evt.type === 'delta') {
           ensureAssistantBubble();
           assistantText += evt.text;

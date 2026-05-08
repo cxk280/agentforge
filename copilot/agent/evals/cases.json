@@ -503,6 +503,36 @@
       "expected": {
         "rubric": "Real-session pattern: discrepancy reconciliation. Acceptable to compare cp_extracted_facts (intake) to FHIR MedicationRequest and call out any deltas, OR to say no intake form has been ingested. Hallucinating a discrepancy fails. Reply must cite both sources when comparing."
       }
+    },
+
+    {
+      "id": "guideline-semantic-blood-sugar-target",
+      "category": "guideline_retrieval",
+      "patient_id": "1",
+      "message": "What's the recommended blood sugar target for adults with diabetes?",
+      "expected": {
+        "must_contain": ["7%"],
+        "rubric": "Hybrid-retrieval semantic case: query says 'blood sugar' but the corpus says 'A1C'. BM25 alone misses; the dense leg of the hybrid retriever surfaces the ADA glycemic-target chunk. Reply must mention the <7% A1C target and cite ADA Standards of Care 2024 (source_id: ada-standards-of-care-2024 or equivalent)."
+      }
+    },
+    {
+      "id": "guideline-semantic-kidney-and-metformin",
+      "category": "guideline_retrieval",
+      "patient_id": "1",
+      "message": "Is metformin safe for someone with reduced kidney function?",
+      "expected": {
+        "must_contain": ["eGFR"],
+        "rubric": "Hybrid-retrieval semantic case: 'reduced kidney function' must surface the metformin-eGFR chunk. Reply should mention the eGFR thresholds (contraindicated <30, not initiated 30-45) and cite ADA Standards of Care 2024."
+      }
+    },
+    {
+      "id": "guideline-semantic-bp-goal-paraphrase",
+      "category": "guideline_retrieval",
+      "patient_id": "1",
+      "message": "How low should I aim to get this patient's blood pressure?",
+      "expected": {
+        "rubric": "Hybrid-retrieval paraphrase case: the corpus uses '<130/80 mmHg' phrasing; the user says 'how low'. Dense embeddings link them. Reply must cite ACC/AHA hypertension 2017 and reference the <130/80 target. Acceptable to caveat with patient-specific factors."
+      }
     }
   ]
 }

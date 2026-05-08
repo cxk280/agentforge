@@ -35,7 +35,7 @@ Week 1 shipped a tool-using Co-Pilot that reads structured FHIR data and answers
 
 **Document ingestion.** A new `attach_and_extract(patient_id, doc_type, document_id|file_path)` tool accepts a PDF, ships it to Sonnet 4.6 as a native `document` content block, and uses forced tool-use to coerce a Pydantic-validated JSON extraction. The source PDF is persisted via OpenEMR's legacy `addNewDocument()` pipeline (`library/documents.php`) — the same `documents` table that backs `GET /fhir/DocumentReference?patient=:pid`, so the source round-trips through FHIR for free with no new controller code. Each derived fact lives in `cp_extracted_facts` with an explicit `derivedFrom: DocumentReference/{id}` field; bounding-box metadata sits alongside in `cp_extraction_citations`. We pivoted to this hybrid path on 2026-05-05 after a Day-1 grep confirmed OpenEMR has no `POST /fhir/Binary`, no `POST /fhir/Observation`, and only the `$docref` operation for DocumentReference — so a "full FHIR write" path would have required ~300 lines of new REST controller plumbing for no behavioral gain over the hybrid.
 
-**Hybrid RAG.** A new `pg-rag` Railway service (Postgres 16 + pgvector, one per env) holds a small clinical-guideline corpus (~250 chunks across ADA, ACC/AHA HTN, USPSTF, GINA, KDIGO). Retrieval is hybrid: cosine top-30 (Voyage-3 embeddings) ∪ ts_rank top-30 (BM25-style sparse) → Cohere Rerank → top-5 evidence chunks fed to the answer model. Every retrieved chunk carries source_id, page, section, and exact quote to satisfy the citation contract.
+**Hybrid RAG.** Retrieval is true hybrid sparse+dense: BM25 (rank-bm25) ∪ Voyage-3 dense embeddings → Reciprocal Rank Fusion (k=60) → optional Cohere Rerank v3.5 → top-5 evidence chunks fed to the answer model. Embeddings are precomputed at startup and cached on disk keyed by `(chunk_id, model, text_hash)` so a fresh container hydrates without re-spending Voyage budget. Every retrieved chunk carries source_id, page, section, and exact quote to satisfy the citation contract — plus per-component `bm25_score`, `dense_score`, `rrf_score`, `rerank_score`, and a `source` tag (`sparse` | `dense` | `both`) so reviewers can verify the dense layer fired without inspecting architecture notes. The MVP corpus is small (12 chunks, ADA / ACC-AHA / USPSTF / GINA / KDIGO highlights); the in-memory cosine over precomputed vectors is bounded and stays well under the 90-second-per-room budget. The pgvector path stays in-roadmap for the full ~250-chunk corpus (`copilot/agent/rag/ingest_corpus.py`), but ships behind hybrid_sparse_dense in /search rather than gating it.
 
 **Eval gate.** The Week-1 25-case suite grows to 50 and switches from float scoring to per-rubric booleans (`schema_valid`, `citation_present`, `factually_consistent`, `safe_refusal`, `no_phi_in_logs`). A `gate.py` compares each run against a checked-in `baseline.json` and fails CI if any rubric category drops more than 5% or below an absolute threshold. The gate runs as a required GitHub Actions check on every PR; CircleCI keeps doing deploy gating downstream.
 
@@ -160,13 +160,19 @@ CREATE INDEX ON corpus_chunks USING ivfflat (embedding vector_cosine_ops);
 CREATE INDEX ON corpus_chunks USING gin (tsv);
 ```
 
-**Retrieval:**
+**Retrieval (MVP, in-memory — `copilot/agent/rag/retriever.py`):**
 
-1. Sparse: `ts_rank_cd(tsv, plainto_tsquery(query))` top-30
-2. Dense: `1 - (embedding <=> voyage_3_embed(query))` top-30
-3. Union, dedupe, keep up to 60 candidates
-4. Cohere Rerank v3.5 → top-5
-5. Each result: `{source_id, source_url, page, section, text, score}` — required for citations
+1. Sparse: BM25-Okapi (`rank-bm25`) → top-30 by raw BM25 score
+2. Dense: cosine of `voyage-3` query vector against cached chunk vectors → top-30
+3. Reciprocal Rank Fusion: `score(d) = Σ_r 1 / (60 + rank_r(d))` over both rankings
+4. Optional Cohere Rerank v3.5 (when `COHERE_API_KEY` is set) → top-5
+5. Each result: `{source_id, source_url, page, section, quote, score, bm25_score, dense_score, rrf_score, rerank_score, source}` — citation-required fields plus per-component scores so the demo UI and `/search` clients can show which retriever surfaced each chunk.
+
+`/search` and `search_guidelines` both also return a `meta`/`retrieval` block: `{retrieval_mode, sparse_model, dense_model, dense_enabled, fusion, rrf_k, rerank_enabled, contributors, corpus_size}` — observable in the demo (the chat UI renders a Hybrid · sparse + dense pill on every retrieval), in `retrieval_hit` SSE events, and in CI smoke artifacts.
+
+**pgvector path (post-MVP):**
+
+Same RRF shape, swap step 1's BM25 for `ts_rank_cd` and step 2's in-memory cosine for `embedding <=> voyage_3_embed(query)` against pgvector. Steps 3–5 unchanged.
 
 **Embedding model:** Voyage-3 (1024 dim). Anthropic-recommended; biomedical-strong; HIPAA-eligible under BAA.
 

@@ -238,7 +238,8 @@ async def intake_extractor_node(state: AgentState) -> AgentState:
 # ---------------------------------------------------------------------------
 
 async def evidence_retriever_node(state: AgentState) -> AgentState:
-    """BM25 + (optional) Cohere Rerank over the guideline corpus.
+    """Hybrid sparse+dense retrieval over the guideline corpus
+    (BM25 + Voyage → RRF → optional Cohere Rerank).
 
     Caches its output in AgentState.evidence_chunks for the final-answer
     node and any subsequent supervisor decisions on this turn.
@@ -253,13 +254,24 @@ async def evidence_retriever_node(state: AgentState) -> AgentState:
     if not query:
         return {**state, "evidence_done": True, "evidence_chunks": [], "events": new_events}
 
-    from rag.retriever import search as rag_search
-    chunks = rag_search(query, top_k=5)
+    from rag.retriever import search_with_meta
+    bundle = search_with_meta(query, top_k=5)
+    chunks = bundle["results"]
+    meta = bundle["meta"]
 
     new_events.append({
         "type": "retrieval_hit",
         "n_results": len(chunks),
         "top_source_ids": [c["source_id"] for c in chunks[:3]],
+        "retrieval_mode": meta.get("retrieval_mode"),
+        "dense_enabled": meta.get("dense_enabled"),
+        "dense_model": meta.get("dense_model"),
+        "sparse_model": meta.get("sparse_model"),
+        "fusion": meta.get("fusion"),
+        "contributors": meta.get("contributors"),
+        # Compact per-result provenance — { chunk_id: 'sparse'|'dense'|'both' } —
+        # keeps the SSE payload small but lets the demo UI badge each chip.
+        "result_sources": {c["chunk_id"]: c.get("source") for c in chunks},
     })
 
     return {

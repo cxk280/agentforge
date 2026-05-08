@@ -555,18 +555,26 @@ class SearchRequest(BaseModel):
 async def search_route(request: Request, req: SearchRequest):
     """Hybrid retrieval over the clinical-guideline corpus.
 
-    MVP shape: BM25 sparse + optional Cohere Rerank. Returns up to top_k
-    evidence chunks with full citation metadata (source_id, source_url,
-    page, section, exact quote, score) — exactly the shape the agent's
-    citation contract expects.
+    Stack: BM25 sparse + Voyage-AI dense → Reciprocal Rank Fusion →
+    optional Cohere Rerank. The response includes a `meta` block
+    (retrieval_mode, sparse_model, dense_model, dense_enabled, fusion,
+    contributors) so reviewers can verify the dense layer is live
+    without reading architecture docs. Each result carries per-component
+    scores (bm25_score, dense_score, rrf_score, rerank_score) and a
+    `source` tag of 'sparse' | 'dense' | 'both'.
     """
-    from rag.retriever import search as rag_search
+    from rag.retriever import search_with_meta
 
     if not req.query.strip():
         raise HTTPException(status_code=400, detail="query must be non-empty")
 
-    results = rag_search(req.query, top_k=req.top_k)
-    return {"query": req.query, "top_k": req.top_k, "results": results}
+    bundle = search_with_meta(req.query, top_k=req.top_k)
+    return {
+        "query": req.query,
+        "top_k": req.top_k,
+        "results": bundle["results"],
+        "meta": bundle["meta"],
+    }
 
 
 @app.post("/extract")
