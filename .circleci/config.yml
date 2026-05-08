@@ -107,15 +107,25 @@ commands:
           name: Deploy << parameters.service >>
           # Tee the deploy output to a per-service log so the deploy
           # job can publish it as an artifact for later debugging.
+          #
+          # `--ci` (non-interactive, waits for build + rollout) NOT
+          # `--detach` (queues build, returns immediately). Caught
+          # 2026-05-07: with `--detach`, deploy-agent-* would report
+          # success while Railway was still building; the next
+          # downstream job (smoke / eval) would hit the PREVIOUS
+          # image. Pipeline 76's eval-full-agent-qa scored 47/50 with
+          # adversarial-empty-message ✗ even though the empty-message
+          # fix was on the deployed commit — the fix wasn't actually
+          # rolled out yet because `--detach` had returned early.
           command: |
             mkdir -p /tmp/deploy-logs
             export RAILWAY_TOKEN="${<< parameters.env_token >>}"
             cd << parameters.service_path >>
             if [ "<< parameters.use_path_as_root >>" = "true" ]; then
-              railway up --service << parameters.service >> --path-as-root . --detach \
+              railway up --service << parameters.service >> --path-as-root . --ci \
                 2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
             else
-              railway up --service << parameters.service >> --detach \
+              railway up --service << parameters.service >> --ci \
                 2>&1 | tee /tmp/deploy-logs/<< parameters.service >>.log
             fi
 
