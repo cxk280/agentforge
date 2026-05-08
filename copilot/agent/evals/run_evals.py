@@ -231,7 +231,11 @@ def run() -> int:
         print("✗ No cases matched filter.", file=sys.stderr)
         return 2
 
-    anthropic = Anthropic()
+    # 60s ceiling per judge call — Anthropic SDK's default is 10 minutes,
+    # which lets one stuck judge call hang the entire suite past
+    # CircleCI's no-output timeout. Caught 2026-05-08 when eval-smoke
+    # hung mid-case-4 for ~10 min and CircleCI killed the job.
+    anthropic = Anthropic(timeout=60.0, max_retries=2)
     lf: Langfuse | None = None
     if not args.no_langfuse and os.environ.get("LANGFUSE_PUBLIC_KEY"):
         lf = Langfuse()
