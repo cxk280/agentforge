@@ -76,8 +76,79 @@ function cpUpdateBannerVisibility(activeName) {
             && app_view_model.application_data.patient
             && app_view_model.application_data.patient() !== null);
     } catch (_) { hasPatient = false; }
+    // Fast-path: walk the actual iframe src attributes (NOT just the
+    // Knockout url() observables, which lag behind contentWindow.location
+    // on existing tabs). If any iframe currently shows a URL with
+    // ?set_pid=N, treat the patient as selected so the banner can show
+    // before demographics.php finishes loading + firing the observable.
+    if (!hasPatient && inPatientFrame) {
+        try {
+            var iframes = document.querySelectorAll('iframe');
+            for (var i = 0; i < iframes.length; i++) {
+                var src = iframes[i].getAttribute('src') || '';
+                var liveSrc = '';
+                try { liveSrc = iframes[i].contentWindow.location.href || ''; } catch (_) {}
+                if (/[?&]set_pid=\d+/.test(src) || /[?&]set_pid=\d+/.test(liveSrc)) {
+                    hasPatient = true;
+                    break;
+                }
+            }
+        } catch (_) {}
+    }
     banner.style.display = (inPatientFrame && hasPatient) ? '' : 'none';
 }
+
+// Re-evaluate the banner periodically for the first ~5 seconds after a tab
+// activation, so the URL fast-path can pick up an iframe whose src was just
+// reassigned (the visible-tab url() observable lags behind contentWindow
+// location updates on existing tabs).
+function cpReevaluateBannerSoon() {
+    var deadlines = [50, 200, 500, 1000, 2000, 4000];
+    deadlines.forEach(function (ms) {
+        setTimeout(function () {
+            try {
+                var tabs = app_view_model.application_data.tabs.tabsList();
+                for (var i = 0; i < tabs.length; i++) {
+                    if (tabs[i].visible && tabs[i].visible()) {
+                        cpUpdateBannerVisibility(tabs[i].name());
+                        return;
+                    }
+                }
+            } catch (_) {}
+        }, ms);
+    });
+}
+
+// Re-evaluate banner visibility on each tab list change. activateTab fires
+// it once at activation time, but a tab can mutate its URL afterward (e.g.
+// navigateTab updating contentWindow.location on an existing tab) — without
+// this hook the banner stays hidden until the patient observable lands.
+(function cpReevaluateOnTabListChange() {
+    function attach() {
+        try {
+            if (!window.app_view_model
+                || !app_view_model.application_data
+                || !app_view_model.application_data.tabs
+                || !app_view_model.application_data.tabs.tabsList
+                || typeof app_view_model.application_data.tabs.tabsList.subscribe !== 'function') {
+                return false;
+            }
+            // Re-evaluate after every list change. Use the burst poller
+            // because contentWindow.location lags behind tab.url() updates.
+            app_view_model.application_data.tabs.tabsList.subscribe(function () {
+                cpReevaluateBannerSoon();
+            });
+            return true;
+        } catch (_) { return false; }
+    }
+    if (!attach()) {
+        var tries = 0;
+        var iv = setInterval(function () {
+            tries++;
+            if (attach() || tries > 50) clearInterval(iv);
+        }, 100);
+    }
+})();
 
 // Re-evaluate banner visibility whenever the patient observable changes —
 // otherwise the banner is set hidden when the 'pat' tab activates *before*
@@ -136,6 +207,7 @@ function activateTab(data)
     }
     if (data && typeof data.name === 'function') {
         cpUpdateBannerVisibility(data.name());
+        cpReevaluateBannerSoon();
     }
 }
 
@@ -158,6 +230,7 @@ function activateTabByName(name,hideOthers)
         }
     }
     cpUpdateBannerVisibility(name);
+    cpReevaluateBannerSoon();
 }
 
 function tabClicked(data,evt)
@@ -218,6 +291,15 @@ function tabCloseByName(name)
 function navigateTab(url,name,afterLoadFunction,loading_label='')
 {
     top.restoreSession();
+    // If we're about to load a set_pid URL into a patient-context tab,
+    // surface the banner the moment the request fires — don't wait for
+    // demographics.php to load and populate the patient observable.
+    if (typeof url === 'string' && /[?&]set_pid=\d+/.test(url)) {
+        try {
+            var banner = document.getElementById('attendantData');
+            if (banner) banner.style.display = '';
+        } catch (_) {}
+    }
     if($("iframe[name='"+name+"']").length>0)
     {
         // If the iframe is already pointed at this URL, don't reassign
