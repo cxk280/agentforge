@@ -59,6 +59,11 @@ type Module = {
   readonly hasUpdate: boolean;
 };
 
+export type ModuleInstallerPayload = {
+  readonly modules: readonly Module[];
+  readonly installedCount: number;
+};
+
 const ADMIN_NAV: readonly SidebarGroup[] = [
   {
     label: 'Users & Access',
@@ -254,14 +259,19 @@ const MODULES: readonly Module[] = [
 
 type ModuleInstallerProps = {
   readonly boot: BootContext;
+  readonly payload: ModuleInstallerPayload;
 };
 
-export function ModuleInstaller(_props: ModuleInstallerProps): JSX.Element {
+export function ModuleInstaller({ payload }: ModuleInstallerProps): JSX.Element {
+  // Live modules from the wrapper, demo otherwise. Only the Installed tab is
+  // backed by real data — Updates / Marketplace / Custom uploads stay demo.
+  const allModules: readonly Module[] = payload.modules.length > 0 ? payload.modules : MODULES;
+
   const [activeTab, setActiveTab] = useState<TabKey>('installed');
   const [activeCat, setActiveCat] = useState<CategoryKey>('all');
   const [search, setSearch] = useState<string>('');
   const [toggleState, setToggleState] = useState<ReadonlyMap<string, boolean>>(
-    () => new Map(MODULES.map((m) => [m.id, m.active])),
+    () => new Map(allModules.map((m) => [m.id, m.active])),
   );
 
   const toggle = (id: string): void => {
@@ -371,7 +381,7 @@ export function ModuleInstaller(_props: ModuleInstallerProps): JSX.Element {
 
           <div className={styles.body}>
             <div className={styles.grid}>
-              {MODULES.map((m) => {
+              {allModules.map((m) => {
                 const isOn = toggleState.get(m.id) ?? m.active;
                 const toggleCls = isOn
                   ? styles.toggle

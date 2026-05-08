@@ -55,6 +55,59 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live modules — admin scope, from the `modules` table.
+// ---------------------------------------------------------------------------
+
+$installedModules = [];
+$rs = sqlStatement(
+    "SELECT mod_id, mod_name, mod_active, mod_directory, mod_type
+       FROM modules
+      ORDER BY mod_active DESC, mod_name"
+);
+while ($r = sqlFetchArray($rs)) {
+    $name = (string)($r['mod_name'] ?? '');
+    if ($name === '') { continue; }
+    $type = strtolower((string)($r['mod_type'] ?? ''));
+    if ($type === '') {
+        // Lazy categorization based on the module name.
+        $lower = strtolower($name);
+        if (str_contains($lower, 'doc') || str_contains($lower, 'ccr')) {
+            $cat = 'Clinical';
+        } elseif (str_contains($lower, 'immun') || str_contains($lower, 'syndrom') || str_contains($lower, 'care')) {
+            $cat = 'Clinical';
+        } else {
+            $cat = 'Integration';
+        }
+    } else {
+        $cat = ucfirst($type);
+    }
+
+    $installedModules[] = [
+        'id'          => 'mod-' . (int)($r['mod_id'] ?? 0),
+        'icon'        => "\u{2728}",
+        'iconBg'      => '#E6F5F5',
+        'name'        => $name,
+        'version'     => 'v1.0.0',
+        'category'    => $cat,
+        'description' => trim((string)($r['mod_directory'] ?? '')) !== ''
+            ? 'Directory: ' . (string)$r['mod_directory']
+            : '',
+        'active'      => (int)($r['mod_active'] ?? 0) === 1,
+        'hasUpdate'   => false,
+    ];
+}
+
+$installedCount = 0;
+foreach ($installedModules as $m) {
+    if ($m['active']) { $installedCount++; }
+}
+$moduleInstallerPayload = [
+    'modules'        => $installedModules,
+    'installedCount' => $installedCount,
+];
+$moduleInstallerJson = json_encode($moduleInstallerPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,7 +153,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-modules="<?php echo attr($moduleInstallerJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>
