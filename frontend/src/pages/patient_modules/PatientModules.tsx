@@ -4,9 +4,14 @@
 // Marketplace button; followed by two grouped grids (ACTIVE — CLINICAL and
 // AVAILABLE — RECOMMENDED FOR THIS PATIENT) of module cards.
 //
-// 1:1 port of the static-HTML PHP mock previously at
-// /interface/patient_file/modules/copilot_modules.php (preserved as
-// copilot_modules.php.bak). Static demo data only — no DB, no API calls.
+// Wired via the Finder pattern: the PHP wrapper at
+// /interface/patient_file/modules/copilot_modules.php JSON-encodes the
+// active-clinical + available rows and the summary counts onto data-* attrs
+// on #cp-root, and the entry index.tsx parses + passes them as props. The
+// arrays are still hardcoded stubs in the wrapper (see TODO(real-data) — no
+// per-patient module-activation schema exists in this build), but the
+// data-attribute → prop pipeline is consistent with Finder / External Data
+// so swapping in a real SQL pull is a server-side-only change.
 //
 // The PHP wrapper is iframe-mounted under the navy top nav and patient
 // header2 banner that the outer OpenEMR shell still renders, so this
@@ -16,116 +21,59 @@ import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './PatientModules.module.css';
 
 type StatusFilter = 'active' | 'available' | 'all';
-type IconTone = 'teal' | 'info' | 'violet' | 'mint' | 'warn' | 'pink';
-type StatusTone = 'good' | 'warn' | 'neutral';
-type ActionTone = 'primary' | 'warn' | 'secondary';
 
-type Module = {
+// Server-side row shape (mirrors the PHP arrays in copilot_modules.php).
+// Tones are kept as plain strings so unknown values don't blow up the parser
+// — the CSS lookup falls back to '' if a tone isn't recognized.
+export type PatientModule = {
   readonly name: string;
   readonly icon: string;
-  readonly iconTone: IconTone;
+  readonly iconTone: string;
   readonly version: string;
   readonly vendor: string;
   readonly description: string;
   readonly status: string;
-  readonly statusTone: StatusTone;
+  readonly statusTone: string;
   readonly action: string;
-  readonly actionTone: ActionTone;
+  readonly actionTone: string;
+};
+
+export type PatientModulesSummary = {
+  readonly active: number;
+  readonly available: number;
 };
 
 type Section = {
   readonly heading: string;
-  readonly items: readonly Module[];
+  readonly items: readonly PatientModule[];
 };
-
-const ACTIVE_CLINICAL: readonly Module[] = [
-  {
-    name: 'Care Coordination',
-    icon: '🤝', iconTone: 'teal',
-    version: 'v2.4.1', vendor: 'OpenEMR Foundation',
-    description: 'Care plan, care team roster, transitions of care. Direct messaging integrated.',
-    status: 'ACTIVE', statusTone: 'good',
-    action: 'Open →', actionTone: 'primary',
-  },
-  {
-    name: 'Clinical Decision Rules',
-    icon: '✨', iconTone: 'info',
-    version: 'v1.9.3', vendor: 'OpenEMR Foundation',
-    description: 'CQM rules engine: drives reminders, alerts, and quality measure calculation.',
-    status: 'ACTIVE', statusTone: 'good',
-    action: 'Open →', actionTone: 'primary',
-  },
-  {
-    name: 'EasiPRO',
-    icon: '📊', iconTone: 'violet',
-    version: 'v3.1.0', vendor: 'Northwestern',
-    description: 'Patient-Reported Outcome instruments delivered through the Patient Portal.',
-    status: 'ACTIVE', statusTone: 'good',
-    action: 'Open →', actionTone: 'primary',
-  },
-  {
-    name: 'ClinicalTables FHIR',
-    icon: '🔗', iconTone: 'mint',
-    version: 'v0.7.2', vendor: 'NLM',
-    description: 'Code-set lookups for ICD-10, SNOMED, RxNorm via the FHIR ValueSet API.',
-    status: 'UPDATE AVAILABLE', statusTone: 'warn',
-    action: 'Update', actionTone: 'warn',
-  },
-];
-
-const AVAILABLE: readonly Module[] = [
-  {
-    name: 'Diabetes Coach',
-    icon: '🩸', iconTone: 'warn',
-    version: 'v1.2.0', vendor: 'RiversideHealth',
-    description: 'Glucose log integration, A1C trending, and Co-Pilot diabetes-focused prompts.',
-    status: 'AVAILABLE', statusTone: 'neutral',
-    action: 'Install', actionTone: 'secondary',
-  },
-  {
-    name: 'Care Plan Templates',
-    icon: '📋', iconTone: 'info',
-    version: 'v0.9.1', vendor: 'OpenEMR Foundation',
-    description: 'Condition-specific care plan templates with order sets and patient education.',
-    status: 'AVAILABLE', statusTone: 'neutral',
-    action: 'Install', actionTone: 'secondary',
-  },
-  {
-    name: 'Pharmacy Sync',
-    icon: '💊', iconTone: 'pink',
-    version: 'v2.0.1', vendor: 'Surescripts',
-    description: 'Two-way sync of medication history, including external prescriptions.',
-    status: 'AVAILABLE', statusTone: 'neutral',
-    action: 'Install', actionTone: 'secondary',
-  },
-  {
-    name: 'Telehealth Studio',
-    icon: '📹', iconTone: 'violet',
-    version: 'v4.2.0', vendor: 'OpenEMR Foundation',
-    description: 'Embedded video visits with screen-share, captioning, and visit recording.',
-    status: 'AVAILABLE', statusTone: 'neutral',
-    action: 'Install', actionTone: 'secondary',
-  },
-];
-
-const SECTIONS: readonly Section[] = [
-  { heading: 'ACTIVE — CLINICAL',                         items: ACTIVE_CLINICAL },
-  { heading: 'AVAILABLE — RECOMMENDED FOR THIS PATIENT',  items: AVAILABLE },
-];
 
 type PatientModulesProps = {
   readonly boot: BootContext;
+  readonly activeClinical: readonly PatientModule[];
+  readonly available: readonly PatientModule[];
+  readonly summary: PatientModulesSummary;
 };
 
-export function PatientModules(_props: PatientModulesProps): JSX.Element {
+export function PatientModules(
+  { activeClinical, available, summary }: PatientModulesProps,
+): JSX.Element {
   const [filter, setFilter] = useState<StatusFilter>('active');
+
+  const sections: readonly Section[] = [
+    { heading: 'ACTIVE — CLINICAL',                         items: activeClinical },
+    { heading: 'AVAILABLE — RECOMMENDED FOR THIS PATIENT',  items: available },
+  ];
+
+  const metaText =
+    `Patient-context modules • ${summary.active} active, ${summary.available} available`;
 
   return (
     <>
       <header className={styles.head}>
         <div className={styles.title}>Modules</div>
         <div className={styles.bullet}>•</div>
-        <div className={styles.meta}>Patient-context modules • 4 active, 3 available</div>
+        <div className={styles.meta}>{metaText}</div>
         <div className={styles.spacer} />
         <div className={styles.seg} role="tablist">
           <FilterTab mode="active"    current={filter} onSelect={setFilter}>Active</FilterTab>
@@ -136,7 +84,7 @@ export function PatientModules(_props: PatientModulesProps): JSX.Element {
       </header>
 
       <main className={styles.body}>
-        {SECTIONS.map((section) => (
+        {sections.map((section) => (
           <section key={section.heading} className={styles.section}>
             <header className={styles.sectionHead}>
               <span className={styles.sectionLabel}>{section.heading}</span>
@@ -178,13 +126,13 @@ function FilterTab({ mode, current, onSelect, children }: FilterTabProps): JSX.E
 }
 
 type ModuleCardProps = {
-  readonly module: Module;
+  readonly module: PatientModule;
 };
 
 function ModuleCard({ module: m }: ModuleCardProps): JSX.Element {
-  const iconClass = `${styles.icon} ${styles[`icon_${m.iconTone}`] ?? ''}`;
-  const pillClass = `${styles.pill} ${styles[`pill_${m.statusTone}`] ?? ''}`;
-  const actionClass = `${styles.action} ${styles[`action_${m.actionTone}`] ?? ''}`;
+  const iconClass = `${styles.icon} ${styles[`icon_${m.iconTone}`] ?? ''}`.trim();
+  const pillClass = `${styles.pill} ${styles[`pill_${m.statusTone}`] ?? ''}`.trim();
+  const actionClass = `${styles.action} ${styles[`action_${m.actionTone}`] ?? ''}`.trim();
 
   return (
     <article className={styles.card}>

@@ -12,8 +12,19 @@
  * is passed to React via data-* attributes on the #cp-root mount node and
  * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
  *
- * The original static-HTML mock is preserved at copilot_assessments.php.bak
- * so a side-by-side screenshot diff remains possible.
+ * TODO(real-data): The "Assessments" page is a Figma demo of standardized
+ * screening instruments (PHQ-9, GAD-7, AUDIT-C, PRAPARE, DDS-17, Stop-BANG,
+ * Barthel Index). None of those instruments have a backing schema in this
+ * build — the lists table's "assessment" issue subtype stores free-form
+ * clinical notes, not scored screening instrument administrations, and the
+ * pre-React .bak page (preserved at copilot_assessments.php.bak) shipped
+ * these as a hardcoded array too. The arrays below are kept verbatim from
+ * the .bak so the React port renders 1:1 with the Figma frame. When a real
+ * questionnaire/assessment ingestion exists (e.g. a `patient_assessments`
+ * + `assessment_responses` schema, or the form_questionnaire_assessments
+ * pipeline wired up end-to-end), replace the $categories / $assessments
+ * literals with SQL pulls scoped to the current patient — the
+ * data-attribute → prop pipeline below already takes care of the React side.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
@@ -53,6 +64,107 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Assessments payload.
+//
+// TODO(real-data): hardcoded stubs lifted verbatim from copilot_assessments.php.bak.
+// No DB table backs scored screening-instrument administrations in this
+// build; replace with SQL once a `patient_assessments` schema exists (or the
+// form_questionnaire_assessments pipeline is wired up). Patient-context
+// guard: if pid is empty/0 we still emit the same demo arrays so the page
+// continues to render the Figma frame — when real-data lands, scope the
+// queries to $pid > 0 and emit empty arrays otherwise.
+// Shape below matches the React props in /frontend/src/pages/assessments/Assessments.tsx.
+// ---------------------------------------------------------------------------
+
+$pid = (int)$patientId;
+
+// status: due | done | scheduled
+$assessments = [
+    [
+        'status' => 'due',
+        'title'  => 'PHQ-9 — Patient Health Questionnaire',
+        'cat'    => 'Behavioral Health',
+        'desc'   => '9-item depression screening instrument',
+        'meta'   => 'Last taken 90 days ago',
+    ],
+    [
+        'status' => 'due',
+        'title'  => 'GAD-7 — Generalized Anxiety Disorder',
+        'cat'    => 'Behavioral Health',
+        'desc'   => '7-item anxiety screening',
+        'meta'   => 'Never administered',
+    ],
+    [
+        'status' => 'due',
+        'title'  => 'AUDIT-C — Alcohol Use Disorders',
+        'cat'    => 'Behavioral Health',
+        'desc'   => '3-item alcohol use screening',
+        'meta'   => 'Last taken 12 months ago',
+    ],
+    [
+        'status' => 'due',
+        'title'  => 'SDOH Assessment — PRAPARE',
+        'cat'    => 'Social Determinants',
+        'desc'   => '21 questions covering housing, food, transportation, employment',
+        'meta'   => 'Never administered',
+    ],
+    [
+        'status'      => 'done',
+        'title'       => 'Diabetes Distress Scale (DDS-17)',
+        'cat'         => 'Behavioral Health',
+        'desc'        => 'Screens for emotional distress related to diabetes management',
+        'meta'        => 'Score 32 — moderate distress • 02/18/2026',
+        'scoreLabel'  => 'SCORE',
+        'scoreValue'  => '32 / 102',
+    ],
+    [
+        'status'      => 'done',
+        'title'       => 'Falls Risk Assessment (Stop-BANG)',
+        'cat'         => 'Risk Screening',
+        'desc'        => 'Identifies fall risk in older adults',
+        'meta'        => 'Low risk • 02/18/2026',
+        'scoreLabel'  => 'SCORE',
+        'scoreValue'  => 'Low',
+    ],
+    [
+        'status' => 'scheduled',
+        'title'  => 'Functional Status (Barthel Index)',
+        'cat'    => 'Functional',
+        'desc'   => 'Activities of Daily Living assessment',
+        'meta'   => 'Sent to patient portal • Due 11/20',
+    ],
+];
+
+$categories = [
+    ['label' => 'All',                 'count' => 12, 'active' => true],
+    ['label' => 'Due Now',              'count' => 4,  'active' => false],
+    ['label' => 'Behavioral Health',    'count' => 6,  'active' => false],
+    ['label' => 'Social Determinants',  'count' => 2,  'active' => false],
+    ['label' => 'Functional',           'count' => 3,  'active' => false],
+    ['label' => 'Risk Screening',       'count' => 1,  'active' => false],
+    ['label' => 'Wellness',             'count' => 0,  'active' => false],
+];
+
+// Header summary line: "N due, M completed". Computed from the array above
+// so the meta line stays consistent with the cards rendered.
+$dueCount  = 0;
+$doneCount = 0;
+foreach ($assessments as $a) {
+    if (($a['status'] ?? '') === 'due') {
+        $dueCount++;
+    } elseif (($a['status'] ?? '') === 'done') {
+        $doneCount++;
+    }
+}
+$summary = [
+    'due'       => $dueCount,
+    // The Figma copy says "8 completed" even though the demo shows 2 done
+    // cards; preserve the .bak's verbatim "4 due, 8 completed" line by
+    // padding the historical-completed total beyond what's currently shown.
+    'completed' => max(8, $doneCount),
+];
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -96,7 +208,10 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-categories="<?php echo attr((string)json_encode($categories)); ?>"
+     data-assessments="<?php echo attr((string)json_encode($assessments)); ?>"
+     data-summary="<?php echo attr((string)json_encode($summary)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

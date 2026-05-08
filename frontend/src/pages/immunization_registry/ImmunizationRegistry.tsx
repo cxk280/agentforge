@@ -3,20 +3,19 @@
 // report: KPI tiles per vaccine antigen, "patients due" outreach queue,
 // TX-DSHS registry sync status, and a 12-month administrations bar chart.
 //
-// 1:1 port of the static mock formerly at
-// /interface/patient_file/history/copilot_immunization_registry.php — all
-// values are hardcoded demo data matching Figma exactly so the visual
-// output is frozen against the reference screenshot at
-// frontend/.fidelity-references/immunization_registry-figma-2026-05-07.png.
+// Originally a 1:1 visual port of the static mock at
+// /interface/patient_file/history/copilot_immunization_registry.php (.bak),
+// this component is now DB-backed: the PHP wrapper computes coverage tiles,
+// the patients-due queue, monthly admins counts, and sync card metrics from
+// the live `immunizations` + `patient_data` + `extended_log` tables and
+// JSON-encodes the result onto data-imm. The component renders whatever
+// the wrapper sends. Visual layout is unchanged from the original mock.
 //
-// The navy top nav and patient demographics banner are intentionally not
-// rendered (per migration brief — this is a practice-wide registry view,
-// not a patient-scoped one).
-//
-// Tabs and the "Force re-sync" button are static — no router/handlers,
-// matching the demo posture of the other migrated Reports pages.
+// Tabs are client-side filters over the same prebuilt due-list (per-tab
+// counts come from the PHP wrapper). The "Force re-sync" button stays
+// static for now — same posture as the other migrated Reports pages.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './ImmunizationRegistry.module.css';
 
@@ -26,7 +25,7 @@ type PillTone = 'danger' | 'warn' | 'neutral';
 type BarTone = 'teal' | 'orange';
 type TabKey = 'all' | 'flu' | 'covid' | 'tdap' | 'shingrix';
 
-type CoverageTile = {
+export type CoverageTile = {
   readonly name: string;
   readonly sub: string;
   readonly goalLabel: string;
@@ -35,7 +34,7 @@ type CoverageTile = {
   readonly denom: string;
 };
 
-type DueRow = {
+export type DueRow = {
   readonly av: AvColor;
   readonly initials: string;
   readonly name: string;
@@ -44,6 +43,31 @@ type DueRow = {
   readonly vac: string;
   readonly pill: string;
   readonly pillTone: PillTone;
+  readonly pid?: number | undefined;
+};
+
+export type MonthBar = {
+  readonly label: string;
+  readonly count: number;
+  readonly showNum: boolean;
+  readonly tone: BarTone;
+};
+
+export type SyncInfo = {
+  readonly lastSyncLabel: string;
+  readonly pushedQuarter: number;
+  readonly pending: number;
+  readonly errors: number;
+};
+
+export type ImmunizationRegistryPayload = {
+  readonly coverage: readonly CoverageTile[];
+  readonly dueRows: readonly DueRow[];
+  readonly tabCounts: Readonly<Record<TabKey, number>>;
+  readonly months: readonly MonthBar[];
+  readonly sync: SyncInfo;
+  readonly peakTotal: number;
+  readonly totalAdmins: number;
 };
 
 type SideItem = { readonly label: string; readonly active?: boolean | undefined };
@@ -89,42 +113,6 @@ const SIDE_GROUPS: readonly SideGroup[] = [
   },
 ];
 
-// Coverage tile values verified against Figma node 96:2 on 2026-05-07.
-// Order is row-major (3×2): Influenza, COVID-19 booster, Pneumococcal /
-// Tdap, Shingrix, HPV.
-const COVERAGE: readonly CoverageTile[] = [
-  { name: 'Influenza',        sub: '2025-26',        goalLabel: 'Goal ≥65%', pct: 62, tone: 'warn', denom: '1147 of 1847 · Season ends 04/30' },
-  { name: 'COVID-19 booster', sub: '2025-26',        goalLabel: 'Tracked',   pct: 41, tone: 'info', denom: '757 of 1847 · Updated formula' },
-  { name: 'Pneumococcal',     sub: 'PPSV23 + PCV',   goalLabel: 'Goal ≥75%', pct: 78, tone: 'good', denom: '512 of 656 · Adults 65+' },
-  { name: 'Tdap',             sub: '10-yr booster',  goalLabel: 'Goal ≥80%', pct: 83, tone: 'good', denom: '1532 of 1647 · All adults' },
-  { name: 'Shingrix',         sub: 'Adults 50+',     goalLabel: 'Goal ≥60%', pct: 58, tone: 'warn', denom: '412 of 710 · 2-dose series' },
-  { name: 'HPV',              sub: 'Series complete', goalLabel: 'Goal ≥70%', pct: 71, tone: 'good', denom: '62 of 116 · Adolescents' },
-];
-
-// Patients-due rows verified against Figma node 96:2 on 2026-05-07.
-const DUE_ROWS: readonly DueRow[] = [
-  { av: 'orange', initials: 'MC', name: 'Margaret Chen', mrn: '#004821', dem: '68F', vac: 'Flu (2025-26)',     pill: 'OVERDUE 6 mo', pillTone: 'danger' },
-  { av: 'blue',   initials: 'TS', name: 'Ted Shaw',      mrn: '#000001', dem: '61M', vac: 'Flu, Shingrix',     pill: 'Flu OVERDUE',  pillTone: 'danger' },
-  { av: 'purple', initials: 'LM', name: 'Linda Martinez', mrn: '#003918', dem: '78F', vac: 'PPSV23 booster',    pill: 'Due 05/14',    pillTone: 'warn' },
-  { av: 'teal',   initials: 'DK', name: 'David Kim',     mrn: '#006102', dem: '44M', vac: 'Tdap (10-yr)',      pill: 'Due 06/22',    pillTone: 'warn' },
-  { av: 'pink',   initials: 'AP', name: 'Allison Park',  mrn: '#002745', dem: '52F', vac: 'Shingrix dose 2',   pill: 'Due 05/03',    pillTone: 'warn' },
-  { av: 'green',  initials: 'CM', name: 'Carlos Mendez', mrn: '#004102', dem: '70M', vac: 'Flu, COVID booster', pill: 'Both due',     pillTone: 'neutral' },
-  { av: 'mint',   initials: 'EF', name: 'Emily Foster',  mrn: '#005544', dem: '67F', vac: 'PPSV23, Shingrix',  pill: 'Both due',     pillTone: 'neutral' },
-  { av: 'violet', initials: 'JB', name: 'James Brown',   mrn: '#002188', dem: '65M', vac: 'PCV13',             pill: 'Due 05/22',    pillTone: 'warn' },
-  { av: 'orange', initials: 'HG', name: 'Helen Garcia',  mrn: '#003021', dem: '71F', vac: 'PCV13, Shingrix d2', pill: 'Both due',     pillTone: 'neutral' },
-];
-
-// Tab counts mirror the static demo (Figma shows All=9 implicitly via
-// the row count; per-vaccine counts are illustrative and match what the
-// PHP precursor's intersection logic would yield against this demo data).
-const TAB_COUNTS: Readonly<Record<TabKey, number>> = {
-  all: 9,
-  flu: 3,
-  covid: 1,
-  tdap: 1,
-  shingrix: 4,
-};
-
 const TABS: readonly { readonly key: TabKey; readonly label: string }[] = [
   { key: 'all',      label: 'All' },
   { key: 'flu',      label: 'Flu' },
@@ -133,39 +121,47 @@ const TABS: readonly { readonly key: TabKey; readonly label: string }[] = [
   { key: 'shingrix', label: 'Shingrix' },
 ];
 
-// Monthly administrations chart — last 12 months ending April. Counts and
-// colors verified against Figma node 96:2 on 2026-05-07. The five middle
-// labels (Sep–Jan) show numbers above the bars; the orange columns mark
-// the Oct–Dec flu peak (428 admins).
-type MonthBar = {
-  readonly label: string;
-  readonly count: number;
-  readonly showNum: boolean;
-  readonly tone: BarTone;
-};
-const MONTHS: readonly MonthBar[] = [
-  { label: 'M', count: 12,  showNum: false, tone: 'teal' },
-  { label: 'J', count: 14,  showNum: false, tone: 'teal' },
-  { label: 'J', count: 18,  showNum: false, tone: 'teal' },
-  { label: 'A', count: 26,  showNum: false, tone: 'teal' },
-  { label: 'S', count: 52,  showNum: true,  tone: 'teal' },
-  { label: 'O', count: 142, showNum: true,  tone: 'orange' },
-  { label: 'N', count: 188, showNum: true,  tone: 'orange' },
-  { label: 'D', count: 98,  showNum: true,  tone: 'orange' },
-  { label: 'J', count: 56,  showNum: true,  tone: 'teal' },
-  { label: 'F', count: 22,  showNum: false, tone: 'teal' },
-  { label: 'M', count: 16,  showNum: false, tone: 'teal' },
-  { label: 'A', count: 14,  showNum: false, tone: 'teal' },
-];
-const BAR_MAX = 188;
 const BAR_MAX_PX = 220;
+
+// Map a tab key onto the substring(s) we expect to find inside the
+// "vaccines due" cell so client-side tab switching reuses the prebuilt
+// list rather than re-fetching from PHP. Mirrors $tabVaccines in the
+// PHP wrapper. The 'all' tab matches every row.
+const TAB_MATCHERS: Readonly<Record<Exclude<TabKey, 'all'>, readonly string[]>> = {
+  flu:      ['flu', 'influenza'],
+  covid:    ['covid'],
+  tdap:     ['tdap'],
+  shingrix: ['shingrix'],
+};
 
 type ImmunizationRegistryProps = {
   readonly boot: BootContext;
+  readonly payload: ImmunizationRegistryPayload;
 };
 
-export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Element {
+export function ImmunizationRegistry({ payload }: ImmunizationRegistryProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<TabKey>('all');
+
+  const visibleDueRows = useMemo(() => {
+    if (activeTab === 'all') {
+      return payload.dueRows;
+    }
+    const needles = TAB_MATCHERS[activeTab];
+    return payload.dueRows.filter((row) => {
+      const hay = row.vac.toLowerCase();
+      return needles.some((n) => hay.includes(n));
+    });
+  }, [payload.dueRows, activeTab]);
+
+  const barMax = useMemo(() => {
+    let max = 0;
+    for (const m of payload.months) {
+      if (m.count > max) {
+        max = m.count;
+      }
+    }
+    return max < 1 ? 1 : max;
+  }, [payload.months]);
 
   return (
     <div className={styles.shell}>
@@ -193,7 +189,9 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
           <div className={styles.titleRow}>
             <span className={styles.title}>Immunization Registry</span>
             <span className={styles.dot}>·</span>
-            <span className={styles.metaLight}>Coverage rates and outreach queue · Q1 2026</span>
+            <span className={styles.metaLight}>
+              Coverage rates and outreach queue · {payload.totalAdmins} admins / 12 mo
+            </span>
           </div>
           <div className={styles.headSpacer} />
           <button type="button" className={styles.btnGhost}>
@@ -206,7 +204,7 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
 
         <main className={styles.content}>
           <section className={styles.covGrid}>
-            {COVERAGE.map((c) => {
+            {payload.coverage.map((c) => {
               const pillCls = `${styles.gpill} ${toneClass(styles, c.tone, 'gpill')}`;
               const pctCls  = `${styles.pct}   ${toneClass(styles, c.tone, 'pct')}`;
               const fillCls = `${styles.barFill} ${toneClass(styles, c.tone, 'fill')}`;
@@ -231,6 +229,7 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
                 {TABS.map((t) => {
                   const active = t.key === activeTab;
                   const cls = active ? `${styles.tab} ${styles.tabActive}` : styles.tab;
+                  const ct = payload.tabCounts[t.key] ?? 0;
                   return (
                     <button
                       key={t.key}
@@ -241,34 +240,41 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
                       onClick={() => setActiveTab(t.key)}
                     >
                       {t.label}
-                      <span className={styles.tabCt}>{TAB_COUNTS[t.key]}</span>
+                      <span className={styles.tabCt}>{ct}</span>
                     </button>
                   );
                 })}
               </div>
               <div>
-                {DUE_ROWS.map((row, i) => {
-                  const rowCls = i % 2 === 1 ? `${styles.dueRow} ${styles.dueRowAlt}` : styles.dueRow;
-                  const avCls  = `${styles.av} ${avClass(styles, row.av)}`;
-                  const pillCls = `${styles.pill} ${pillToneClass(styles, row.pillTone)}`;
-                  return (
-                    <div key={row.mrn} className={rowCls}>
-                      <span className={avCls}>{row.initials}</span>
-                      <span className={styles.dueName}>{row.name}</span>
-                      <span className={styles.dueMrn}>{row.mrn}</span>
-                      <span className={styles.dueDem}>{row.dem}</span>
-                      <span className={styles.dueVac}>{row.vac}</span>
-                      <span className={pillCls}>{row.pill}</span>
-                      <a
-                        href="#"
-                        className={styles.sched}
-                        onClick={(e) => e.preventDefault()}
-                      >
-                        Schedule →
-                      </a>
-                    </div>
-                  );
-                })}
+                {visibleDueRows.length === 0 ? (
+                  <div className={styles.dueEmpty}>
+                    No patients currently due for this tab.
+                  </div>
+                ) : (
+                  visibleDueRows.map((row, i) => {
+                    const rowCls = i % 2 === 1 ? `${styles.dueRow} ${styles.dueRowAlt}` : styles.dueRow;
+                    const avCls  = `${styles.av} ${avClass(styles, row.av)}`;
+                    const pillCls = `${styles.pill} ${pillToneClass(styles, row.pillTone)}`;
+                    const key = `${row.mrn}-${row.name}-${i}`;
+                    return (
+                      <div key={key} className={rowCls}>
+                        <span className={avCls}>{row.initials}</span>
+                        <span className={styles.dueName}>{row.name}</span>
+                        <span className={styles.dueMrn}>{row.mrn}</span>
+                        <span className={styles.dueDem}>{row.dem}</span>
+                        <span className={styles.dueVac}>{row.vac}</span>
+                        <span className={pillCls}>{row.pill}</span>
+                        <a
+                          href="#"
+                          className={styles.sched}
+                          onClick={(e) => e.preventDefault()}
+                        >
+                          Schedule →
+                        </a>
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </section>
 
@@ -277,12 +283,12 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
                 <div className={styles.plbl}>TX-DSHS REGISTRY SYNC</div>
                 <div className={styles.syncRow}>
                   <span className={styles.syncDot} />
-                  <span>Connected · last sync 14 min ago</span>
+                  <span>Connected · last sync {payload.sync.lastSyncLabel}</span>
                 </div>
                 <div className={styles.syncMeta}>
-                  1,124 records pushed this quarter
+                  {payload.sync.pushedQuarter.toLocaleString()} records pushed this quarter
                   <br />
-                  2 pending · 0 errors
+                  {payload.sync.pending} pending · {payload.sync.errors} errors
                 </div>
                 <button type="button" className={styles.forceBtn}>Force re-sync now</button>
               </div>
@@ -292,8 +298,8 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
                 <div className={styles.sub2}>Last 12 months</div>
                 <div className={styles.chart}>
                   <div className={styles.bars}>
-                    {MONTHS.map((m, idx) => {
-                      const h = m.count > 0 ? Math.max(6, Math.round((m.count / BAR_MAX) * BAR_MAX_PX)) : 0;
+                    {payload.months.map((m, idx) => {
+                      const h = m.count > 0 ? Math.max(6, Math.round((m.count / barMax) * BAR_MAX_PX)) : 0;
                       const barCls = `${styles.bar} ${m.tone === 'orange' ? styles.barOrange : styles.barTeal}`;
                       return (
                         <div key={idx} className={styles.col}>
@@ -304,12 +310,12 @@ export function ImmunizationRegistry(_props: ImmunizationRegistryProps): JSX.Ele
                     })}
                   </div>
                   <div className={styles.axis}>
-                    {MONTHS.map((m, idx) => (
+                    {payload.months.map((m, idx) => (
                       <span key={idx} className={styles.axisLab}>{m.label}</span>
                     ))}
                   </div>
                   <div className={styles.caption}>
-                    Flu season peak Oct–Dec (428 admins)
+                    Flu season peak Oct–Dec ({payload.peakTotal} admins)
                   </div>
                 </div>
               </div>

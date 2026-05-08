@@ -57,6 +57,137 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Active + recommended modules for this patient.
+//
+// TODO(real-data): hardcoded stubs lifted verbatim from copilot_modules.php.bak.
+// The pre-React .bak page also shipped these as a static mock — there has
+// never been a "patient_modules" / "module_recommendations" schema in this
+// build (the OpenEMR `modules` table tracks installed modules globally, not
+// patient-context activations or per-patient recommendations). The arrays
+// below are kept verbatim from the .bak so the React port renders 1:1 with
+// the Figma frame. When a real per-patient module-activation schema exists
+// (e.g. `patient_module_activations` + `module_recommendations`, or service-
+// layer adapters joining `modules` to clinical context), replace the
+// $active_clinical / $available literals with SQL pulls scoped to the current
+// patient — the data-attribute → prop pipeline below already takes care of
+// the React side.
+//
+// Shape below matches the React props in
+// /frontend/src/pages/patient_modules/PatientModules.tsx.
+// ---------------------------------------------------------------------------
+
+$active_clinical = [
+    [
+        'name'        => 'Care Coordination',
+        'icon'        => '🤝',
+        'iconTone'    => 'teal',
+        'version'     => 'v2.4.1',
+        'vendor'      => 'OpenEMR Foundation',
+        'description' => 'Care plan, care team roster, transitions of care. Direct messaging integrated.',
+        'status'      => 'ACTIVE',
+        'statusTone'  => 'good',
+        'action'      => 'Open →',
+        'actionTone'  => 'primary',
+    ],
+    [
+        'name'        => 'Clinical Decision Rules',
+        'icon'        => '✨',
+        'iconTone'    => 'info',
+        'version'     => 'v1.9.3',
+        'vendor'      => 'OpenEMR Foundation',
+        'description' => 'CQM rules engine: drives reminders, alerts, and quality measure calculation.',
+        'status'      => 'ACTIVE',
+        'statusTone'  => 'good',
+        'action'      => 'Open →',
+        'actionTone'  => 'primary',
+    ],
+    [
+        'name'        => 'EasiPRO',
+        'icon'        => '📊',
+        'iconTone'    => 'violet',
+        'version'     => 'v3.1.0',
+        'vendor'      => 'Northwestern',
+        'description' => 'Patient-Reported Outcome instruments delivered through the Patient Portal.',
+        'status'      => 'ACTIVE',
+        'statusTone'  => 'good',
+        'action'      => 'Open →',
+        'actionTone'  => 'primary',
+    ],
+    [
+        'name'        => 'ClinicalTables FHIR',
+        'icon'        => '🔗',
+        'iconTone'    => 'mint',
+        'version'     => 'v0.7.2',
+        'vendor'      => 'NLM',
+        'description' => 'Code-set lookups for ICD-10, SNOMED, RxNorm via the FHIR ValueSet API.',
+        'status'      => 'UPDATE AVAILABLE',
+        'statusTone'  => 'warn',
+        'action'      => 'Update',
+        'actionTone'  => 'warn',
+    ],
+];
+
+$available = [
+    [
+        'name'        => 'Diabetes Coach',
+        'icon'        => '🩸',
+        'iconTone'    => 'warn',
+        'version'     => 'v1.2.0',
+        'vendor'      => 'RiversideHealth',
+        'description' => 'Glucose log integration, A1C trending, and Co-Pilot diabetes-focused prompts.',
+        'status'      => 'AVAILABLE',
+        'statusTone'  => 'neutral',
+        'action'      => 'Install',
+        'actionTone'  => 'secondary',
+    ],
+    [
+        'name'        => 'Care Plan Templates',
+        'icon'        => '📋',
+        'iconTone'    => 'info',
+        'version'     => 'v0.9.1',
+        'vendor'      => 'OpenEMR Foundation',
+        'description' => 'Condition-specific care plan templates with order sets and patient education.',
+        'status'      => 'AVAILABLE',
+        'statusTone'  => 'neutral',
+        'action'      => 'Install',
+        'actionTone'  => 'secondary',
+    ],
+    [
+        'name'        => 'Pharmacy Sync',
+        'icon'        => '💊',
+        'iconTone'    => 'pink',
+        'version'     => 'v2.0.1',
+        'vendor'      => 'Surescripts',
+        'description' => 'Two-way sync of medication history, including external prescriptions.',
+        'status'      => 'AVAILABLE',
+        'statusTone'  => 'neutral',
+        'action'      => 'Install',
+        'actionTone'  => 'secondary',
+    ],
+    [
+        'name'        => 'Telehealth Studio',
+        'icon'        => '📹',
+        'iconTone'    => 'violet',
+        'version'     => 'v4.2.0',
+        'vendor'      => 'OpenEMR Foundation',
+        'description' => 'Embedded video visits with screen-share, captioning, and visit recording.',
+        'status'      => 'AVAILABLE',
+        'statusTone'  => 'neutral',
+        'action'      => 'Install',
+        'actionTone'  => 'secondary',
+    ],
+];
+
+// Header summary line: "N active, M available". Computed from the arrays
+// above so the meta line stays consistent with the rendered cards.
+$activeCount    = count($active_clinical);
+$availableCount = count($available);
+$summary = [
+    'active'    => $activeCount,
+    'available' => $availableCount,
+];
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -100,7 +231,10 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-active-clinical="<?php echo attr((string)json_encode($active_clinical)); ?>"
+     data-available="<?php echo attr((string)json_encode($available)); ?>"
+     data-summary="<?php echo attr((string)json_encode($summary)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

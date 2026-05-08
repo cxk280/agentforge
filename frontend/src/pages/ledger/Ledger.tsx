@@ -64,7 +64,22 @@ const DEMO_ROWS: readonly LedgerRow[] = [
   { date: '08/22/2025', txn: 'TX-8823', desc: 'Contractual write-off (BCBS)',   debit: '—',       credit: '$48.00',  ins: '—',                  bal: '$1,157.60' },
 ];
 
-const DEMO_PAYLOAD: LedgerPayload = {
+const EMPTY_PAYLOAD: LedgerPayload = {
+  outstandingBalance: '$0.00',
+  lastActivity:       '',
+  aging:              [
+    { range: '0–30 days',  amount: '$0.00', value: 0 },
+    { range: '31–60 days', amount: '$0.00', value: 0 },
+    { range: '61–90 days', amount: '$0.00', value: 0 },
+    { range: '91+ days',   amount: '$0.00', value: 0 },
+  ],
+  rows: [],
+};
+
+// Kept for visual reference / Storybook fixtures only — NOT used as a runtime
+// fallback. Showing fake $1,303.60 to a clinician viewing a patient with no
+// billing history would mislead them and hide the real-data wiring.
+export const LEDGER_DEMO_PAYLOAD: LedgerPayload = {
   outstandingBalance: '$1,303.60',
   lastActivity:       '04/12/2026',
   aging:              DEMO_AGING,
@@ -77,12 +92,8 @@ type LedgerProps = {
 };
 
 export function Ledger({ ledger }: LedgerProps): JSX.Element {
-  // Fall back to the demo dataset when the wrapper hands us no rows so the
-  // Figma frame keeps rendering even on patients with no billing history.
-  const payload: LedgerPayload =
-    ledger && ledger.rows.length > 0 ? ledger : DEMO_PAYLOAD;
-
-  const aging = payload.aging.length > 0 ? payload.aging : DEMO_AGING;
+  const payload: LedgerPayload = ledger ?? EMPTY_PAYLOAD;
+  const aging = payload.aging.length > 0 ? payload.aging : EMPTY_PAYLOAD.aging;
   const agingTotal = aging.reduce((sum, b) => sum + b.value, 0);
 
   return (
