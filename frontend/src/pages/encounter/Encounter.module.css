@@ -1,0 +1,359 @@
+/*
+ * Encounter — page-specific styles. Values verified against Figma node 51:2
+ * (Screen 23 — Encounter Detail) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_encounter.php — this
+ * file owns only Encounter-component styles. The navy top nav and patient
+ * demographics banner are rendered by the parent shell (main.php), so this
+ * page only paints the body below the breadcrumb-tab strip.
+ */
+
+/* ── Header strip ── */
+.head {
+  width: 100%;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta { color: #8A91A1; font-size: 12px; line-height: 1; }
+.status {
+  background: #FFF1E3;
+  color: #FA8C33;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 10px; font-weight: 700;
+  letter-spacing: 0.4px;
+  line-height: 1.2;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.statusDot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #FA8C33;
+  display: inline-block;
+}
+.spacer { flex: 1; }
+
+.btn {
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btnGhost {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border-color: #E4E5E8;
+  font-weight: 500;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 7px 18px;
+}
+.btnPrimary:hover { background: #00787A; }
+
+/* ── Vitals strip ── */
+.vitals {
+  width: 100%;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 16px 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.vitalsLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+  align-self: center;
+  margin-right: 4px;
+}
+.vitalCard {
+  background: #F5F6F7;
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+}
+.vitalLbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.vitalValRow {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.vitalVal {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.vitalValGood { color: #33A666; }
+.vitalUnit {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8A91A1;
+  line-height: 1;
+}
+.vitalsSpacer { flex: 1; }
+.addMeas {
+  align-self: center;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #008C8C;
+  line-height: 1;
+  cursor: pointer;
+}
+.addMeas:hover { background: #F5F6F7; }
+
+/* ── Body grid ── */
+.body {
+  display: grid;
+  grid-template-columns: 900px 1fr;
+  gap: 16px;
+  padding: 16px 24px 24px;
+  align-items: start;
+}
+
+/* ── Left SOAP panel ── */
+.soapPanel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.soapTabs {
+  display: inline-flex;
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 4px;
+  gap: 4px;
+  align-self: flex-start;
+}
+.soapTab {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+  cursor: pointer;
+}
+.soapTabActive {
+  background: #FFFFFF;
+  color: #008C8C;
+}
+
+.soapHeading {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1B2A;
+  margin: 0;
+  line-height: 1;
+}
+.soapText {
+  background: #F5F6F7;
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  color: #0D1B2A;
+  line-height: 18px;
+}
+.hpiPara { margin: 0; }
+.hpiPara + .hpiPara { margin-top: 8px; }
+
+.ros {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 4px;
+}
+.pill {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pillFlag {
+  background: #FFF1E3;
+  color: #FA8C33;
+}
+
+/* ── Right rail ── */
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.railCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.railHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.railTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  margin: 0;
+  line-height: 1;
+}
+.cnt {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.addBtn {
+  background: transparent;
+  border: none;
+  color: #008C8C;
+  font-weight: 600;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.railRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+}
+.railRowDivider { border-bottom: 0.5px solid #E4E5E8; }
+
+.tag {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.4;
+  flex: 0 0 auto;
+}
+.tagDx { padding: 1px 8px; }
+
+.rowName {
+  flex: 1;
+  color: #0D1B2A;
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 0;
+}
+.rowMeta {
+  color: #8A91A1;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* ── Co-Pilot card ── */
+.copilotCard {
+  background: #E6F4F4;
+  border: 1px solid #B6E1E1;
+  border-radius: 12px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.copilotHead {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #008C8C;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.3px;
+  line-height: 1;
+}
+.copilotSparkle {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+}
+.copilotBody {
+  margin: 0;
+  font-size: 12px;
+  color: #0D1B2A;
+  line-height: 18px;
+}
+.copilotActions {
+  display: flex;
+  gap: 8px;
+}
+.copilotInsert {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.copilotInsert:hover { background: #00787A; }
+.copilotDismiss {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.copilotDismiss:hover { background: #F5F6F7; }

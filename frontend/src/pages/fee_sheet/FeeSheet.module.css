@@ -1,0 +1,315 @@
+/*
+ * FeeSheet — page-specific styles. Values verified against Figma node 53:2
+ * (Screen 24 — Fee Sheet) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg, Inter font, #cp-root
+ * sizing) lives in the PHP wrapper at copilot_fee_sheet.php — this file
+ * owns only FeeSheet-component styles.
+ */
+
+/* ── Header bar (full width — matches the user's standing rule that page
+ *    headers span full viewport edge to edge) ── */
+.head {
+  width: 100%;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+
+.subtotal {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-right: 12px;
+}
+.subtotalLbl {
+  font-size: 11px;
+  color: #8A91A1;
+  font-weight: 600;
+  letter-spacing: 0.4px;
+}
+.subtotalVal { font-size: 16px; font-weight: 700; color: #0D1B2A; }
+
+.btn {
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 12px;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btnGhost {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border-color: #E4E5E8;
+  font-weight: 500;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  font-weight: 600;
+  padding: 7px 16px;
+}
+.btnPrimary:hover { background: #00787A; }
+
+/* ── Body grid ── */
+.body {
+  display: grid;
+  grid-template-columns: 740px 1fr;
+  gap: 16px;
+  padding: 16px 24px 24px;
+  align-items: start;
+}
+
+.panel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* Left panel uses internal padding; right panel uses sectioned dividers */
+.panel:first-child { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+
+.panelLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+
+/* ── Search ── */
+.searchWrap {
+  background: #F5F6F7;
+  border-radius: 8px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 8px;
+}
+.searchIc { color: #8A91A1; font-size: 13px; line-height: 1; }
+.searchWrap input {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  font-size: 13px;
+  color: #0D1B2A;
+  font-family: inherit;
+}
+.searchWrap input::placeholder { color: #8A91A1; }
+
+/* ── Category pills ── */
+.cats { display: flex; flex-wrap: wrap; gap: 6px; }
+.catPill {
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  cursor: pointer;
+  font-family: inherit;
+}
+.catPillActive {
+  background: #E6F4F4;
+  color: #008C8C;
+  border-color: #008C8C;
+  font-weight: 600;
+}
+
+.catSub {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  line-height: 1;
+}
+
+/* ── Code list ── */
+.codeList {
+  display: flex;
+  flex-direction: column;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.codeRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+  font-size: 12px;
+  background: #FFFFFF;
+}
+.codeRow + .codeRow { border-top: 0.5px solid #E4E5E8; }
+.codeRowSelected { background: #E6F4F4; }
+
+.codeCode {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: #4F5763;
+  font-weight: 600;
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+.codeLabel { color: #0D1B2A; font-weight: 500; }
+.codePrice {
+  margin-left: auto;
+  color: #4F5763;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.addBtn {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid #008C8C;
+  background: #FFFFFF;
+  color: #008C8C;
+  cursor: pointer;
+  font-family: inherit;
+  flex: 0 0 auto;
+}
+.addBtn:hover:not(.addBtnAdded) { background: #F5F6F7; }
+.addBtnAdded {
+  background: #008C8C;
+  color: #FFFFFF;
+  border-color: #008C8C;
+}
+
+/* ── Selected panel ── */
+.panelHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.panelHead h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1B2A;
+  margin: 0;
+  line-height: 1;
+}
+.cnt {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.selList { display: flex; flex-direction: column; }
+.selRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 18px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.selRow + .selRow { border-top: 0.5px solid #E4E5E8; }
+
+.selTag {
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  flex: 0 0 auto;
+  line-height: 1.4;
+}
+.selTagCpt { background: #E8F0F8; color: #4785D9; }
+.selTagIcd { background: #F5F6F7; color: #4F5763; }
+
+.selCode {
+  background: #F5F6F7;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-weight: 600;
+  font-size: 10px;
+  color: #4F5763;
+  flex: 0 0 auto;
+}
+.selLabel {
+  color: #0D1B2A;
+  font-weight: 500;
+  font-size: 12px;
+}
+.selQty {
+  color: #8A91A1;
+  font-size: 11px;
+  flex-basis: 100%;
+  margin-left: 56px;
+  order: 99;
+}
+.selPrice {
+  margin-left: auto;
+  color: #0D1B2A;
+  font-weight: 600;
+  font-size: 12px;
+}
+.selX {
+  background: none;
+  border: none;
+  color: #8A91A1;
+  font-size: 12px;
+  padding: 4px;
+  cursor: pointer;
+  margin-left: 4px;
+  font-family: inherit;
+}
+.selX:hover { color: #D93838; }
+
+/* ── Totals box ── */
+.totals {
+  border-top: 1px solid #E4E5E8;
+  background: #F5F6F7;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.totalsRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #4F5763;
+  font-weight: 500;
+}
+.totalsVal { font-weight: 600; color: #4F5763; }
+.totalsRowNeg .totalsVal { color: #4F5763; }
+.totalsRowTotal {
+  border-top: 1px solid #E4E5E8;
+  padding-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1B2A;
+}
+.totalsRowTotal span:first-child { color: #0D1B2A; }
+.totalsRowTotal .totalsVal {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0D1B2A;
+}
