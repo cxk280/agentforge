@@ -56,6 +56,163 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live users + groups + service-account counts. Admin scope (no pid filter).
+// We surface the full set; client-side React filters with the same role
+// heuristic used by the original .bak.
+// ---------------------------------------------------------------------------
+
+function cp_users_initials(string $fname, string $lname, string $username): string
+{
+    $f = strtoupper(substr(trim($fname), 0, 1));
+    $l = strtoupper(substr(trim($lname), 0, 1));
+    if ($f !== '' && $l !== '') {
+        return $f . $l;
+    }
+    if ($f !== '' || $l !== '') {
+        return ($f . $l) ?: 'U';
+    }
+    return strtoupper(substr($username, 0, 2)) ?: 'U';
+}
+
+function cp_users_role_for(array $u): string
+{
+    $title = strtoupper((string)($u['title'] ?? ''));
+    $username = strtolower((string)($u['username'] ?? ''));
+    if (in_array($title, ['MD', 'DO', 'DDS', 'DMD', 'DPM', 'DC', 'OD', 'PHD', 'NP', 'PA'], true)) {
+        return 'Provider';
+    }
+    if (in_array($title, ['RN', 'LPN'], true)) {
+        return 'Nurse';
+    }
+    if (str_contains($username, 'recept') || str_contains($username, 'desk')) {
+        return 'Front desk';
+    }
+    if (str_contains($username, 'bill')) {
+        return 'Billing';
+    }
+    if ($username === 'admin' || str_contains($username, 'admin')) {
+        return 'Admin';
+    }
+    if ((int)($u['authorized'] ?? 0) === 1) {
+        return 'Provider';
+    }
+    return 'Staff';
+}
+
+function cp_users_role_key(string $role): string
+{
+    $r = strtolower($role);
+    if (str_starts_with($r, 'provider')) return 'provider';
+    if ($r === 'nurse') return 'nurse';
+    if ($r === 'front desk') return 'fd';
+    if ($r === 'billing') return 'billing';
+    if ($r === 'admin') return 'admin';
+    return 'any';
+}
+
+function cp_users_relative_login(?string $iso): string
+{
+    if ($iso === null || $iso === '' || $iso === '0000-00-00 00:00:00') {
+        return 'Never';
+    }
+    $ts = strtotime($iso);
+    if ($ts === false) { return 'Never'; }
+    $delta = time() - $ts;
+    if ($delta < 60)             { return 'Just now'; }
+    if ($delta < 3600)           { return (int)floor($delta / 60) . ' min ago'; }
+    if ($delta < 86400)          { return (int)floor($delta / 3600) . 'h ago'; }
+    if ($delta < 86400 * 7) {
+        $d = (int)floor($delta / 86400);
+        return $d . ' day' . ($d === 1 ? '' : 's') . ' ago';
+    }
+    return date('M j, Y', $ts);
+}
+
+$usersList   = [];
+$groupsList  = [];
+$activeCount = 0;
+
+$rs = sqlStatement(
+    "SELECT u.id, u.username, u.fname, u.mname, u.lname, u.title, u.email,
+            u.authorized, u.active, u.abook_type,
+            (SELECT GROUP_CONCAT(DISTINCT g.name ORDER BY g.name SEPARATOR ', ')
+               FROM `groups` g WHERE g.user = u.username) AS group_names,
+            (SELECT MAX(l.date) FROM log l
+              WHERE l.event = 'login' AND l.user = u.username) AS last_login_at
+       FROM users u
+      ORDER BY u.active DESC, u.lname ASC, u.fname ASC, u.username ASC
+      LIMIT 200"
+);
+while ($r = sqlFetchArray($rs)) {
+    $username = (string)($r['username'] ?? '');
+    if ($username === '') { continue; }
+    $fname = (string)($r['fname'] ?? '');
+    $lname = (string)($r['lname'] ?? '');
+    $name  = trim($fname . ' ' . $lname);
+    if ($name === '') { $name = $username; }
+    if (!empty($r['title'])) { $name .= ', ' . $r['title']; }
+
+    $role = cp_users_role_for($r);
+    $isService = (int)($r['abook_type'] ?? 0) === 0
+        ? false
+        : false; // abook_type doesn't reliably mark service accounts; rely on naming.
+    $isService = $isService || str_contains($username, '_svc') || $username === 'erx_svc' || str_contains($username, 'service');
+    $active = (int)($r['active'] ?? 0) === 1;
+    if ($active && !$isService) { $activeCount++; }
+
+    $groups = [];
+    $gnames = (string)($r['group_names'] ?? '');
+    if ($gnames !== '') {
+        foreach (explode(',', $gnames) as $g) {
+            $g = trim($g);
+            if ($g !== '') { $groups[] = $g; }
+        }
+    }
+
+    $usersList[] = [
+        'id'        => (string)(int)$r['id'],
+        'name'      => $name,
+        'initials'  => cp_users_initials($fname, $lname, $username),
+        'username'  => $username,
+        'email'     => (string)($r['email'] ?? '') !== '' ? (string)$r['email'] : '-',
+        'role'      => $isService ? 'Service account' : $role,
+        'roleKey'   => $isService ? 'any' : cp_users_role_key($role),
+        'groups'    => $groups,
+        'mfaOn'     => false,
+        'active'    => $active,
+        'lastLogin' => cp_users_relative_login(is_string($r['last_login_at'] ?? null) ? (string)$r['last_login_at'] : null),
+        'badge'     => $isService ? 'svc' : (!$active ? 'inactive' : ''),
+        'isService' => $isService,
+    ];
+}
+
+$grs = sqlStatement(
+    "SELECT name, COUNT(DISTINCT user) AS members
+       FROM `groups`
+      GROUP BY name
+      ORDER BY name"
+);
+while ($g = sqlFetchArray($grs)) {
+    $groupsList[] = [
+        'name'    => (string)($g['name'] ?? ''),
+        'members' => (int)($g['members'] ?? 0),
+    ];
+}
+
+$serviceCount = 0;
+foreach ($usersList as $u) {
+    if (!empty($u['isService'])) { $serviceCount++; }
+}
+
+$usersPayload = [
+    'users'        => $usersList,
+    'groups'       => $groupsList,
+    'activeCount'  => $activeCount,
+    'serviceCount' => $serviceCount,
+];
+$usersJson = json_encode($usersPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -101,7 +258,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-users="<?php echo attr($usersJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

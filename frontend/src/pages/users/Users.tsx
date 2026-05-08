@@ -56,6 +56,13 @@ type GroupRow = {
   readonly members: number;
 };
 
+export type UsersPayload = {
+  readonly users: readonly UserRow[];
+  readonly groups: readonly GroupRow[];
+  readonly activeCount: number;
+  readonly serviceCount: number;
+};
+
 const SIDEBAR: readonly SidebarGroup[] = [
   {
     label: 'Users & Access',
@@ -137,9 +144,10 @@ const TABS: ReadonlyArray<{ readonly key: TabKey; readonly label: string }> = [
 
 type UsersProps = {
   readonly boot: BootContext;
+  readonly payload: UsersPayload;
 };
 
-export function Users(_props: UsersProps): JSX.Element {
+export function Users({ payload }: UsersProps): JSX.Element {
   const [tab, setTab]                 = useState<TabKey>('users');
   const [q, setQ]                     = useState<string>('');
   const [roleFilter, setRoleFilter]   = useState<RoleFilter>('any');
@@ -147,13 +155,16 @@ export function Users(_props: UsersProps): JSX.Element {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [mfaFilter, setMfaFilter]     = useState<MfaFilter>('any');
 
-  // Header counts always reflect the full demo set, not the active filter.
-  const activeCount  = ALL_USERS.filter((u) => u.active && !u.isService).length;
-  const groupsCount  = ALL_GROUPS.length;
-  const serviceCount = ALL_USERS.filter((u) => u.isService).length;
+  // Live data when present, demo otherwise — payload.users / payload.groups
+  // come from the wrapper's DB query.
+  const allUsers: readonly UserRow[] = payload.users.length > 0 ? payload.users : ALL_USERS;
+  const allGroups: readonly GroupRow[] = payload.groups.length > 0 ? payload.groups : ALL_GROUPS;
+  const activeCount  = payload.users.length > 0 ? payload.activeCount : ALL_USERS.filter((u) => u.active && !u.isService).length;
+  const groupsCount  = allGroups.length;
+  const serviceCount = payload.users.length > 0 ? payload.serviceCount : ALL_USERS.filter((u) => u.isService).length;
 
   const visibleUsers = useMemo<readonly UserRow[]>(() => {
-    return ALL_USERS.filter((u) => {
+    return allUsers.filter((u) => {
       // Tab gating: services tab only shows services; users tab hides services.
       if (tab === 'users'    && u.isService) return false;
       if (tab === 'services' && !u.isService) return false;
@@ -304,7 +315,7 @@ export function Users(_props: UsersProps): JSX.Element {
                   aria-label="Group"
                 >
                   <option value="">All</option>
-                  {ALL_GROUPS.map((g) => (
+                  {allGroups.map((g) => (
                     <option key={g.name} value={g.name}>{g.name}</option>
                   ))}
                 </select>
@@ -432,7 +443,7 @@ export function Users(_props: UsersProps): JSX.Element {
                     </tr>
                   </thead>
                   <tbody>
-                    {ALL_GROUPS.map((g) => (
+                    {allGroups.map((g) => (
                       <tr key={g.name}>
                         <td className={styles.userName}>{g.name}</td>
                         <td className={styles.muted}>{g.members}</td>
