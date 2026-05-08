@@ -1,0 +1,378 @@
+/*
+ * VisitHistory — page-specific styles. Values verified against Figma node
+ * 73:2 (Screen 30 — Visit History) on 2026-05-07. Mirrors the styling
+ * previously defined inline at /interface/patient_file/encounter/copilot_visit_history.php
+ * (preserved at copilot_visit_history.php.bak).
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_visit_history.php.
+ * This file owns only VisitHistory-component styles.
+ */
+
+/* ── Page header ── */
+.pageHead {
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.dot {
+  color: #C9CDD4;
+  font-size: 14px;
+  line-height: 1;
+}
+.metaLight {
+  color: #8A91A1;
+  font-size: 12px;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  text-decoration: none;
+}
+.btnGhost {
+  background: #FFFFFF;
+  color: #4F5763;
+  border-color: #E4E5E8;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+.btnPrimary:hover { background: #00787A; }
+.btnIc {
+  font-size: 11px;
+  opacity: 0.85;
+  margin-right: 1px;
+}
+.btnPlus {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ── Content wrapper ── */
+.content {
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── Filter row ── */
+.filter {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+.search {
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 36px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 220px;
+}
+.searchIc {
+  color: #8A91A1;
+  font-size: 13px;
+  line-height: 1;
+}
+.search input {
+  border: none;
+  background: transparent;
+  outline: none;
+  flex: 1;
+  font-size: 12px;
+  color: #0D1B2A;
+  font-family: inherit;
+}
+.search input::placeholder { color: #8A91A1; }
+
+.dd {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 36px;
+  padding: 4px 28px 4px 12px;
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  position: relative;
+  min-width: 120px;
+  flex: 0 0 auto;
+}
+.ddLbl {
+  font-size: 9px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+  letter-spacing: 0.2px;
+}
+.ddVal {
+  font-size: 12px;
+  font-weight: 500;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.dd::after {
+  content: '';
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid #8A91A1;
+  border-bottom: 1.5px solid #8A91A1;
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+.ddSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  appearance: none;
+  font-family: inherit;
+}
+
+.clear {
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.clear:hover { text-decoration: underline; }
+
+/* ── Visit-history table ── */
+.tbl {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.tbl table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.tbl thead {
+  background: #F5F6F7;
+}
+.tbl th {
+  padding: 11px 16px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.tbl td {
+  padding: 14px 16px;
+  border-bottom: 1px solid #F0F1F3;
+  vertical-align: middle;
+}
+.tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+.cellDate   { color: #0D1B2A; font-weight: 500; }
+.cellTime   { color: #4F5763; }
+.cellType   { color: #0D1B2A; font-weight: 500; }
+.cellProv   { color: #4F5763; }
+.cellReason { color: #4F5763; }
+.cellDur    { color: #4F5763; }
+
+/* ── Status pills ── */
+.pillSigned {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #EBF8F0;
+  color: #1F8C4D;
+  border-radius: 999px;
+  padding: 3px 10px 3px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pillSignedDot {
+  width: 12px;
+  height: 12px;
+  background: #1F8C4D;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  flex: 0 0 auto;
+}
+.pillInfo {
+  display: inline-block;
+  background: #F0F4F9;
+  color: #4785D9;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pillWarn {
+  display: inline-block;
+  background: #FFF8EC;
+  color: #FA8C33;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+.pillBilled {
+  display: inline-block;
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 999px;
+  padding: 3px 11px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+.dash {
+  color: #C9CDD4;
+  font-size: 11px;
+}
+
+/* ── Open link + kebab cell ── */
+.cellOpen {
+  white-space: nowrap;
+  text-align: left;
+  padding-right: 8px !important;
+}
+.openLink {
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.openLink:hover { text-decoration: underline; }
+.kebab {
+  display: inline-block;
+  color: #8A91A1;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  margin-left: 12px;
+  cursor: not-allowed;
+  border-radius: 4px;
+  vertical-align: middle;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+}
+
+/* ── Footer / pagination ── */
+.footer {
+  display: flex;
+  align-items: center;
+  padding: 4px 4px 0;
+  font-size: 12px;
+  color: #8A91A1;
+}
+.footerLeft { flex: 1; }
+.pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.pg {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #4F5763;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+  padding: 0 6px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  font-family: inherit;
+}
+.pg:hover { background: #F5F6F7; }
+.pgActive {
+  background: #008C8C;
+  color: #FFFFFF;
+  border-color: #008C8C;
+  font-weight: 600;
+}
+.pgActive:hover { background: #008C8C; }
+.pagerNav {
+  color: #4F5763;
+  font-size: 11px;
+  padding: 0 6px;
+  line-height: 22px;
+  cursor: pointer;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+}
+.pagerNav:hover:not(:disabled) { color: #0D1B2A; }
+.pagerNavDisabled {
+  color: #C9CDD4;
+  cursor: not-allowed;
+}

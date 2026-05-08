@@ -1,0 +1,346 @@
+/*
+ * Authorizations — page-specific styles. Values verified against Figma node
+ * 79:2 (Screen 34 — Authorizations) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_authorizations.php —
+ * this file owns only Authorizations-component styles.
+ */
+
+/* ── Page header (full width — matches the Figma intent and the user's
+ *    standing rule that headers span full width edge to edge) ── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.titleBlock {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.meta {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btnGhost {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  color: #4F5763;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnIcon { font-size: 12px; }
+
+.btnPrimary {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: #008C8C;
+  border: none;
+  color: #FFFFFF;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.helpPill {
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #F5F6F7;
+  border: none;
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+.helpPill:hover { background: #E4E5E8; }
+
+.divider {
+  width: 100%;
+  height: 1px;
+  background: #E4E5E8;
+}
+
+/* ── Main content ── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip — single bordered card with 5 cells separated by 1px lines ── */
+.kpiCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 72px;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  position: relative;
+}
+.kpiCell {
+  padding: 11px 23px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kpiSeparator {
+  position: absolute;
+  right: 0;
+  top: 16px;
+  width: 1px;
+  height: 40px;
+  background: #E4E5E8;
+}
+.kpiLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+}
+.kpiRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.kpiVal {
+  font-size: 22px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1.1;
+}
+.kpiOrange { color: #FA8C33; }
+.kpiGreen  { color: #33A666; }
+.kpiRed    { color: #D93838; }
+.kpiUnit {
+  font-size: 14px;
+  font-weight: 600;
+  color: #181D26;
+}
+.kpiSub {
+  font-size: 11px;
+  color: #4F5763;
+  font-weight: 400;
+  line-height: 1;
+}
+.kpiDown {
+  color: #33A666;
+  font-weight: 600;
+}
+
+/* ── Filter strip ── */
+.filterBar {
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search {
+  flex: 0 0 300px;
+  height: 32px;
+  background: #F5F6F7;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 11px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.searchIcon { font-size: 13px; line-height: 1; }
+.search input {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font: inherit;
+  font-size: 13px;
+  color: #181D26;
+  flex: 1;
+  min-width: 0;
+}
+.search input::placeholder { color: #8A91A1; }
+
+.sel {
+  height: 32px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 0 9px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  position: relative;
+  cursor: pointer;
+}
+.selLbl {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A91A1;
+  line-height: 1;
+}
+.selVal {
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1.2;
+}
+.selCaret {
+  position: absolute;
+  right: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #8A91A1;
+  font-size: 11px;
+  line-height: 1;
+}
+
+/* ── Table card ── */
+.tableCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+.table thead tr {
+  background: #F9FAFB;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table th {
+  text-align: left;
+  height: 40px;
+  padding: 0 16px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.table tbody tr {
+  height: 42px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table tbody tr:last-child { border-bottom: none; }
+.table tbody tr.rowAlt { background: #FAFBFC; }
+.table td {
+  padding: 0 16px;
+  font-size: 13px;
+  color: #181D26;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.cb {
+  width: 48px;
+  padding-left: 16px !important;
+  padding-right: 0 !important;
+}
+.cb16 {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.act {
+  width: 56px;
+  text-align: right;
+  padding-left: 0 !important;
+  padding-right: 16px !important;
+}
+.kebab {
+  display: inline-block;
+  color: #8A91A1;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.kebab:hover { background: #F5F6F7; color: #181D26; }
+
+.authnum {
+  color: #008C8C;
+  font-weight: 500;
+  font-size: 12px;
+}
+.patient {
+  font-weight: 600;
+  color: #181D26;
+}
+.payer { color: #181D26; }
+.service { color: #4F5763; }
+.cpt { color: #4F5763; font-size: 12px; }
+.due { color: #181D26; font-size: 12px; }
+.muted { color: #4F5763; font-size: 12px; }
+
+/* ── Status pills ── */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pillGood {
+  background: #E8F7ED;
+  color: #33A666;
+}
+.pillWarn {
+  background: #FFF4EA;
+  color: #FA8C33;
+}
+.pillDanger {
+  background: #FCEAEA;
+  color: #D93838;
+}
+.pillNeutral {
+  background: #F5F6F7;
+  color: #4F5763;
+}

@@ -1,0 +1,489 @@
+/*
+ * ImmunizationRegistry — page-specific styles. Values verified against
+ * Figma node 96:2 (Screen 47 — Immunization Registry) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at
+ * copilot_immunization_registry.php — this file owns only
+ * ImmunizationRegistry-component styles.
+ *
+ * The navy top nav is intentionally not rendered (per migration brief).
+ */
+
+/* ── Shell: left side rail + main column. ───────────────────────────── */
+.shell {
+  display: flex;
+  width: 100%;
+  min-height: 100%;
+  background: #F5F6F7;
+}
+
+.side {
+  flex: 0 0 200px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 16px 0 24px;
+  overflow-y: auto;
+}
+.sideHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.7px;
+  padding: 0 16px 12px;
+}
+.sideGroup { margin-bottom: 8px; }
+.sideGroupLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  padding: 8px 16px 4px;
+  letter-spacing: 0.2px;
+}
+.sideItem {
+  display: block;
+  margin: 0 8px;
+  padding: 9px 16px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  text-decoration: none;
+  line-height: 1.2;
+}
+.sideItem:hover { background: #F5F6F7; color: #0D1B2A; }
+.sideItemActive,
+.sideItemActive:hover {
+  background: #E6F5F5;
+  color: #008C8C;
+  font-weight: 600;
+}
+
+/* ── Main column. ───────────────────────────────────────────────────── */
+.main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Page header — full width per standing rule, with bottom hairline. */
+.pagehead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 24px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+}
+.titleRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.metaLight {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.headSpacer { flex: 1 1 auto; }
+
+.btnGhost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.btnGhost:hover { background: #F5F6F7; }
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 14px;
+  background: #008C8C;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #FFFFFF;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+/* ── Content area. ──────────────────────────────────────────────────── */
+.content {
+  padding: 18px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Coverage tiles: 3×2 grid. ──────────────────────────────────────── */
+.covGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 20px;
+}
+.covCard {
+  position: relative;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 92px;
+  padding: 15px;
+}
+.covName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.covSub {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+  margin-top: 6px;
+}
+.covDenom {
+  position: absolute;
+  left: 15px;
+  top: 51px;
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+}
+.pct {
+  position: absolute;
+  right: 15px;
+  top: 28px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+.pctWarn { color: #FA8C33; }
+.pctInfo { color: #4785D9; }
+.pctGood { color: #33A666; }
+
+.gpill {
+  position: absolute;
+  right: 15px;
+  top: 14px;
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  display: inline-block;
+}
+.gpillWarn { background: #FFF4EA; color: #FA8C33; }
+.gpillInfo { background: #EAF1FC; color: #4785D9; }
+.gpillGood { background: #E8F7ED; color: #33A666; }
+
+.barBg {
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  bottom: 15px;
+  height: 6px;
+  border-radius: 3px;
+  background: #F5F6F7;
+}
+.barFill {
+  position: absolute;
+  left: 15px;
+  bottom: 15px;
+  height: 6px;
+  border-radius: 3px;
+}
+.fillWarn { background: #FA8C33; }
+.fillInfo { background: #4785D9; }
+.fillGood { background: #33A666; }
+
+/* ── Two-column layout for due-list + right rail. ───────────────────── */
+.cols {
+  display: grid;
+  grid-template-columns: 1fr 448px;
+  gap: 20px;
+  align-items: start;
+}
+
+/* ── Patients-due panel. ────────────────────────────────────────────── */
+.duePanel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.dueLbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  padding: 15px 19px 0;
+  line-height: 1;
+}
+.dueTabs {
+  display: flex;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid #E4E5E8;
+  gap: 4px;
+}
+.tab {
+  position: relative;
+  padding: 7px 12px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  background: transparent;
+  border: 0;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tabActive {
+  color: #008C8C;
+  font-weight: 600;
+}
+.tabActive::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 1px;
+  background: #008C8C;
+}
+.tabCt {
+  color: #8A91A1;
+  font-weight: 500;
+  margin-left: 4px;
+}
+.tabActive .tabCt { color: #008C8C; }
+
+.dueRow {
+  display: grid;
+  grid-template-columns: 24px 140px 64px 40px 1fr 96px 80px;
+  align-items: center;
+  height: 44px;
+  padding: 0 19px 0 20px;
+  gap: 0;
+}
+.dueRowAlt { background: #FAFBFC; }
+
+.av {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: #FFFFFF;
+}
+.avTeal   { background: #008C8C; }
+.avBlue   { background: #4785D9; }
+.avPurple { background: #8561C7; }
+.avOrange { background: #FA8C33; }
+.avGreen  { background: #33A666; }
+.avPink   { background: #D9668C; }
+.avMint   { background: #33A68C; }
+.avViolet { background: #8561C7; }
+
+.dueName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dueMrn {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.dueDem {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+}
+.dueVac {
+  font-size: 12px;
+  color: #181D26;
+  line-height: 1;
+}
+
+.pill {
+  height: 18px;
+  border-radius: 9px;
+  padding: 0 8px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  display: inline-block;
+  white-space: nowrap;
+}
+.pillDanger  { background: #FCEAEA; color: #D93838; }
+.pillWarn    { background: #FFF4EA; color: #FA8C33; }
+.pillNeutral { background: #F5F6F7; color: #4F5763; }
+
+.sched {
+  font-size: 12px;
+  font-weight: 600;
+  color: #008C8C;
+  text-decoration: none;
+  line-height: 1;
+  text-align: right;
+}
+.sched:hover { text-decoration: underline; }
+
+/* ── Right rail. ────────────────────────────────────────────────────── */
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.panelCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 15px 19px 16px;
+}
+.plbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  line-height: 1;
+}
+
+/* TX-DSHS sync card. */
+.syncRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #181D26;
+  line-height: 1;
+}
+.syncDot {
+  width: 8px;
+  height: 8px;
+  background: #1F8C4D;
+  border-radius: 50%;
+}
+.syncMeta {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.forceBtn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  height: 32px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 30px;
+  text-align: center;
+  cursor: pointer;
+  font-family: inherit;
+}
+.forceBtn:hover { background: #F5F6F7; }
+
+/* Monthly chart card. */
+.monthCard { padding-bottom: 18px; }
+.sub2 {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1;
+  margin-top: 6px;
+}
+.chart {
+  position: relative;
+  height: 280px;
+  margin-top: 14px;
+  padding: 0 4px;
+}
+.bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 220px;
+}
+.col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+}
+.num {
+  font-size: 10px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+  height: 12px;
+}
+.bar {
+  width: 100%;
+  border-radius: 4px;
+  min-height: 0;
+}
+.barTeal   { background: #008C8C; }
+.barOrange { background: #FA8C33; }
+
+.axis {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.axisLab {
+  flex: 1;
+  text-align: center;
+  font-size: 10px;
+  color: #8A91A1;
+  line-height: 1;
+}
+.caption {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+  margin-top: 12px;
+}

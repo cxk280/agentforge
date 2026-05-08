@@ -1,0 +1,191 @@
+/*
+ * ExternalData — page-specific styles. Values verified against Figma node
+ * 40:2 (Screen 19 — External Data) on 2026-05-07. Patient-context page; the
+ * navy top nav and demographics banner are rendered by the outer OpenEMR
+ * shell — only the page header + body live here.
+ *
+ * Global scaffolding (html/body resets, body bg color, Inter font, and
+ * #cp-root sizing) lives in the PHP wrapper at copilot_external_data.php.
+ */
+
+/* ── Page header ─────────────────────────────────────────────────────────── */
+.head {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex; align-items: center; gap: 12px;
+}
+.title { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+
+.pill {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: #4F5763;
+  line-height: 1;
+  display: inline-flex; align-items: center; gap: 6px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.pill:hover { background: #F5F6F7; }
+
+.primary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  font-size: 12px; font-weight: 600;
+  line-height: 1;
+  display: inline-flex; align-items: center; gap: 6px;
+  cursor: pointer;
+}
+.primary:hover { background: #00787A; }
+
+/* ── Body layout ─────────────────────────────────────────────────────────── */
+.body {
+  padding: 20px 24px 32px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── Source connection cards (4-up grid) ─────────────────────────────────── */
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.sourceCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.sourceTop { display: flex; align-items: center; gap: 10px; }
+.sourceIcon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px;
+  flex: 0 0 auto;
+}
+.iconGood   { background: rgba(51, 166, 102, 0.14); }
+.iconInfo   { background: rgba(71, 133, 217, 0.14); }
+.iconViolet { background: rgba(133, 97, 199, 0.14); }
+.iconWarn   { background: rgba(250, 140, 51, 0.14); }
+
+.sourceName {
+  font-size: 13px; font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.sourceStatus {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 500;
+  line-height: 1;
+  margin-top: 1px;
+}
+.statusGood { color: #33A666; }
+.statusWarn { color: #FA8C33; }
+.dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+  background: currentColor;
+}
+.sourceSub { font-size: 11px; color: #8A91A1; line-height: 1; }
+.sourceStats { display: flex; align-items: baseline; gap: 4px; }
+.sourceNum { font-size: 18px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.sourceLbl { font-size: 12px; color: #8A91A1; }
+
+/* ── Recent imports card ─────────────────────────────────────────────────── */
+.impCard {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.impHead {
+  height: 48px;
+  padding: 0 22px;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex; align-items: center; gap: 12px;
+}
+.impTitle { font-size: 13px; font-weight: 600; color: #0D1B2A; line-height: 1; }
+.impLink {
+  font-size: 11px; font-weight: 500;
+  color: #008C8C;
+  line-height: 1;
+  cursor: pointer;
+}
+.impRow {
+  height: 72px;
+  padding: 0 22px;
+  border-bottom: 0.5px solid #E4E5E8;
+  display: flex; align-items: center; gap: 16px;
+}
+.impRowLast { border-bottom: none; }
+.impIcon {
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  flex: 0 0 auto;
+}
+.impInfo {
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 0;
+}
+.impTitleRow { display: inline-flex; align-items: center; gap: 8px; }
+.impRowTitle {
+  font-size: 13px; font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.typePill {
+  background: #F5F6F7;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px; font-weight: 500;
+  color: #4F5763;
+  line-height: 1.4;
+}
+.impSub { font-size: 11px; color: #8A91A1; line-height: 1.2; }
+
+.statusPill {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px; font-weight: 600;
+  line-height: 1;
+  display: inline-flex; align-items: center;
+}
+.pillGood { background: rgba(51, 166, 102, 0.14); color: #33A666; }
+.pillWarn { background: rgba(250, 140, 51, 0.14); color: #FA8C33; }
+
+.action {
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px; font-weight: 500;
+  line-height: 1;
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+}
+.actionSecondary {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border-color: #E4E5E8;
+}
+.actionSecondary:hover { background: #F5F6F7; }
+.actionPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  font-weight: 600;
+}
+.actionPrimary:hover { background: #00787A; }
