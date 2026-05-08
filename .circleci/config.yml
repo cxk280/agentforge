@@ -209,13 +209,29 @@ commands:
             fi
 
             # 3. Re-register the OAuth client. Idempotent.
+            #
+            # Two-sided check — must see a positive registration marker
+            # AND must NOT see any of the failure tells. The previous
+            # version only printed a warning and proceeded; that let an
+            # entirely-empty openemr DB pass smoke (the body was just
+            # "SQL Statement failed on preparation: ..." which didn't
+            # match the lenient grep). 2026-05-07.
             curl -fsS -b "$COOKIES" -o /tmp/openemr-smoke/api-enable.html \
                 "$BASE/interface/super/copilot_enable_api.php?confirm=1"
-            if ! grep -q "OAuth client" /tmp/openemr-smoke/api-enable.html 2>/dev/null \
-                && ! grep -q "enabled" /tmp/openemr-smoke/api-enable.html 2>/dev/null \
-                && ! grep -qi "ok\|done\|registered" /tmp/openemr-smoke/api-enable.html 2>/dev/null; then
-              echo "⚠ copilot_enable_api.php did not return a confirmation marker — review the artifact"
-              # not fatal — the script may have changed its output format
+
+            if grep -qE "SQL Statement failed|Table .* doesn'?t exist|Authentication Error|Admin access required" \
+                 /tmp/openemr-smoke/api-enable.html; then
+              echo "✗ copilot_enable_api.php returned a database/auth error — see artifact" >&2
+              echo "    head of body:" >&2
+              head -c 400 /tmp/openemr-smoke/api-enable.html >&2 || true
+              echo >&2
+              exit 1
+            fi
+
+            if ! grep -qE "REGISTERED agent OAuth client|REFRESHED agent OAuth client" \
+                 /tmp/openemr-smoke/api-enable.html; then
+              echo "✗ copilot_enable_api.php did not REGISTER or REFRESH the agent client — see artifact" >&2
+              exit 1
             fi
 
             echo "✓ OpenEMR smoke passed for $BASE"
@@ -360,7 +376,7 @@ jobs:
       - run-evals:
           endpoint: "https://copilot-agent-qa.up.railway.app/chat"
           smoke: false
-          min_pass: 23
+          min_pass: 46
 
   deploy-agent-prod:
     executor: railway
@@ -385,7 +401,7 @@ jobs:
       - run-evals:
           endpoint: "https://copilot-agent-production-41de.up.railway.app/chat"
           smoke: false
-          min_pass: 23
+          min_pass: 46
 
   # ─── OpenEMR lane ────────────────────────────────────────────────────
   #
