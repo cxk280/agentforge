@@ -54,6 +54,99 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live facilities — admin scope. Each row becomes a sidebar card; the first
+// active row is auto-selected. The right-rail edit form / hours / capabilities
+// stay demo-mode for now (those tables aren't part of OpenEMR's `facility`).
+// ---------------------------------------------------------------------------
+
+$facilityList = [];
+$facilityCount = 0;
+$activeFacilityCount = 0;
+
+$rs = sqlStatement(
+    "SELECT id, name, street, city, state, postal_code, country_code, phone,
+            COALESCE(billing_location, 0) AS billing_location,
+            COALESCE(accepts_assignment, 0) AS accepts_assignment,
+            COALESCE(primary_business_entity, 0) AS primary_business_entity,
+            COALESCE(service_location, 0) AS service_location,
+            COALESCE(inactive, 0) AS inactive,
+            COALESCE(facility_npi, '') AS facility_npi
+       FROM facility
+      ORDER BY (primary_business_entity = 1) DESC, inactive ASC, name ASC"
+);
+while ($r = sqlFetchArray($rs)) {
+    $name = (string)($r['name'] ?? '');
+    if ($name === '') { continue; }
+
+    $isPrimary  = (int)($r['primary_business_entity'] ?? 0) === 1;
+    $isInactive = (int)($r['inactive'] ?? 0) === 1;
+
+    // Build a "Sub" line: prefer street + city/state, fall back to "Virtual"
+    // if both are empty. Service-location/billing tags are appended.
+    $street = trim((string)($r['street'] ?? ''));
+    $city   = trim((string)($r['city'] ?? ''));
+    $state  = trim((string)($r['state'] ?? ''));
+    $cityState = $city !== '' ? ($city . ($state !== '' ? ', ' . $state : '')) : $state;
+    if ($street !== '' && $cityState !== '') {
+        $address = $street . ', ' . $cityState;
+    } elseif ($street !== '') {
+        $address = $street;
+    } elseif ($cityState !== '') {
+        $address = $cityState;
+    } else {
+        $address = '';
+    }
+
+    $tags = [];
+    if ($isPrimary) {
+        $tags[] = 'Main';
+    } elseif ((int)($r['service_location'] ?? 0) === 1) {
+        $tags[] = 'Service';
+    } else {
+        $tags[] = 'Satellite';
+    }
+    if ((int)($r['billing_location'] ?? 0) === 1) {
+        $tags[] = 'Billing';
+    }
+    $sub = implode(' · ', array_filter([
+        implode(' · ', $tags),
+        $address !== '' ? $address : ($isInactive ? 'Inactive' : 'No address on file'),
+    ]));
+
+    if ($isInactive) {
+        $pillLabel = 'Inactive';
+        $pillTone  = 'neutral';
+    } elseif ($isPrimary) {
+        $pillLabel = "\u{2B50} Primary";
+        $pillTone  = 'primary';
+    } else {
+        $pillLabel = 'Active';
+        $pillTone  = 'good';
+    }
+
+    $facilityList[] = [
+        'id'        => 'fac-' . (int)$r['id'],
+        'dbId'      => (int)$r['id'],
+        'name'      => $name,
+        'sub'       => $sub,
+        'pillLabel' => $pillLabel,
+        'pillTone'  => $pillTone,
+        'phone'     => (string)($r['phone'] ?? ''),
+        'npi'       => (string)($r['facility_npi'] ?? ''),
+        'inactive'  => $isInactive,
+    ];
+    $facilityCount++;
+    if (!$isInactive) { $activeFacilityCount++; }
+}
+
+$facilitiesPayload = [
+    'facilities'          => $facilityList,
+    'facilityCount'       => $facilityCount,
+    'activeFacilityCount' => $activeFacilityCount,
+];
+$facilitiesJson = json_encode($facilitiesPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -99,7 +192,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-facilities="<?php echo attr($facilitiesJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

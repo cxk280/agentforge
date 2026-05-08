@@ -37,6 +37,12 @@ type FacilityCard = {
   readonly pillTone: FacilityPillTone;
 };
 
+export type FacilitiesPayload = {
+  readonly facilities: readonly FacilityCard[];
+  readonly facilityCount: number;
+  readonly activeFacilityCount: number;
+};
+
 type ServiceHour = {
   readonly day: string;
   readonly value: string;
@@ -162,15 +168,21 @@ const PILL_TONE_CLASS: Record<FacilityPillTone, string> = {
 
 type FacilitiesProps = {
   readonly boot: BootContext;
+  readonly payload: FacilitiesPayload;
 };
 
-export function Facilities(_props: FacilitiesProps): JSX.Element {
-  const [selectedId, setSelectedId] = useState<string>('rfm-main');
+export function Facilities({ payload }: FacilitiesProps): JSX.Element {
+  // Live facilities when present, demo otherwise.
+  const facilities: readonly FacilityCard[] = payload.facilities.length > 0
+    ? payload.facilities
+    : FACILITIES;
+  const initialId = facilities[0]?.id ?? 'rfm-main';
+  const [selectedId, setSelectedId] = useState<string>(initialId);
   const [capState, setCapState] = useState<ReadonlyMap<string, boolean>>(
     () => new Map(CAPABILITIES.map((c) => [c.slug, c.checked])),
   );
 
-  const selected = FACILITIES.find((f) => f.id === selectedId) ?? FACILITIES[0]!;
+  const selected = facilities.find((f) => f.id === selectedId) ?? facilities[0]!;
 
   const toggleCap = (slug: string): void => {
     setCapState((prev) => {
@@ -207,7 +219,7 @@ export function Facilities(_props: FacilitiesProps): JSX.Element {
             <div className={styles.pageheadTitle}>Facilities</div>
             <span className={styles.pageheadDot}>•</span>
             <div className={styles.pageheadMeta}>
-              {FACILITIES.length} facilities · 1 selected for edit
+              {facilities.length} facilities · 1 selected for edit
             </div>
             <span className={styles.pageheadSpacer} />
             <button type="button" className={styles.newBtn}>+ New facility</button>
@@ -217,7 +229,7 @@ export function Facilities(_props: FacilitiesProps): JSX.Element {
 
             <div className={styles.list}>
               <div className={styles.listLabel}>PRACTICE FACILITIES</div>
-              {FACILITIES.map((f) => {
+              {facilities.map((f) => {
                 const isActive = f.id === selectedId;
                 const cardCls = isActive
                   ? `${styles.card} ${styles.cardActive}`
