@@ -56,6 +56,79 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($_SESSION['authUserID'] ?? '');
 $patientId   = (string)($_SESSION['pid'] ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live patient roster — preserves the behavior of the pre-React PHP page
+// (copilot_finder.php.bak). Same JOIN to users + scalar subqueries; React
+// renders the result and handles search / filter / pagination client-side.
+// ---------------------------------------------------------------------------
+
+$roster_sql = "SELECT
+    pd.pid, pd.pubpid, pd.fname, pd.lname, pd.DOB, pd.providerID,
+    NULLIF(TRIM(CONCAT(COALESCE(u.fname, ''), ' ', COALESCE(u.lname, ''))), '') AS provider_name,
+    (SELECT plan_name FROM insurance_data
+       WHERE pid = pd.pid AND type='primary' ORDER BY date DESC LIMIT 1) AS insurance,
+    (SELECT MAX(date) FROM form_encounter WHERE pid = pd.pid) AS last_visit,
+    (SELECT title FROM lists
+       WHERE pid = pd.pid AND type='allergy' AND activity=1 ORDER BY id LIMIT 1) AS top_allergy,
+    (SELECT COUNT(*) FROM lists
+       WHERE pid = pd.pid AND type='allergy' AND activity=1) AS allergy_count,
+    (SELECT title FROM lists
+       WHERE pid = pd.pid AND type='medical_problem' AND activity=1 ORDER BY id LIMIT 1) AS top_condition,
+    (SELECT COUNT(*) FROM lists
+       WHERE pid = pd.pid AND type='medical_problem' AND activity=1) AS condition_count,
+    (pd.deceased_date IS NULL OR pd.deceased_date = '0000-00-00 00:00:00') AS is_active
+  FROM patient_data pd
+  LEFT JOIN users u ON u.id = pd.providerID
+  ORDER BY pd.lname, pd.fname
+  LIMIT 200";
+
+$roster = [];
+$result = sqlStatement($roster_sql);
+while ($row = sqlFetchArray($result)) {
+    $age = null;
+    $dob_str = (string)($row['DOB'] ?? '');
+    if ($dob_str !== '' && $dob_str !== '0000-00-00') {
+        try {
+            $dob = new DateTime($dob_str);
+            $age = (int)$dob->diff(new DateTime('now'))->y;
+        } catch (Throwable $_) {
+            $age = null;
+        }
+    }
+    $last_visit = (string)($row['last_visit'] ?? '');
+    $today = date('Y-m-d');
+    $last_visit_label = '';
+    $is_today = false;
+    if ($last_visit !== '' && $last_visit !== '0000-00-00 00:00:00') {
+        $is_today = str_starts_with($last_visit, $today);
+        try {
+            $last_visit_label = (new DateTime($last_visit))->format('M j');
+        } catch (Throwable $_) {
+            $last_visit_label = $last_visit;
+        }
+    }
+
+    $roster[] = [
+        'pid'              => (int)$row['pid'],
+        'mrn'              => '#' . str_pad((string)($row['pubpid'] ?? $row['pid']), 6, '0', STR_PAD_LEFT),
+        'fname'            => (string)($row['fname'] ?? ''),
+        'lname'            => (string)($row['lname'] ?? ''),
+        'name'             => trim((string)($row['lname'] ?? '') . ', ' . (string)($row['fname'] ?? '')),
+        'dob'              => $dob_str !== '' && $dob_str !== '0000-00-00' ? $dob_str : '',
+        'age'              => $age,
+        'providerId'       => (int)($row['providerID'] ?? 0),
+        'providerName'     => (string)($row['provider_name'] ?? ''),
+        'insurance'        => (string)($row['insurance'] ?? ''),
+        'lastVisit'        => $last_visit_label,
+        'isToday'          => $is_today,
+        'topAllergy'       => (string)($row['top_allergy'] ?? ''),
+        'allergyCount'     => (int)($row['allergy_count'] ?? 0),
+        'topCondition'     => (string)($row['top_condition'] ?? ''),
+        'conditionCount'   => (int)($row['condition_count'] ?? 0),
+        'isActive'         => (bool)($row['is_active'] ?? true),
+    ];
+}
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -99,7 +172,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-roster="<?php echo attr((string)json_encode($roster)); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>

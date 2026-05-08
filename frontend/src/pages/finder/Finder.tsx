@@ -1,42 +1,43 @@
-// Finder — Figma "Screen 10 — Patient Finder". Renders the page header
-// (title + spacer + search pill + New Patient button), filter chip row, and
-// results table.
+// Finder — Figma "Screen 10 — Patient Finder".
 //
-// This is a 1:1 port of the visual layer of the PHP-rendered finder
-// previously at /interface/main/finder/copilot_finder.php. The original PHP
-// was DB-backed (queries patient_data + joins for provider/insurance/visits);
-// this React port uses hardcoded demo data matching the Figma mock so the
-// shell can be migrated independently of the data layer. Wiring this back
-// to /apis/copilot/patients (or an equivalent endpoint) is a follow-up.
-//
-// Search state, the active-filter set, and the highlighted row are held in
-// React local state and behave identically to the static Figma frame:
-// search box pre-populated with "Chen", "My panel" + "Active only" chips
-// active, the first row (Margaret Chen) selected, "23 results" count.
+// 1:1 port of the PHP-rendered finder previously at
+// /interface/main/finder/copilot_finder.php (preserved as .bak). DB-backed:
+// the PHP wrapper queries patient_data + JOINs and JSON-encodes the result
+// as data-roster on #cp-root; the entry index.tsx parses it and passes it
+// here as the `roster` prop. Search, filter chips, and selection are held
+// in React local state. Row click → window.parent.navigateTab to
+// demographics.php?set_pid=N (matches the PHP <a href> behavior).
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './Finder.module.css';
+
+// Server-side roster shape (mirrors the PHP query in copilot_finder.php).
+export type RosterPatient = {
+  readonly pid: number;
+  readonly mrn: string;
+  readonly fname: string;
+  readonly lname: string;
+  readonly name: string;
+  readonly dob: string;            // 'YYYY-MM-DD' or ''
+  readonly age: number | null;
+  readonly providerId: number;
+  readonly providerName: string;
+  readonly insurance: string;
+  readonly lastVisit: string;      // 'Apr 12' or ''
+  readonly isToday: boolean;
+  readonly topAllergy: string;
+  readonly allergyCount: number;
+  readonly topCondition: string;
+  readonly conditionCount: number;
+  readonly isActive: boolean;
+};
 
 type FlagKind = 'warn' | 'cond' | 'rx';
 
 type Flag = {
   readonly kind: FlagKind;
   readonly label: string;
-};
-
-type PatientRow = {
-  readonly pid: number;
-  readonly initials: string;
-  readonly avatarColor: string;
-  readonly name: string;
-  readonly mrn: string;
-  readonly dob: string;
-  readonly provider: string;
-  readonly insurance: string;
-  readonly lastVisit: string;
-  readonly today: boolean;
-  readonly flags: readonly Flag[];
 };
 
 type FilterKey = 'my_panel' | 'all_providers' | 'active' | 'ins' | 'recent';
@@ -51,118 +52,47 @@ const COLUMNS: readonly string[] = [
   'FLAGS',
 ];
 
-// Demo data lifted directly from the Figma frame (Screen 10 — Patient Finder).
-const ROWS: readonly PatientRow[] = [
-  {
-    pid: 1,
-    initials: 'MC',
-    avatarColor: '#5FD0D0',
-    name: 'Chen, Margaret',
-    mrn: '#004821',
-    dob: '03/14/1958 (68 yrs)',
-    provider: 'Dr. E. Rivera',
-    insurance: 'Blue Cross PPO',
-    lastVisit: 'Today',
-    today: true,
-    flags: [
-      { kind: 'warn', label: '⚠ Penicillin' },
-      { kind: 'cond', label: '🩺 T2DM' },
-    ],
-  },
-  {
-    pid: 2,
-    initials: 'RC',
-    avatarColor: '#4785D9',
-    name: 'Chen, Robert',
-    mrn: '#005713',
-    dob: '11/02/1971 (54 yrs)',
-    provider: 'Dr. E. Rivera',
-    insurance: 'Aetna PPO',
-    lastVisit: 'Oct 18',
-    today: false,
-    flags: [
-      { kind: 'cond', label: '🩺 HTN' },
-    ],
-  },
-  {
-    pid: 3,
-    initials: 'LC',
-    avatarColor: '#FA8C33',
-    name: 'Chen, Lily',
-    mrn: '#006904',
-    dob: '08/22/1985 (40 yrs)',
-    provider: 'Dr. A. Patel',
-    insurance: 'United HMO',
-    lastVisit: 'Sep 03',
-    today: false,
-    flags: [],
-  },
-  {
-    pid: 4,
-    initials: 'WC',
-    avatarColor: '#8561C7',
-    name: 'Chen, Wei',
-    mrn: '#004112',
-    dob: '01/30/1949 (76 yrs)',
-    provider: 'Dr. E. Rivera',
-    insurance: 'Medicare A+B',
-    lastVisit: 'Aug 28',
-    today: false,
-    flags: [
-      { kind: 'warn', label: '⚠ Sulfa' },
-      { kind: 'cond', label: '🩺 CHF' },
-    ],
-  },
-  {
-    pid: 5,
-    initials: 'JC',
-    avatarColor: '#33A68C',
-    name: 'Chen-Wong, Jasmine',
-    mrn: '#007231',
-    dob: '05/12/1992 (33 yrs)',
-    provider: 'Dr. S. Chen',
-    insurance: 'Cigna PPO',
-    lastVisit: 'Jul 15',
-    today: false,
-    flags: [],
-  },
-  {
-    pid: 6,
-    initials: 'DC',
-    avatarColor: '#D9668C',
-    name: 'Chen, Daniel',
-    mrn: '#005002',
-    dob: '12/04/2003 (22 yrs)',
-    provider: 'Dr. A. Patel',
-    insurance: 'Self Pay',
-    lastVisit: 'May 22',
-    today: false,
-    flags: [
-      { kind: 'rx', label: '💊 Refill due' },
-    ],
-  },
+// Avatar palette mirrors the PHP version; deterministic per-pid pick.
+const AVATAR_PALETTE: readonly string[] = [
+  '#5FD0D0', '#4885D9', '#FA8C33', '#8561C7', '#33A68C', '#D9668C',
 ];
+function avatarColor(pid: number): string {
+  return AVATAR_PALETTE[pid % AVATAR_PALETTE.length] ?? '#5FD0D0';
+}
 
-// Display label for the "Insurance" chip — switches between "Any" and "Yes"
-// depending on whether the chip is active, mirroring the PHP version.
+function initials(fname: string, lname: string): string {
+  const a = fname.charAt(0).toUpperCase();
+  const b = lname.charAt(0).toUpperCase();
+  const i = (a + b).trim();
+  return i !== '' ? i : '?';
+}
+
+function flagsFor(p: RosterPatient): readonly Flag[] {
+  const out: Flag[] = [];
+  if (p.allergyCount > 0 && p.topAllergy !== '') {
+    const label = p.topAllergy.length > 14 ? p.topAllergy.slice(0, 13) + '…' : p.topAllergy;
+    out.push({ kind: 'warn', label: `⚠ ${label}` });
+  }
+  if (p.conditionCount > 0 && p.topCondition !== '') {
+    const label = p.topCondition.length > 14 ? p.topCondition.slice(0, 13) + '…' : p.topCondition;
+    out.push({ kind: 'cond', label: `🩺 ${label}` });
+  }
+  return out;
+}
+
+function dobLabel(p: RosterPatient): string {
+  if (p.dob === '') return '—';
+  const dobFmt = p.dob.replace(/^(\d{4})-(\d{2})-(\d{2}).*/, '$2/$3/$1');
+  return p.age !== null ? `${dobFmt} (${p.age} yrs)` : dobFmt;
+}
+
 function insuranceChipLabel(active: boolean): string {
   return active ? 'Insurance: Yes' : 'Insurance: Any';
 }
 
-// Default state matches the original PHP page (copilot_finder.php.bak):
-// no prepopulated search, no preselected row, only "Active only" filter on.
-// The Figma frame shows "Chen" + Margaret selected as a visual demo of the
-// filtered state — that's design decoration, not initial state.
-const RESULTS_COUNT = ROWS.length;
-const DEFAULT_SEARCH = '';
-const DEFAULT_SELECTED_PID: number | null = null;
-const DEFAULT_FILTERS: ReadonlySet<FilterKey> = new Set<FilterKey>([
-  'active',
-]);
-
 // Reach into the helpers the parent shell defines (interface/main/tabs/js/
-// tabs_view_model.js). Finder runs INSIDE the #maimain iframe, so the helpers
-// live on `window.parent` (the shell), not on the iframe's own `window`.
+// tabs_view_model.js). Finder runs INSIDE the #maimain iframe, so the
+// helpers live on `window.parent` (the shell), not on `window`.
 type Win = Window & {
   navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
   activateTabByName?: (name: string, hideOthers?: boolean) => void;
@@ -177,30 +107,49 @@ function openDemographics(pid: number): void {
   const webroot = parent.webroot_url ?? top.webroot_url ?? self.webroot_url ?? '';
   const url = `${webroot}/interface/patient_file/summary/demographics.php?set_pid=${pid}`;
 
-  // Prefer the shell-level helpers — they update the tab viewmodel + show the
-  // demographics banner ("header2") + unlock the patient nav menu.
   const navigateTab = parent.navigateTab ?? top.navigateTab;
   const activateTabByName = parent.activateTabByName ?? top.activateTabByName;
   if (typeof navigateTab === 'function') {
-    navigateTab(url, 'pat', () => {
-      activateTabByName?.('pat', true);
-    });
+    navigateTab(url, 'pat', () => activateTabByName?.('pat', true));
     return;
   }
-
-  // Fallback: navigate just THIS iframe (preserves the parent shell + nav).
-  // Never replace window.top — that would destroy the navy header.
+  // Last resort: navigate just THIS iframe — never window.top.
   self.location.href = url;
 }
 
 type FinderProps = {
   readonly boot: BootContext;
+  readonly roster: readonly RosterPatient[];
 };
 
-export function Finder(_props: FinderProps): JSX.Element {
-  const [query, setQuery] = useState<string>(DEFAULT_SEARCH);
-  const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(DEFAULT_FILTERS);
-  const [selectedPid, setSelectedPid] = useState<number | null>(DEFAULT_SELECTED_PID);
+export function Finder({ roster }: FinderProps): JSX.Element {
+  // Default state matches the PHP `?q=` empty + `?active=1` defaults.
+  const [query, setQuery] = useState<string>('');
+  const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(
+    new Set<FilterKey>(['active']),
+  );
+  const [selectedPid, setSelectedPid] = useState<number | null>(null);
+
+  const insActive = filters.has('ins');
+  const onlyActive = filters.has('active');
+  const onlyMyPanel = filters.has('my_panel');
+  const onlyRecent = filters.has('recent');
+  const currentUserId = Number.parseInt(useBootUserId(), 10) || 0;
+
+  const visibleRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return roster.filter((p) => {
+      if (onlyActive && !p.isActive) return false;
+      if (onlyMyPanel && p.providerId !== currentUserId) return false;
+      if (insActive && p.insurance.trim() === '') return false;
+      if (onlyRecent && p.lastVisit === '') return false;
+      if (q !== '') {
+        const hay = `${p.name} ${p.fname} ${p.lname} ${p.mrn}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [roster, query, onlyActive, onlyMyPanel, onlyRecent, insActive, currentUserId]);
 
   const onRowClick = (pid: number): void => {
     setSelectedPid(pid);
@@ -217,13 +166,12 @@ export function Finder(_props: FinderProps): JSX.Element {
     setFilters(next);
   };
 
-  const insActive = filters.has('ins');
   const chips: readonly { key: FilterKey; label: string }[] = [
-    { key: 'my_panel',       label: 'My panel' },
-    { key: 'all_providers',  label: 'All providers' },
-    { key: 'active',         label: 'Active only' },
-    { key: 'ins',            label: insuranceChipLabel(insActive) },
-    { key: 'recent',         label: 'Last visit ≤ 12 mo' },
+    { key: 'my_panel',      label: 'My panel' },
+    { key: 'all_providers', label: 'All providers' },
+    { key: 'active',        label: 'Active only' },
+    { key: 'ins',           label: insuranceChipLabel(insActive) },
+    { key: 'recent',        label: 'Last visit ≤ 12 mo' },
   ];
 
   return (
@@ -270,7 +218,7 @@ export function Finder(_props: FinderProps): JSX.Element {
             </button>
           );
         })}
-        <span className={styles.resultsCount}>{RESULTS_COUNT} results</span>
+        <span className={styles.resultsCount}>{visibleRows.length} results</span>
       </div>
 
       <div className={styles.tableWrap}>
@@ -281,69 +229,81 @@ export function Finder(_props: FinderProps): JSX.Element {
             ))}
           </div>
 
-          {ROWS.map((r) => {
-            const selected = r.pid === selectedPid;
-            const rowCls = selected
-              ? `${styles.row} ${styles.rowSelected}`
-              : styles.row;
-            return (
-              <div
-                key={r.pid}
-                className={rowCls}
-                role="button"
-                tabIndex={0}
-                onClick={() => onRowClick(r.pid)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    onRowClick(r.pid);
-                  }
-                }}
-                title={`Open ${r.name}`}
-              >
-                <div className={styles.cellName}>
-                  <span
-                    className={styles.avatar}
-                    style={{ backgroundColor: r.avatarColor }}
-                  >
-                    {r.initials}
-                  </span>
-                  <span className={styles.name}>{r.name}</span>
-                </div>
-                <div className={styles.mrn}>{r.mrn}</div>
-                <div className={styles.dob}>{r.dob}</div>
-                <div className={styles.prov}>{r.provider}</div>
-                <div className={styles.ins}>{r.insurance}</div>
+          {visibleRows.length === 0 ? (
+            <div className={styles.emptyRow}>
+              No patients match the current filters.
+            </div>
+          ) : (
+            visibleRows.map((p) => {
+              const selected = p.pid === selectedPid;
+              const rowCls = selected
+                ? `${styles.row} ${styles.rowSelected}`
+                : styles.row;
+              const flags = flagsFor(p);
+              return (
                 <div
-                  className={
-                    r.today ? `${styles.visit} ${styles.visitToday}` : styles.visit
-                  }
+                  key={p.pid}
+                  className={rowCls}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => onRowClick(p.pid)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onRowClick(p.pid);
+                    }
+                  }}
+                  title={`Open ${p.name}`}
                 >
-                  {r.lastVisit}
-                </div>
-                <div className={styles.flags}>
-                  {r.flags.map((fl, i) => (
+                  <div className={styles.cellName}>
                     <span
-                      key={i}
-                      className={`${styles.flag} ${flagClass(fl.kind, styles)}`}
+                      className={styles.avatar}
+                      style={{ backgroundColor: avatarColor(p.pid) }}
                     >
-                      {fl.label}
+                      {initials(p.fname, p.lname)}
                     </span>
-                  ))}
+                    <span className={styles.name}>{p.name}</span>
+                  </div>
+                  <div className={styles.mrn}>{p.mrn}</div>
+                  <div className={styles.dob}>{dobLabel(p)}</div>
+                  <div className={styles.prov}>{p.providerName || '—'}</div>
+                  <div className={styles.ins}>{p.insurance || '—'}</div>
+                  <div
+                    className={
+                      p.isToday ? `${styles.visit} ${styles.visitToday}` : styles.visit
+                    }
+                  >
+                    {p.lastVisit || '—'}
+                  </div>
+                  <div className={styles.flags}>
+                    {flags.map((fl, i) => (
+                      <span
+                        key={i}
+                        className={`${styles.flag} ${flagClass(fl.kind)}`}
+                      >
+                        {fl.label}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </>
   );
 }
 
-function flagClass(kind: FlagKind, s: typeof styles): string {
+function flagClass(kind: FlagKind): string {
   switch (kind) {
-    case 'warn': return s['flagWarn'] ?? '';
-    case 'cond': return s['flagCond'] ?? '';
-    case 'rx':   return s['flagRx'] ?? '';
+    case 'warn': return styles['flagWarn'] ?? '';
+    case 'cond': return styles['flagCond'] ?? '';
+    case 'rx':   return styles['flagRx'] ?? '';
   }
+}
+
+function useBootUserId(): string {
+  const el = document.getElementById('cp-root');
+  return el?.dataset['userId'] ?? '';
 }
