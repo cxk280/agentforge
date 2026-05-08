@@ -3,14 +3,12 @@
 // column (Subjective/Objective/Assessment/Plan) and a right rail with Active
 // Orders, Diagnoses for this visit, and a Co-Pilot suggestion card.
 //
-// 1:1 port of the PHP-rendered mock previously at
-// /interface/patient_file/encounter/copilot_encounter.php. State is held in
-// React but behaves identically to the static version: hardcoded demo data
-// (Margaret Chen, 99213 Office Visit, OPEN), Subjective tab is the default
-// active tab, no DB. The navy nav and demographics banner live in the parent
-// shell — this page renders only the body.
-//
-// Verified against Figma node 51:2 on 2026-05-07.
+// The encounter row + most-recent vitals are now live: the wrapper at
+// copilot_encounter.php queries form_encounter (preferring ?eid=N from the
+// Visit-History "Open →" link, otherwise the most recent open encounter)
+// and form_vitals (most recent), and JSON-encodes the typed payload onto
+// data-encounter. The SOAP body, ROS, orders and diagnoses stay
+// demo-mode for now (no SOAP narrative table seeded in the DB).
 
 import { useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
@@ -23,6 +21,32 @@ type Vital = {
   readonly value: string;
   readonly unit: string;
   readonly tone?: 'good' | undefined;
+};
+
+export type EncounterRow = {
+  readonly id: number;
+  readonly encounter: number;
+  readonly date: string;
+  readonly reason: string;
+  readonly closed: boolean;
+  readonly billed: boolean;
+  readonly facility: string;
+  readonly provider: string;
+};
+
+export type VitalsRow = {
+  readonly bp: string;
+  readonly hr: string;
+  readonly temp: string;
+  readonly spo2: string;
+  readonly wt: string;
+  readonly bmi: string;
+  readonly date: string;
+};
+
+export type EncounterPayload = {
+  readonly encounter: EncounterRow | null;
+  readonly vitals: VitalsRow | null;
 };
 
 type RosItem = {
@@ -84,20 +108,47 @@ const HPI_PARAS: readonly string[] = [
 
 type EncounterProps = {
   readonly boot: BootContext;
+  readonly payload: EncounterPayload;
 };
 
-export function Encounter(_props: EncounterProps): JSX.Element {
+export function Encounter({ payload }: EncounterProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<SoapTab>('Subjective');
+
+  const enc = payload.encounter;
+  const v = payload.vitals;
+
+  // Build vitals strip from the live row when present; otherwise fall back to
+  // demo so the Figma frame still renders cleanly. Each card renders only when
+  // the underlying value is non-empty (no placeholder zeros).
+  const liveVitals: readonly Vital[] = v === null ? [] : [
+    ...(v.bp   !== '' ? [{ label: 'BP',   value: v.bp,   unit: 'mmHg'  }] : []),
+    ...(v.hr   !== '' ? [{ label: 'HR',   value: v.hr,   unit: 'bpm'   }] : []),
+    ...(v.temp !== '' ? [{ label: 'TEMP', value: v.temp, unit: '°F'    }] : []),
+    ...(v.spo2 !== '' ? [{ label: 'SPO₂', value: v.spo2, unit: '%'     }] : []),
+    ...(v.wt   !== '' ? [{ label: 'WT',   value: v.wt,   unit: 'lbs'   }] : []),
+    ...(v.bmi  !== '' ? [{ label: 'BMI',  value: v.bmi,  unit: 'kg/m²',
+                          tone: parseFloat(v.bmi) >= 30 ? undefined : ('good' as const) }] : []),
+  ];
+  const vitalsToShow: readonly Vital[] = liveVitals.length > 0 ? liveVitals : VITALS;
+
+  // Today's-visit meta line. Falls back to demo string when there is no
+  // active encounter row (e.g. a fresh patient with no encounters yet).
+  const metaLine = enc !== null
+    ? `${enc.reason || 'Office Visit'} — ${enc.provider || 'Provider'}`
+    : 'Office Visit, Level 3 (99213) — Dr. E. Rivera';
+  const statusLabel = enc !== null
+    ? (enc.closed ? 'SIGNED' : (enc.billed ? 'BILLED' : 'OPEN'))
+    : 'OPEN';
 
   return (
     <>
       <header className={styles.head}>
-        <div className={styles.title}>Today&apos;s Visit</div>
+        <div className={styles.title}>{enc !== null ? 'Encounter' : 'Today’s Visit'}</div>
         <div className={styles.bullet}>•</div>
-        <div className={styles.meta}>Office Visit, Level 3 (99213) — Dr. E. Rivera</div>
+        <div className={styles.meta}>{metaLine}</div>
         <span className={styles.status}>
           <span className={styles.statusDot} aria-hidden="true" />
-          OPEN
+          {statusLabel}
         </span>
         <div className={styles.spacer} />
         <button type="button" className={`${styles.btn} ${styles.btnGhost}`}>
@@ -113,20 +164,20 @@ export function Encounter(_props: EncounterProps): JSX.Element {
 
       <section className={styles.vitals}>
         <span className={styles.vitalsLbl}>VITALS</span>
-        {VITALS.map((v) => (
-          <div key={v.label} className={styles.vitalCard}>
-            <div className={styles.vitalLbl}>{v.label}</div>
+        {vitalsToShow.map((vt) => (
+          <div key={vt.label} className={styles.vitalCard}>
+            <div className={styles.vitalLbl}>{vt.label}</div>
             <div className={styles.vitalValRow}>
               <span
                 className={
-                  v.tone === 'good'
+                  vt.tone === 'good'
                     ? `${styles.vitalVal} ${styles.vitalValGood}`
                     : styles.vitalVal
                 }
               >
-                {v.value}
+                {vt.value}
               </span>
-              <span className={styles.vitalUnit}>{v.unit}</span>
+              <span className={styles.vitalUnit}>{vt.unit}</span>
             </div>
           </div>
         ))}
