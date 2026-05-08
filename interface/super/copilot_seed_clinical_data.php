@@ -64,11 +64,22 @@ $errors = 0;
 
 foreach ($inserts as $stmt) {
     $stmt = trim($stmt);
-    if ($stmt === '' || str_starts_with($stmt, '--')) { continue; }
-    // Skip MySQL session-mode comments — they aren't valid statements
-    // when handed to mysqli without the multi-query flag.
-    if (str_starts_with($stmt, '/*!') || str_starts_with($stmt, '/*')) { continue; }
-    if (!str_starts_with($stmt, 'INSERT IGNORE INTO')) { continue; }
+    if ($stmt === '') { continue; }
+    // Strip leading comment blocks (/* ... */ and -- ... lines + blank
+    // lines) so a chunk like "/*! SET ... */;\nINSERT IGNORE INTO ..."
+    // still finds the INSERT keyword. The SQL dump bundles MySQL
+    // session-mode SET comments above each INSERT block.
+    while (true) {
+        $prev = $stmt;
+        // Strip /* ... */ multi-line C-style comment at the head.
+        $stmt = preg_replace('/^\/\*.*?\*\/\s*/s', '', $stmt) ?? $stmt;
+        // Strip "-- ..." line comments at the head.
+        $stmt = preg_replace('/^(--[^\n]*\n)+\s*/', '', $stmt) ?? $stmt;
+        // Strip any other whitespace.
+        $stmt = ltrim($stmt);
+        if ($stmt === $prev) { break; }
+    }
+    if ($stmt === '' || !str_starts_with($stmt, 'INSERT IGNORE INTO')) { continue; }
 
     if (preg_match('/INSERT IGNORE INTO `([^`]+)`/', $stmt, $m)) {
         $table = $m[1];

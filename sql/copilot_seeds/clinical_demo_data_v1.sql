@@ -20,9 +20,6 @@
 -- Imported by interface/super/copilot_seed_clinical_data.php (which leaves
 -- the file untouched and just runs it via $sqlStatementNoLog).
 
-/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
-/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
-
 -- ─────────────────────────────────────────────────────────────────────
 -- procedure_order: lab orders attached to existing encounters.
 -- ─────────────────────────────────────────────────────────────────────
@@ -159,5 +156,3 @@ VALUES
   (90009,  9, 'PRV-040-T2025',    '2027-04-30', 'AstraZeneca',           120, 'main', 0),
   (90010, 10, 'GBP-300-U2024',    '2026-08-31', 'Apotex',                  0, 'main', 0); -- out of stock for visual
 
-/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
-/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
