@@ -317,6 +317,20 @@ async def chat(request: Request, req: ChatRequest):
     # rather than per IP (see _rate_limit_key docstring).
     request.state.rate_limit_session_id = req.session_id
 
+    # Empty/whitespace-only — short-circuit. Anthropic's API rejects
+    # whitespace-only text content with `messages: text content blocks
+    # must contain non-whitespace text` (HTTP 400), which the agent
+    # currently bubbles up as a 500. A clarification ask is both
+    # cheaper and more useful than a generic error.
+    if not req.message or not req.message.strip():
+        history = _sessions.get(req.session_id, [])
+        return ChatResponse(
+            session_id=req.session_id,
+            patient_id=req.patient_id,
+            reply="It looks like your message was empty. What would you like to know about this patient?",
+            history_length=len(history),
+        )
+
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
     fhir_patient_id = await _resolve_fhir_id(req.patient_id)
@@ -371,6 +385,18 @@ async def chat_stream(request: Request, req: ChatRequest):
         raise HTTPException(status_code=400, detail="patient_id is required")
 
     request.state.rate_limit_session_id = req.session_id
+
+    # Empty/whitespace short-circuit — see /chat for rationale. Stream a
+    # single delta + done so the UI gets the same shape it expects.
+    if not req.message or not req.message.strip():
+        history = _sessions.get(req.session_id, [])
+        clarification = "It looks like your message was empty. What would you like to know about this patient?"
+
+        async def empty_stream():
+            yield json.dumps({"type": "delta", "text": clarification}) + "\n"
+            yield json.dumps({"type": "done", "history_length": len(history)}) + "\n"
+
+        return StreamingResponse(empty_stream(), media_type="application/x-ndjson")
 
     history = _sessions.get(req.session_id, [])
     history.append({"role": "user", "content": req.message})
