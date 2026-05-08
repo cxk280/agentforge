@@ -1,0 +1,401 @@
+/*
+ * Education — page-specific styles. Verified against Figma node 97:2
+ * (Screen 48 — Patient Education) on 2026-05-07. Values are a 1:1 port
+ * of the PHP version's inline <style> block; the global page reset
+ * (html/body resets, font, body bg) lives in the PHP wrapper at
+ * copilot_education.php.
+ */
+
+/* ── Page header (full width — matches Figma intent and the user's
+ *    standing rule that headers span full width edge to edge) ── */
+.pagehead {
+  width: 100%;
+  height: 56px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 22px;
+  gap: 12px;
+}
+.headInfo {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.titleSm {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.star {
+  color: #008C8C;
+  font-size: 13px;
+  margin: 0 2px 0 0;
+}
+.metaL {
+  color: #4F5763;
+  font-size: 12px;
+  line-height: 1;
+}
+.headRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.langPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: #4F5763;
+  font-weight: 500;
+}
+.globe {
+  color: #008C8C;
+  font-size: 11px;
+}
+.caret {
+  color: #8A91A1;
+  font-size: 9px;
+  margin-left: 8px;
+}
+
+.shareBtn {
+  display: inline-flex;
+  align-items: center;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+.shareBtn:hover { background: #006F6F; }
+.shareBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.helpLink {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+  color: #4F5763;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* ── Page shell — left rail + main column ── */
+.shell {
+  flex: 1 1 auto;
+  display: flex;
+  min-height: 0;
+  background: #F5F6F7;
+}
+
+/* ── Left rail ── */
+.rail {
+  flex: 0 0 220px;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  padding: 14px 0;
+  overflow-y: auto;
+}
+.railLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.7px;
+  color: #8A91A1;
+  padding: 0 18px 8px;
+}
+.catBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 18px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  color: #4F5763;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  position: relative;
+  cursor: pointer;
+}
+.catBtn:hover {
+  background: #F8F9FA;
+  color: #0D1B2A;
+}
+.catIc {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #8A91A1;
+  font-size: 12px;
+}
+.catName { flex: 1; }
+.catCt {
+  color: #8A91A1;
+  font-size: 11px;
+  font-weight: 500;
+}
+.catBtnActive {
+  background: rgba(0, 140, 140, 0.08);
+  color: #008C8C;
+  font-weight: 600;
+}
+.catBtnActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: #008C8C;
+}
+.catBtnActive .catIc,
+.catBtnActive .catCt {
+  color: #008C8C;
+}
+
+/* ── Main column ── */
+.main {
+  flex: 1 1 auto;
+  padding: 18px 22px 28px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ── Top filter row: big search + 3 dropdown selects ── */
+.filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.search {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  height: 42px;
+  padding: 0 14px;
+}
+.searchIc {
+  color: #8A91A1;
+  font-size: 13px;
+}
+.search input {
+  flex: 1;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font-size: 13px;
+  color: #0D1B2A;
+  font-family: inherit;
+}
+.search input::placeholder { color: #8A91A1; }
+
+.sel {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  height: 42px;
+  padding: 4px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 140px;
+  position: relative;
+}
+.selLabel {
+  font-size: 10px;
+  color: #8A91A1;
+  font-weight: 500;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+.selVal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: #0D1B2A;
+  font-weight: 500;
+  line-height: 1;
+}
+.sel select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  font-family: inherit;
+}
+
+/* ── Suggestion banner ── */
+.suggest {
+  background: rgba(0, 140, 140, 0.06);
+  border: 1px solid rgba(0, 140, 140, 0.20);
+  border-radius: 10px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #0D1B2A;
+}
+.suggestStar {
+  color: #008C8C;
+  font-size: 12px;
+}
+.suggestTxt { flex: 1; }
+.showAll {
+  color: #008C8C;
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* ── Card grid (4 × 2) ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.empty {
+  grid-column: 1 / -1;
+  background: #FFFFFF;
+  border: 1px dashed #E4E5E8;
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  color: #8A91A1;
+  font-size: 13px;
+}
+
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.art {
+  height: 132px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.check {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+.checkOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+
+.body {
+  padding: 12px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ttl {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1.25;
+}
+.desc {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1.35;
+  min-height: 30px;
+}
+.src {
+  font-size: 11px;
+  color: #008C8C;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.meta {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+
+.actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.actBtn {
+  flex: 1;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  color: #4F5763;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0 8px;
+}
+.actBtnPreview {
+  color: #008C8C;
+  border-color: rgba(0, 140, 140, 0.35);
+  background: rgba(0, 140, 140, 0.06);
+  font-weight: 600;
+}

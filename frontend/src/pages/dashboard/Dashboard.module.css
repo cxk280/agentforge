@@ -1,0 +1,244 @@
+/*
+ * Dashboard — page-specific styles. Values verified against Figma node 32:2
+ * (Screen 11 — Dashboard) on 2026-05-07. Mirrors the PHP mock at
+ * copilot_dashboard.php.bak; widths converted from Figma's fixed pixel layout
+ * (336/448/700+668px columns) to fluid grid columns so the page fills the
+ * iframe at any width.
+ *
+ * Global scaffolding (html/body resets, Inter font, body bg, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_dashboard.php — this file owns only
+ * Dashboard-component styles. The navy top nav and demographics banner are
+ * owned by the parent shell (main/tabs/main.php), not this page.
+ */
+
+.dash {
+  padding: 20px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Card primitives ────────────────────────────────────────────────────── */
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.cardHead {
+  height: 44px;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #E4E5E8;
+}
+.cardTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+.cardLink {
+  font-size: 11px;
+  font-weight: 500;
+  color: #008C8C;
+  text-decoration: none;
+}
+.cardLink:hover { text-decoration: underline; }
+
+/* ── Vitals row ────────────────────────────────────────────────────────── */
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+.vital {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-radius: 12px;
+}
+.lbl {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+.row {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.val {
+  font-size: 24px;
+  font-weight: 700;
+  color: #0D1B2A;
+  line-height: 1.1;
+}
+.unit {
+  font-size: 12px;
+  color: #8A91A1;
+}
+.trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.trend .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.trendDown .dot { background: #26A65B; }
+.trendUp   .dot { background: #FA8C33; }
+
+/* ── Three-up panels (Allergies / Problems / Meds) ─────────────────────── */
+.threeUp {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+}
+.listItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 52px;
+  padding: 0 18px;
+  border-bottom: 0.5px solid #E4E5E8;
+}
+.listItem:last-child { border-bottom: 0; }
+/* Allergy tiles in the Figma are taller (69.333px) — bump the first panel's
+ * rows when the alert tone is present. Generic 52px is the Figma default for
+ * Problems / Medications. */
+
+.itemIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #0D1B2A;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+.iconAlert { background: rgba(217, 56, 56, 0.14); }
+.iconNote  { background: rgba(250, 140, 51, 0.14); }
+.iconMed   { background: rgba(0, 140, 140, 0.14); }
+.iconVisit { background: rgba(71, 133, 217, 0.14); }
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.itemName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1.2;
+}
+.itemSub {
+  font-size: 11px;
+  color: #8A91A1;
+  line-height: 1.3;
+}
+
+/* ── Two-up panels (Labs / Visits) ─────────────────────────────────────── */
+.twoUp {
+  display: grid;
+  grid-template-columns: 700fr 668fr;   /* preserves Figma's 700:668 ratio */
+  gap: 16px;
+}
+
+/* ── Lab table ─────────────────────────────────────────────────────────── */
+.labTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.labTable thead th {
+  text-align: left;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 0 18px;
+  height: 32px;
+  background: #F5F6F7;
+  border-bottom: 0;
+  vertical-align: middle;
+}
+.labTable tbody td {
+  padding: 0 18px;
+  height: 44px;
+  border-bottom: 0.5px solid #E4E5E8;
+  color: #0D1B2A;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+.labTable tbody tr:last-child td { border-bottom: 0; }
+.testName {
+  font-weight: 500;
+  font-size: 12px;
+}
+.valCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12px;
+}
+.valCell .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.valNormal       { color: #0D1B2A; }
+.valNormal .dot  { background: #26A65B; }
+.valHigh         { color: #FA8C33; }
+.valHigh .dot    { background: #FA8C33; }
+.range {
+  color: #8A91A1;
+  font-size: 12px;
+  font-weight: 400;
+}
+.date {
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* ── Visit list ────────────────────────────────────────────────────────── */
+.visitList {
+  display: flex;
+  flex-direction: column;
+}
+.visit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 50.4px;
+  padding: 0 18px;
+  border-bottom: 0.5px solid #E4E5E8;
+}
+.visit:last-child { border-bottom: 0; }

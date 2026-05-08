@@ -1,0 +1,234 @@
+/*
+ * Assessments — page-specific styles. Values verified against Figma node 34:2
+ * (Screen 13 — Assessments) on 2026-05-07. Header bar, left category sidebar,
+ * and assessment card list ported 1:1 from the prior PHP mock.
+ *
+ * Global scaffolding (html/body resets, body bg, Inter font, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_assessments.php — this file owns only
+ * Assessments-component styles.
+ */
+
+/* ── Page header bar (full width) ────────────────────────────────────────── */
+.head {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  height: 60px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.title  { font-size: 16px; font-weight: 700; color: #0D1B2A; line-height: 1; }
+.bullet { color: #8A91A1; font-size: 14px; line-height: 1; }
+.meta   { color: #8A91A1; font-size: 12px; line-height: 1; }
+.spacer { flex: 1; }
+
+.cta {
+  height: 32px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1;
+  cursor: pointer;
+}
+.cta:hover { background: #00787A; }
+.ctaPlus { font-size: 14px; font-weight: 700; line-height: 1; }
+
+/* ── Two-column body ─────────────────────────────────────────────────────── */
+.body {
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(100vh - 60px);
+}
+
+.side {
+  width: 240px;
+  flex: 0 0 auto;
+  background: #FFFFFF;
+  border-right: 1px solid #E4E5E8;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 16px 0;
+  align-self: stretch;
+}
+.cat {
+  height: 38px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.cat:hover { background: #FAFBFC; }
+.catLabel {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+}
+.catCount {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+  line-height: 1;
+}
+.catActive { background: rgba(0, 140, 140, 0.08); }
+.catActive .catLabel {
+  color: #008C8C;
+  font-weight: 600;
+}
+.catActive .catCount {
+  color: #008C8C;
+}
+
+/* ── Right side cards ────────────────────────────────────────────────────── */
+.list {
+  flex: 1;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 10px;
+  height: 88px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex: 0 0 auto;
+}
+.avatarDue       { background: rgba(250, 140, 51, 0.15); color: #FA8C33; }
+.avatarDone      { background: rgba(51, 166, 102, 0.15); color: #33A666; }
+.avatarScheduled { background: rgba(71, 133, 217, 0.15); color: #4785D9; }
+
+.cardInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.cardTitleRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0D1B2A;
+  line-height: 1;
+  white-space: nowrap;
+}
+.cardPill {
+  background: #F5F6F7;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+.cardDesc {
+  font-size: 12px;
+  color: #8A91A1;
+  line-height: 1;
+  font-weight: 400;
+}
+.cardMeta {
+  font-size: 11px;
+  color: #4F5763;
+  line-height: 1;
+  font-weight: 500;
+}
+.cardSpacer { flex: 1; }
+
+.statusPill {
+  border-radius: 999px;
+  border: 1px solid;
+  padding: 4px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  line-height: 1;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+.statusPillDue {
+  background: rgba(250, 140, 51, 0.14);
+  border-color: rgba(250, 140, 51, 0.4);
+  color: #FA8C33;
+}
+.statusPillScheduled {
+  background: rgba(71, 133, 217, 0.14);
+  border-color: rgba(71, 133, 217, 0.4);
+  color: #4785D9;
+}
+
+.score {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.scoreLabel {
+  font-size: 9px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+}
+.scoreValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #33A666;
+  line-height: 1;
+}
+
+.action {
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+.actionPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+.actionPrimary:hover { background: #00787A; }
+.actionSecondary {
+  background: #FFFFFF;
+  color: #0D1B2A;
+  border-color: #E4E5E8;
+}
+.actionSecondary:hover { background: #F5F6F7; }

@@ -1,0 +1,341 @@
+/*
+ * RecordRequest — page-specific styles. Values verified against Figma node
+ * 74:2 (Screen 31 — Patient Record Request) on 2026-05-07.
+ *
+ * Global scaffolding (html/body resets, body bg, Inter font, #cp-root sizing)
+ * lives in the PHP wrapper at copilot_record_request.php — this file owns
+ * only RecordRequest-component styles.
+ */
+
+/* ── Pagehead (full width) ── */
+.pagehead {
+  width: 100%;
+  height: 56px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.headInfo { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+.title {
+  font-size: 18px; font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot { color: #8A91A1; font-size: 16px; line-height: 1; }
+.metaLight {
+  font-size: 13px; font-weight: 400;
+  color: #4F5763;
+  line-height: 1;
+}
+.helpPill {
+  background: #F5F6F7;
+  border: none;
+  border-radius: 12px;
+  height: 24px;
+  padding: 0 12px;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex; align-items: center;
+  font-family: inherit;
+}
+
+/* ── Body — 2-column layout ── */
+.body {
+  display: grid;
+  grid-template-columns: 580px 1fr;
+  gap: 20px;
+  padding: 20px 24px 32px;
+  align-items: start;
+}
+
+/* ── Left column — form panel ── */
+.leftCol {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 17px 19px 19px;
+}
+.labelTag {
+  font-size: 11px; font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.field { margin-bottom: 16px; }
+.fieldHead {
+  display: block;
+  font-size: 15px; font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.fieldSub {
+  display: block;
+  font-size: 12px; font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.fieldRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.input {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  height: 36px;
+  padding: 0 11px;
+  font-size: 14px; color: #181D26;
+  outline: none;
+  font-family: inherit;
+}
+.input:focus { border-color: #008C8C; }
+
+.selectWrap { position: relative; }
+.selectWrap .input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 32px;
+}
+.selectCaret {
+  position: absolute;
+  right: 11px; top: 50%;
+  transform: translateY(-50%);
+  color: #8A91A1;
+  font-size: 12px;
+  pointer-events: none;
+  line-height: 1;
+}
+
+.textarea {
+  width: 100%;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  padding: 11px;
+  font-size: 13px; color: #181D26;
+  outline: none; resize: vertical;
+  font-family: inherit;
+  line-height: 1.4;
+  min-height: 72px;
+}
+.textarea:focus { border-color: #008C8C; }
+
+/* ── Records-to-release checkbox grid ── */
+.checks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 16px;
+}
+.chk {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13px; font-weight: 400;
+  color: #181D26;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+}
+.chk input {
+  position: absolute;
+  opacity: 0;
+  width: 0; height: 0;
+  pointer-events: none;
+}
+.chkBox {
+  width: 16px; height: 16px;
+  border: 1px solid #E4E5E8;
+  border-radius: 4px;
+  background: #FFFFFF;
+  display: inline-flex;
+  align-items: center; justify-content: center;
+  flex: 0 0 auto;
+}
+.chkBoxOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.chkBoxOn::after {
+  content: '';
+  width: 9px; height: 5px;
+  border-left: 2px solid #FFFFFF;
+  border-bottom: 2px solid #FFFFFF;
+  transform: rotate(-45deg) translate(1px, -1px);
+}
+.chkUnchecked { color: #181D26; }
+
+/* ── Authorization row ── */
+.authLabel {
+  font-size: 12px; font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  margin-bottom: 8px;
+  display: block;
+}
+.authRow {
+  display: flex; align-items: center; gap: 12px;
+}
+.authPill {
+  flex: 1;
+  background: #E8F7ED;
+  border-radius: 6px;
+  height: 32px;
+  padding: 0 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 500;
+  color: #181D26;
+}
+.authCheck {
+  color: #33A666;
+  font-size: 13px; font-weight: 600;
+  line-height: 1;
+}
+.sendBtn {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 16px;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.sendBtn:hover { background: #006F6F; }
+
+/* ── Right column — queue card ── */
+.rightCol {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.tabs {
+  display: flex; align-items: center;
+  gap: 4px;
+  padding: 0 8px;
+  border-bottom: 1px solid #E4E5E8;
+}
+.tab {
+  background: none; border: 0;
+  font-size: 13px; font-weight: 500;
+  color: #4F5763;
+  padding: 14px 12px 12px;
+  line-height: 1;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.tabActive {
+  color: #008C8C;
+  font-weight: 600;
+  border-bottom-color: #008C8C;
+}
+
+/* ── KPI count strip ── */
+.counts {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 16px 19px 0;
+}
+.count {
+  background: #F5F6F7;
+  border-radius: 6px;
+  height: 40px;
+  padding: 0 12px;
+  display: inline-flex; align-items: center; gap: 8px;
+}
+.countV {
+  font-size: 18px; font-weight: 700;
+  color: #181D26;
+  line-height: 1;
+}
+.countV_warn   { color: #FA8C33; }
+.countV_good   { color: #33A666; }
+.countV_danger { color: #D93838; }
+.countV_info   { color: #008C8C; }
+.countL {
+  font-size: 11px; font-weight: 500;
+  color: #4F5763;
+  line-height: 1.2;
+}
+
+/* ── Queue rows ── */
+.queue {
+  padding: 16px 19px 16px;
+  display: flex; flex-direction: column;
+  gap: 8px;
+}
+.qRow {
+  display: flex; align-items: center;
+  gap: 12px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 6px;
+  height: 60px;
+  padding: 0 13px;
+}
+.qIcon {
+  font-size: 18px;
+  line-height: 1;
+  flex: 0 0 auto;
+  width: 24px;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.qInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.qDest {
+  font-size: 14px; font-weight: 600;
+  color: #181D26;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.qSub {
+  font-size: 12px; font-weight: 400;
+  color: #4F5763;
+  line-height: 1.2;
+}
+.qSent {
+  font-size: 11px; font-weight: 400;
+  color: #8A91A1;
+  line-height: 1.2;
+}
+.pill {
+  flex: 0 0 auto;
+  height: 20px;
+  padding: 0 9px;
+  border-radius: 10px;
+  display: inline-flex; align-items: center;
+  font-size: 11px; font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pill_warn   { background: #FFF4EA; color: #FA8C33; }
+.pill_good   { background: #E8F7ED; color: #33A666; }
+.pill_danger { background: #FCEAEA; color: #D93838; }
+.pill_info   { background: #E6F2F2; color: #008C8C; }
+
+.qView {
+  flex: 0 0 auto;
+  font-size: 12px; font-weight: 600;
+  color: #008C8C;
+  text-decoration: none;
+  line-height: 1;
+}
+.qView:hover { text-decoration: underline; }
