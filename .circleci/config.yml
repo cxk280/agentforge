@@ -432,7 +432,7 @@ jobs:
           min_pass: 4
 
   promote-qa:
-    executor: base
+    executor: python
     steps:
       - promote-to-env-branch:
           env_branch: qa
@@ -449,7 +449,7 @@ jobs:
           min_pass: 46
 
   promote-prod:
-    executor: base
+    executor: python
     steps:
       - promote-to-env-branch:
           env_branch: prod
