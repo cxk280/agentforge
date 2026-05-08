@@ -11,6 +11,7 @@ defensive measures to prevent fail-counter lockout:
 
 import time
 import asyncio
+import ssl as _ssl
 import aiomysql
 import httpx
 from dataclasses import dataclass
@@ -27,6 +28,19 @@ _cache = _TokenCache()
 
 # DB pool for fail-counter reset — created lazily
 _db_pool: aiomysql.Pool | None = None
+
+# Railway-managed MySQL 9.x exposes a self-signed TLS cert on every
+# connection; non-TLS connections fall back to caching_sha2_password's
+# RSA key-exchange path which aiomysql can't complete cleanly (it
+# raises in `sha256_password_auth`). Wrapping every connection in TLS
+# lets the server-side caching_sha2_password handshake stay in its
+# fast path. We disable cert verification because the cert is self-
+# signed on a private internal host (`*.railway.internal`) and there's
+# no public CA to chain to — the wire is still encrypted, we just
+# don't enforce CA trust.
+_DB_SSL_CTX = _ssl.create_default_context()
+_DB_SSL_CTX.check_hostname = False
+_DB_SSL_CTX.verify_mode = _ssl.CERT_NONE
 
 # Shared httpx client. Reusing a single client across FHIR + token calls
 # keeps TCP + TLS connections warm — a fresh AsyncClient per call adds a
@@ -100,6 +114,7 @@ async def get_db_pool() -> aiomysql.Pool | None:
             # "OpenEMR document_id N not found" — even though the row
             # is in the DB and visible to other sessions.
             autocommit=True,
+            ssl=_DB_SSL_CTX,
         )
     return _db_pool
 
