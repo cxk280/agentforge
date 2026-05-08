@@ -36,23 +36,29 @@
 #   7.  smoke-openemr-{qa,prod}   — same shape as dev, against the env's openemr.
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
-#   ANTHROPIC_API_KEY        — for Haiku judge in evals
-#   GITHUB_DEPLOY_TOKEN      — GitHub PAT with `repo` scope (or fine-grained
-#                              with content:write on this repo + qa/prod
-#                              branches). CI uses it to push master HEAD to
-#                              qa/prod branches. Branch protection should
-#                              restrict push to this token's identity.
-#   OE_USER_DEPLOY           — OpenEMR admin username for smoke (default: admin)
-#   OE_PASS_DEPLOY           — OpenEMR admin password for smoke (default: pass)
+#   ANTHROPIC_API_KEY              — for Haiku judge in evals
+#   GITHUB_APP_ID                  — numeric App ID of the AgentForge CI
+#                                    Promoter App. App needs Contents:
+#                                    Read & Write on cxk280/agentforge.
+#   GITHUB_APP_PRIVATE_KEY         — multi-line PEM (entire BEGIN/END block).
+#                                    CircleCI supports newlines in env values.
+#   GITHUB_APP_INSTALLATION_ID     — installation ID for the App on this
+#                                    repo (visible at /settings/installations).
+#   OE_USER_DEPLOY                 — OpenEMR admin username for smoke (default: admin)
+#   OE_PASS_DEPLOY                 — OpenEMR admin password for smoke (default: pass)
 #
 # No longer used (lockdown 2026-05-08):
-#   RAILWAY_TOKEN_DEV / QA / PROD — replaced by git-push promotion. Revoke
-#                                   the Railway project tokens once you've
-#                                   verified this pipeline is the only
-#                                   deploy path.
+#   GITHUB_DEPLOY_TOKEN            — replaced by GitHub App installation
+#                                    tokens (bot-only push isolation).
+#                                    Revoke the PAT once the App-based
+#                                    pipeline is verified end-to-end.
+#   RAILWAY_TOKEN_DEV / QA / PROD  — replaced by git-push promotion. Revoke
+#                                    the Railway project tokens once you've
+#                                    verified this pipeline is the only
+#                                    deploy path.
 #   LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST — see
-#                                   the run-evals command for why we strip
-#                                   these instead of using them.
+#                                    the run-evals command for why we strip
+#                                    these instead of using them.
 #
 # Why openemr deploys aren't risky to the MySQL volume: pushing to an env
 # branch rebuilds the openemr container only. The MySQL service is a
@@ -95,23 +101,45 @@ commands:
     description: |
       Push the current commit to a target env branch (qa/prod).
       Railway services watching that branch auto-deploy on push.
+
+      Auth: GitHub App installation token (NOT a user PAT). The App
+      identity is the only one allowed to push to qa/prod under branch
+      protection, so even a user with repo write access can't sidestep
+      CI. See project_bot_only_push_isolation memory for the rationale
+      and scripts/mint-github-installation-token.py for the token mint.
     parameters:
       env_branch:
         type: string
     steps:
       - checkout
       - run:
-          name: Push HEAD → << parameters.env_branch >>
+          name: Mint GitHub App installation token
           command: |
-            if [ -z "${GITHUB_DEPLOY_TOKEN:-}" ]; then
-              echo "✗ GITHUB_DEPLOY_TOKEN not set — cannot promote." >&2
-              echo "  Add a GitHub PAT (repo scope) as a CircleCI project env var." >&2
+            for var in GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_APP_INSTALLATION_ID; do
+              if [ -z "$(eval echo \$$var)" ]; then
+                echo "✗ $var not set — cannot promote." >&2
+                echo "  See project_bot_only_push_isolation memory for setup." >&2
+                exit 1
+              fi
+            done
+            pip install --quiet 'PyJWT[crypto]'
+            TOKEN=$(python3 scripts/mint-github-installation-token.py)
+            if [ -z "$TOKEN" ]; then
+              echo "✗ Token mint returned empty — see stderr above." >&2
               exit 1
             fi
+            # Stash for the next step. echo to BASH_ENV scopes it to
+            # subsequent steps in the same job; the token is short-
+            # lived (~1 hr) and the job ends in seconds anyway.
+            echo "export GH_INSTALLATION_TOKEN=$TOKEN" >> "$BASH_ENV"
+            echo "✓ Minted installation token (length=${#TOKEN})"
+      - run:
+          name: Push HEAD → << parameters.env_branch >>
+          command: |
             # Push the SHA (not a branch ref) so a stray master move
             # mid-pipeline can't sneak a different commit into qa/prod.
             git push \
-              "https://x-access-token:${GITHUB_DEPLOY_TOKEN}@github.com/cxk280/agentforge.git" \
+              "https://x-access-token:${GH_INSTALLATION_TOKEN}@github.com/cxk280/agentforge.git" \
               "${CIRCLE_SHA1}:refs/heads/<< parameters.env_branch >>"
             echo "✓ Pushed ${CIRCLE_SHA1} → << parameters.env_branch >>"
 
