@@ -101,6 +101,11 @@ export function Documents({ boot }: DocumentsProps): JSX.Element {
     // OpenEMR CsrfUtils::verifyCsrfToken reads the field as csrf_token_form
     // (see interface/patient_file/documents/copilot_documents_upload.php).
     if (boot.csrf) fd.append('csrf_token_form', boot.csrf);
+    // Upload handler files docs against an explicit patient_id POST field
+    // (line 61 of copilot_documents_upload.php). Without this, it 400s
+    // with "Missing patient_id" even though $_SESSION['pid'] is set —
+    // the handler uses POST, not session, for the file destination.
+    if (boot.patientId) fd.append('patient_id', String(boot.patientId));
     try {
       const resp = await fetch('./copilot_documents_upload.php', {
         method: 'POST',
