@@ -51,17 +51,71 @@ function tabs_view_model()
 // patient demographics view + its linked navtab pages, hidden on
 // Reports / Admin / Calendar / Messages / Patient Finder etc.
 //
-// `pat` is the patient demographics + navtab iframe (Dashboard,
-// History, Co-Pilot, Assessments, Report, Documents, Transactions,
-// Issues, Ledger, External Data, PRO, Modules — all load inside it).
-// `enc` is the encounter detail iframe. Both are patient-context.
-const CP_PATIENT_FRAMES = ['pat', 'enc'];
+// `pat` is the patient demographics + navtab iframe (Dashboard, History,
+// Co-Pilot, Assessments, Report, Documents, Transactions, Issues, Ledger,
+// External Data, PRO, Modules — all load inside it).
+// `enc` is the encounter detail iframe.
+// `main` is the iframe the patient nav strip links target ("target": "main"
+// in patient_menus/standard.json) — the user-visible Dashboard/History/etc.
+// land here when clicked, so the banner must stay up.
+// `fin` is the patient finder; the banner is hidden there since no patient
+// is in scope yet. Same logic for any tab whose name isn't in this set.
+const CP_PATIENT_FRAMES = ['pat', 'enc', 'main'];
 function cpUpdateBannerVisibility(activeName) {
     var banner = document.getElementById('attendantData');
     if (!banner) { return; }
-    var isPatient = CP_PATIENT_FRAMES.indexOf(activeName) !== -1;
-    banner.style.display = isPatient ? '' : 'none';
+    // Show the banner when (a) the active tab is a known patient-context
+    // frame AND (b) a patient is actually selected. The second check
+    // prevents header2 from rendering on Calendar / Reports / Admin /
+    // Patient Finder etc. before a patient has been chosen.
+    var inPatientFrame = CP_PATIENT_FRAMES.indexOf(activeName) !== -1;
+    var hasPatient = false;
+    try {
+        hasPatient = !!(app_view_model
+            && app_view_model.application_data
+            && app_view_model.application_data.patient
+            && app_view_model.application_data.patient() !== null);
+    } catch (_) { hasPatient = false; }
+    banner.style.display = (inPatientFrame && hasPatient) ? '' : 'none';
 }
+
+// Re-evaluate banner visibility whenever the patient observable changes —
+// otherwise the banner is set hidden when the 'pat' tab activates *before*
+// demographics.php has populated the patient observable, and never flips
+// back on. Subscribed once on first script load.
+(function cpSubscribeBannerToPatient() {
+    function subscribe() {
+        try {
+            if (!window.app_view_model
+                || !app_view_model.application_data
+                || !app_view_model.application_data.patient
+                || typeof app_view_model.application_data.patient.subscribe !== 'function') {
+                return false;
+            }
+            app_view_model.application_data.patient.subscribe(function () {
+                // Re-evaluate using the currently visible tab's name.
+                try {
+                    var tabs = app_view_model.application_data.tabs.tabsList();
+                    var visible = null;
+                    for (var i = 0; i < tabs.length; i++) {
+                        if (tabs[i].visible && tabs[i].visible()) { visible = tabs[i]; break; }
+                    }
+                    cpUpdateBannerVisibility(visible ? visible.name() : '');
+                } catch (_) {}
+            });
+            return true;
+        } catch (_) { return false; }
+    }
+    if (!subscribe()) {
+        // app_view_model may not be created yet on first script eval; retry
+        // until it is. Capped at ~5s of polling.
+        var tries = 0;
+        var iv = setInterval(function () {
+            tries++;
+            if (subscribe() || tries > 50) { clearInterval(iv); }
+        }, 100);
+    }
+})();
 
 function activateTab(data)
 {
