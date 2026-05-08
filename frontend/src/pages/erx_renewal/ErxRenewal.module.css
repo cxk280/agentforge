@@ -1,0 +1,341 @@
+/*
+ * ErxRenewal — page-specific styles. Values verified against Figma node 88:2
+ * (Screen 41 — e-Rx Renewal) on 2026-05-07. The original PHP mock used the
+ * shared copilot-archetype.css; this React port inlines its own scoped
+ * styles via CSS Modules so the page is self-contained (no Tailwind, no
+ * implicit shared CSS dependency).
+ *
+ * Top-level layout assumptions:
+ *   - The PHP wrapper provides #cp-root with full viewport height; the navy
+ *     top nav and patient header2 are skipped per task spec.
+ *   - Each section (subtabs / pagehead / filterbar / content) is a flex/grid
+ *     row that spans the full viewport width and is separated by 1px
+ *     border-bottom rules (matches the Figma absolute layout).
+ */
+
+/* ── Sub-tab strip (Active / New Rx / Renewals / EPCS / Pharmacy / Drug check) ── */
+.subtabs {
+  width: 100%;
+  height: 40px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.subtab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0 12px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+}
+.subtab:hover { color: #181D26; }
+.subtabActive {
+  color: #181D26;
+  font-weight: 600;
+  border-bottom-color: #008C8C;
+}
+
+/* ── Page head — title + sub-meta + bulk actions ── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+.headInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.metaLight {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.headSpacer { flex: 1; }
+
+.btnGhost {
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+}
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 16px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btnPrimary:hover { background: #006F6F; }
+.checkIc { font-size: 11px; line-height: 1; }
+.help {
+  background: #F5F6F7;
+  color: #4F5763;
+  border: 0;
+  border-radius: 12px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+
+/* ── Filter pill bar ── */
+.filterBar {
+  width: 100%;
+  height: 48px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.pill {
+  appearance: none;
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  padding: 5px 11px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+}
+.pill:hover { background: #F5F6F7; }
+.pillActive {
+  background: #E6F5F5;
+  color: #008C8C;
+  border-color: #008C8C;
+}
+.pillCt {
+  background: #F5F6F7;
+  color: #4F5763;
+  border-radius: 9px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  min-width: 16px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.pillCtActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+
+/* ── Content area / card stack ── */
+.content {
+  padding: 16px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #F5F6F7;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Refill card row.
+ *    Figma column geometry inside the 1392px-wide body:
+ *      checkbox (16px) · gap · avatar (28px) · gap · patient (216px) · drug (316px) · status (440px) · actions (~292px)
+ *    We approximate with a grid that scales: fixed widths for chrome/columns,
+ *    flex-grow on patient/status, fixed 292px on actions. ── */
+.card {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  padding: 14px 18px;
+  display: grid;
+  grid-template-columns: 16px 28px minmax(0, 216px) minmax(0, 1fr) minmax(0, 320px) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 84px;
+  box-sizing: border-box;
+}
+
+/* Checkbox */
+.cb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #C9CDD4;
+  border-radius: 4px;
+  background: #FFFFFF;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cbOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+.cbCheck {
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Avatar */
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #C6CDD9 0%, #8A91A1 100%);
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+/* Patient block */
+.pt { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ptLine { display: inline-flex; align-items: baseline; gap: 6px; }
+.ptName { font-size: 14px; font-weight: 600; color: #181D26; line-height: 1.2; }
+.ptMrn  { font-size: 11px; color: #8A91A1; font-weight: 400; line-height: 1.2; }
+.ptPharm { font-size: 11px; color: #4F5763; line-height: 1.3; }
+
+/* Drug block */
+.rx { display: flex; gap: 8px; align-items: flex-start; min-width: 0; }
+.rxIc { font-size: 16px; line-height: 1; flex: 0 0 auto; margin-top: 1px; }
+.rxBody { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rxName { font-size: 14px; font-weight: 600; color: #181D26; line-height: 1.2; }
+.rxSig { font-size: 12px; color: #4F5763; line-height: 1.3; }
+.refills { font-size: 11px; color: #8A91A1; line-height: 1.3; }
+.refillsDanger {
+  color: #D93838;
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.3px;
+}
+
+/* Status block */
+.st { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; min-width: 0; }
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.statusGood   { background: #E8F7ED; color: #33A666; }
+.statusWarn   { background: #FFF4EA; color: #FA8C33; }
+.statusViolet { background: #EAF1FC; color: #4785D9; }
+/* Override warn for the Tramadol "Controlled — Schedule IV" pill which the
+ * Figma renders in red (#FCEAEA / #D93838) rather than orange. We could split
+ * tones, but the only "warn" red pill is Controlled, so treat it inline:
+ * statusWarn covers Out-of-refills (orange). For controlled we add a class. */
+.statusPill.statusWarn:where([data-controlled]) {
+  background: #FCEAEA;
+  color: #D93838;
+}
+
+.lastFilled { font-size: 11px; color: #8A91A1; line-height: 1.3; }
+.subLine {
+  font-size: 11px;
+  color: #4F66A8;
+  font-weight: 500;
+  line-height: 1.3;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+.subStar { color: #4F66A8; font-size: 11px; }
+
+/* Action cluster */
+.act { display: inline-flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+.btnGhostSm {
+  background: #FFFFFF;
+  color: #4F5763;
+  border: 1px solid #E4E5E8;
+  border-radius: 16px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btnGhostSm:hover { background: #F5F6F7; }
+.caret { color: #8A91A1; font-size: 9px; line-height: 1; }
+.btnPrimarySm {
+  background: #008C8C;
+  color: #FFFFFF;
+  border: 0;
+  border-radius: 16px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.btnPrimarySm:hover { background: #006F6F; }

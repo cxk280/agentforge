@@ -1,0 +1,397 @@
+/*
+ * Batch Results — page-specific styles.
+ *
+ * Values verified against Figma node 84:2 (Screen 38 — Batch Results) on
+ * 2026-05-07. Global scaffolding (html/body resets, body bg color, Inter
+ * font, #cp-root sizing) lives in the PHP wrapper at copilot_batch_results.php.
+ *
+ * Color palette lifted from Figma:
+ *   text primary       #181D26
+ *   text secondary     #4F5763
+ *   text muted         #8A91A1
+ *   teal accent        #008C8C
+ *   teal accent soft   #E6F5F5
+ *   border             #E4E5E8
+ *   row stripe         #FAFBFC
+ *   table head bg      #F9FAFB
+ *   page bg            #F5F6F7
+ *   green              #33A666
+ *   green pill bg      #E8F7ED
+ *   orange             #FA8C33
+ *   orange pill bg     #FFF4EA
+ *   red                #D93838
+ *   red pill bg        #FCEAEA
+ */
+
+/* ── Page header (full width — matches the Figma intent and the user's
+ *    standing rule that headers span full width edge to edge) ── */
+.pagehead {
+  width: 100%;
+  height: 60px;
+  background: #FFFFFF;
+  border-bottom: 1px solid #E4E5E8;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 12px;
+}
+.titleBlock {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #181D26;
+  line-height: 1;
+}
+.dot {
+  color: #8A91A1;
+  font-size: 16px;
+  line-height: 1;
+}
+.metaLight {
+  color: #4F5763;
+  font-size: 13px;
+  line-height: 1;
+}
+.spacer { flex: 1; }
+
+.btn {
+  height: 32px;
+  border-radius: 16px;
+  border: 1px solid #E4E5E8;
+  background: #FFFFFF;
+  padding: 0 18px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4F5763;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.btnGhost { background: #FFFFFF; }
+.btnGhost:hover { background: #F5F6F7; }
+.btnPrimary {
+  background: #008C8C;
+  color: #FFFFFF;
+  border-color: #008C8C;
+  font-weight: 600;
+  padding: 0 14px;
+}
+.btnPrimary:hover { background: #006F6F; }
+
+.helpPill {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 12px;
+  border-radius: 12px;
+  background: #F5F6F7;
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+/* ── Content body ── */
+.content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── KPI strip (single rounded card with vertical dividers) ── */
+.kpiStrip {
+  display: flex;
+  align-items: stretch;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  height: 72px;
+  overflow: hidden;
+}
+.kpiCell {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 24px;
+  gap: 4px;
+}
+.kpiCellWide {
+  flex: 1.6;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 24px;
+}
+.kpiDivider {
+  width: 1px;
+  background: #E4E5E8;
+  margin: 16px 0;
+}
+.kpiLbl {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: #8A91A1;
+  text-transform: uppercase;
+  letter-spacing: 0.2px;
+  line-height: 1;
+}
+.kpiVal {
+  display: block;
+  font-size: 22px;
+  font-weight: 700;
+  color: #181D26;
+  line-height: 1.1;
+  margin-top: 4px;
+}
+.kpiGreen  { color: #33A666; }
+.kpiOrange { color: #FA8C33; }
+.kpiRed    { color: #D93838; }
+
+.kpiSignedTop {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.progressWrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.progress {
+  display: block;
+  height: 12px;
+  background: #F5F6F7;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.progress > i {
+  display: block;
+  height: 100%;
+  background: #008C8C;
+  border-radius: 6px;
+}
+.progressSub {
+  font-size: 11px;
+  font-weight: 500;
+  color: #4F5763;
+  line-height: 1;
+}
+
+/* ── Filter pill row ── */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pillBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  color: #4F5763;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  line-height: 1;
+  font-family: inherit;
+}
+.pillBtnActive {
+  background: #E6F5F5;
+  border-color: #008C8C;
+  color: #008C8C;
+}
+.pillCt {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: #F5F6F7;
+  color: #4F5763;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.pillCtActive {
+  background: #008C8C;
+  color: #FFFFFF;
+}
+
+.filterRight {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.filterLbl {
+  font-size: 11px;
+  font-weight: 500;
+  color: #8A91A1;
+}
+.dropdown {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid #E4E5E8;
+  border-radius: 14px;
+  background: #FFFFFF;
+}
+.dropdownSelect {
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: #4F5763;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 0;
+  margin: 0;
+  outline: none;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.caret {
+  color: #8A91A1;
+  font-size: 9px;
+  line-height: 1;
+}
+
+/* ── Table card ── */
+.tableWrap {
+  background: #FFFFFF;
+  border: 1px solid #E4E5E8;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  color: #4F5763;
+}
+.table thead tr {
+  background: #F9FAFB;
+  border-bottom: 1px solid #E4E5E8;
+}
+.table thead th {
+  padding: 12px 14px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #8A91A1;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+.table tbody tr {
+  border-bottom: 1px solid #E4E5E8;
+}
+.table tbody tr:last-child { border-bottom: none; }
+.table tbody tr:nth-child(even) { background: #FAFBFC; }
+.table tbody td {
+  padding: 11px 14px;
+  font-size: 12px;
+  color: #4F5763;
+  white-space: nowrap;
+}
+
+.cb {
+  width: 36px;
+  padding-left: 18px !important;
+  padding-right: 8px !important;
+}
+.cbBox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1.5px solid #E4E5E8;
+  background: #FFFFFF;
+  color: #FFFFFF;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: middle;
+}
+.cbBoxOn {
+  background: #008C8C;
+  border-color: #008C8C;
+}
+
+.bold {
+  color: #181D26;
+  font-size: 13px;
+  font-weight: 600;
+}
+.mrn { color: #4F5763; }
+.mutedSoft { color: #4F5763; }
+
+.act {
+  width: 28px;
+  text-align: right !important;
+  padding-left: 6px !important;
+  padding-right: 14px !important;
+}
+.kebab {
+  display: inline-block;
+  color: #8A91A1;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 6px;
+}
+.kebab:hover { background: #F5F6F7; color: #181D26; }
+
+/* Value-cell tones */
+.v_danger    { color: #D93838; font-size: 13px; font-weight: 600; }
+.v_warn      { color: #FA8C33; font-size: 13px; font-weight: 600; }
+.v_plain     { color: #181D26; font-size: 13px; font-weight: 500; }
+.v_plainBold { color: #181D26; font-size: 13px; font-weight: 600; }
+
+/* Delta-cell tones */
+.d_danger { color: #D93838; font-weight: 500; }
+.d_warn   { color: #FA8C33; font-weight: 500; }
+.d_muted  { color: #181D26; font-weight: 400; }
+
+/* Flag pills */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.pill_critical { background: #FCEAEA; color: #D93838; }
+.pill_abnormal { background: #FFF4EA; color: #FA8C33; }
+.pill_normal   { background: #E8F7ED; color: #33A666; }
+
+.emptyRow {
+  text-align: center;
+  color: #8A91A1;
+  padding: 24px !important;
+}

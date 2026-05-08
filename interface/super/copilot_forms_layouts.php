@@ -1,71 +1,99 @@
 <?php
 
 /**
- * Forms & Layouts (admin) — bonus archetype page.
+ * Forms & Layouts landing page — Figma "Screen 64 — Forms & Layouts".
+ *
+ * Thin manifest-loading wrapper that hands the page body off to the React
+ * bundle built from /frontend/src/pages/forms_layouts/. The PHP outer shell
+ * at /interface/main/tabs/main.php still owns the navy top nav, left
+ * sidebar, and patient header2 banner; this file only renders inside the
+ * #maimain iframe.
+ *
+ * Boot context (CSRF token, current user id, current patient id, API base)
+ * is passed to React via data-* attributes on the #cp-root mount node and
+ * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
+ *
+ * The original static-HTML mock is preserved at copilot_forms_layouts.php.bak
+ * so a side-by-side screenshot diff remains possible.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
  * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+declare(strict_types=1);
+
 require_once(__DIR__ . "/../globals.php");
-require_once(__DIR__ . "/copilot_admin_sidebar.php");
 
-$forms = [
-    ['Patient Intake (new patient)',  '8 sections',  'Active',     'good'],
-    ['Diabetes Encounter Template',   '5 sections',  'Active',     'good'],
-    ['Hypertension Follow-up',        '4 sections',  'Active',     'good'],
-    ['Annual Wellness',               '12 sections', 'Active',     'good'],
-    ['Telehealth Consent',            '1 section',   'Active',     'good'],
-    ['Pediatric Intake',              '6 sections',  'Draft',      'warn'],
-    ['Old Visit Form (legacy)',       '3 sections',  'Archived',   'neutral'],
-];
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
 
+// ---------------------------------------------------------------------------
+// Resolve built React assets via the Vite manifest.
+// ---------------------------------------------------------------------------
+
+$fileroot     = $GLOBALS['fileroot'] ?? __DIR__ . '/../..';
+$webroot      = $GLOBALS['webroot'] ?? '';
+$manifestPath = $fileroot . '/public/build/.vite/manifest.json';
+$manifest     = is_file($manifestPath)
+    ? (json_decode((string)file_get_contents($manifestPath), true) ?: [])
+    : [];
+$entry        = $manifest['src/pages/forms_layouts/index.tsx'] ?? null;
+$jsHref       = is_array($entry) && isset($entry['file']) ? '/public/build/' . $entry['file'] : null;
+$cssHrefs     = is_array($entry) && isset($entry['css']) && is_array($entry['css']) ? $entry['css'] : [];
+
+$session     = SessionWrapperFactory::getInstance()->getActiveSession();
+$authUserId  = (string)($_SESSION['authUserID'] ?? '');
+$patientId   = (string)($_SESSION['pid'] ?? '');
+$csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?php echo xlt('Forms & Layouts'); ?></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/public/copilot-archetype.css">
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/copilot-tokens.css">
+<?php foreach ($cssHrefs as $h): ?>
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/build/<?php echo attr((string)$h); ?>">
+<?php endforeach; ?>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: var(--cp-font);
+    background: var(--cp-bg);
+    color: var(--cp-navy);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; }
+  #cp-root { height: 100%; display: flex; flex-direction: column; }
+  .cp-boot-error {
+    display: none;
+    padding: 24px;
+    color: #4F5763;
+    font-size: 13px;
+  }
+  #cp-root:empty + .cp-boot-error { display: block; }
+</style>
 </head>
-<body class="cp-arch">
-
-<header class="cp-pagehead">
-  <div class="info">
-    <span class="title"><?php echo xlt('Forms & Layouts'); ?></span>
-    <span class="meta">7 <?php echo xlt('forms'); ?> • 5 <?php echo xlt('active'); ?> • 1 <?php echo xlt('draft'); ?></span>
-  </div>
-  <button type="button" class="cp-btn primary">+ <?php echo xlt('New form'); ?></button>
-</header>
-
-<div class="cp-shell">
-  <?php echo cp_admin_sidebar('forms_layouts'); ?>
-  <main class="cp-content tight">
-    <div class="cp-tbl">
-      <table>
-        <thead>
-          <tr>
-            <th><?php echo xlt('FORM'); ?></th>
-            <th><?php echo xlt('SECTIONS'); ?></th>
-            <th><?php echo xlt('STATUS'); ?></th>
-            <th><?php echo xlt('ACTIONS'); ?></th>
-          </tr>
-        </thead>
-        <tbody>
-          <?php foreach ($forms as [$name, $sections, $status, $tone]): ?>
-            <tr>
-              <td class="bold"><?php echo text($name); ?></td>
-              <td class="muted"><?php echo text($sections); ?></td>
-              <td><span class="cp-status-pill <?php echo attr($tone); ?>"><?php echo text($status); ?></span></td>
-              <td><button type="button" class="cp-btn ghost" style="padding:5px 10px;"><?php echo xlt('Edit'); ?></button></td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-  </main>
+<body>
+<div id="cp-root"
+     data-page="forms_layouts"
+     data-csrf="<?php echo attr($csrfToken); ?>"
+     data-user-id="<?php echo attr($authUserId); ?>"
+     data-patient-id="<?php echo attr($patientId); ?>"
+     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+<?php if ($jsHref !== null): ?>
+<script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
+<?php else: ?>
+<div class="cp-boot-error">
+  <?php echo xlt('Forms & Layouts UI bundle not found. Run "npm run build" in the /frontend directory to generate it.'); ?>
 </div>
-
+<?php endif; ?>
 </body>
 </html>

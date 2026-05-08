@@ -149,13 +149,41 @@ function insuranceChipLabel(active: boolean): string {
   return active ? 'Insurance: Yes' : 'Insurance: Any';
 }
 
-const RESULTS_COUNT = 23;
-const DEFAULT_SEARCH = 'Chen';
-const DEFAULT_SELECTED_PID = 1;
+// Default state matches the original PHP page (copilot_finder.php.bak):
+// no prepopulated search, no preselected row, only "Active only" filter on.
+// The Figma frame shows "Chen" + Margaret selected as a visual demo of the
+// filtered state — that's design decoration, not initial state.
+const RESULTS_COUNT = ROWS.length;
+const DEFAULT_SEARCH = '';
+const DEFAULT_SELECTED_PID: number | null = null;
 const DEFAULT_FILTERS: ReadonlySet<FilterKey> = new Set<FilterKey>([
-  'my_panel',
   'active',
 ]);
+
+// Reach into the helpers the parent shell defines (interface/main/tabs/js/
+// tabs_view_model.js). Same pattern the React Header uses to drive tab nav.
+declare global {
+  interface Window {
+    navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
+    activateTabByName?: (name: string, hideOthers?: boolean) => void;
+    webroot_url?: string;
+  }
+}
+
+function openDemographics(pid: number): void {
+  const webroot = window.webroot_url ?? '';
+  const url = `${webroot}/interface/patient_file/summary/demographics.php?set_pid=${pid}`;
+  if (typeof window.navigateTab === 'function') {
+    window.navigateTab(url, 'pat', () => {
+      window.activateTabByName?.('pat', true);
+    });
+  } else {
+    // Fallback: hard-navigate. Should not happen in the live shell.
+    window.top !== null && window.top !== window
+      ? (window.top.location.href = url)
+      : (window.location.href = url);
+  }
+}
 
 type FinderProps = {
   readonly boot: BootContext;
@@ -164,7 +192,12 @@ type FinderProps = {
 export function Finder(_props: FinderProps): JSX.Element {
   const [query, setQuery] = useState<string>(DEFAULT_SEARCH);
   const [filters, setFilters] = useState<ReadonlySet<FilterKey>>(DEFAULT_FILTERS);
-  const [selectedPid, setSelectedPid] = useState<number>(DEFAULT_SELECTED_PID);
+  const [selectedPid, setSelectedPid] = useState<number | null>(DEFAULT_SELECTED_PID);
+
+  const onRowClick = (pid: number): void => {
+    setSelectedPid(pid);
+    openDemographics(pid);
+  };
 
   const toggleFilter = (key: FilterKey): void => {
     const next = new Set(filters);
@@ -251,11 +284,11 @@ export function Finder(_props: FinderProps): JSX.Element {
                 className={rowCls}
                 role="button"
                 tabIndex={0}
-                onClick={() => setSelectedPid(r.pid)}
+                onClick={() => onRowClick(r.pid)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    setSelectedPid(r.pid);
+                    onRowClick(r.pid);
                   }
                 }}
                 title={`Open ${r.name}`}

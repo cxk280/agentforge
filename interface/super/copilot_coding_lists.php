@@ -1,75 +1,99 @@
 <?php
 
 /**
- * Coding & Lists (admin) — bonus archetype page.
+ * Coding & Lists landing page — Figma "Screen 63 — Coding & Lists".
+ *
+ * Thin manifest-loading wrapper that hands the page body off to the React
+ * bundle built from /frontend/src/pages/coding_lists/. The PHP outer shell
+ * at /interface/main/tabs/main.php still owns the navy top nav, left
+ * sidebar, and patient header2 banner; this file only renders inside the
+ * #maimain iframe.
+ *
+ * Boot context (CSRF token, current user id, current patient id, API base)
+ * is passed to React via data-* attributes on the #cp-root mount node and
+ * parsed in TS by readBootContext() — no global window.__INITIAL_STATE__.
+ *
+ * The original static-HTML mock is preserved at copilot_coding_lists.php.bak
+ * so a side-by-side screenshot diff remains possible.
  *
  * @package OpenEMR
  * @author  AgentForge / Claude Code
  * @license https://github.com/openemr/openemr/blob/master/LICENSE GNU General Public License 3
  */
 
+declare(strict_types=1);
+
 require_once(__DIR__ . "/../globals.php");
-require_once(__DIR__ . "/copilot_admin_sidebar.php");
 
-$lists = [
-    ['ICD-10 (clinical)',       'Code system', '~70,000 entries', '2026 release',  'Synced',   'good'],
-    ['CPT / HCPCS',             'Code system', '~10,400 entries', '2026 release',  'Synced',   'good'],
-    ['SNOMED CT',               'Code system', 'Subset (~80k)',   '2025-09 update','Synced',   'good'],
-    ['RxNorm',                  'Code system', '~150,000 entries','Daily sync',    'Synced',   'good'],
-    ['LOINC',                   'Code system', '~95,000 entries', '2026-04 update','Synced',   'good'],
-    ['Allergies (custom list)', 'List',        '38 entries',      'In-house',      'Local',    'info'],
-    ['Pharmacies (favorites)',  'List',        '12 entries',      'In-house',      'Local',    'info'],
-    ['Insurance plans',         'List',        '47 entries',      'In-house',      'Local',    'info'],
-];
+use OpenEMR\Common\Csrf\CsrfUtils;
+use OpenEMR\Common\Session\SessionWrapperFactory;
 
+// ---------------------------------------------------------------------------
+// Resolve built React assets via the Vite manifest.
+// ---------------------------------------------------------------------------
+
+$fileroot     = $GLOBALS['fileroot'] ?? __DIR__ . '/../..';
+$webroot      = $GLOBALS['webroot'] ?? '';
+$manifestPath = $fileroot . '/public/build/.vite/manifest.json';
+$manifest     = is_file($manifestPath)
+    ? (json_decode((string)file_get_contents($manifestPath), true) ?: [])
+    : [];
+$entry        = $manifest['src/pages/coding_lists/index.tsx'] ?? null;
+$jsHref       = is_array($entry) && isset($entry['file']) ? '/public/build/' . $entry['file'] : null;
+$cssHrefs     = is_array($entry) && isset($entry['css']) && is_array($entry['css']) ? $entry['css'] : [];
+
+$session     = SessionWrapperFactory::getInstance()->getActiveSession();
+$authUserId  = (string)($_SESSION['authUserID'] ?? '');
+$patientId   = (string)($_SESSION['pid'] ?? '');
+$csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?php echo xlt('Coding & Lists'); ?></title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/public/copilot-archetype.css">
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/copilot-tokens.css">
+<?php foreach ($cssHrefs as $h): ?>
+<link rel="stylesheet" href="<?php echo attr($webroot); ?>/public/build/<?php echo attr((string)$h); ?>">
+<?php endforeach; ?>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: var(--cp-font);
+    background: var(--cp-bg);
+    color: var(--cp-navy);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; }
+  #cp-root { height: 100%; display: flex; flex-direction: column; }
+  .cp-boot-error {
+    display: none;
+    padding: 24px;
+    color: #4F5763;
+    font-size: 13px;
+  }
+  #cp-root:empty + .cp-boot-error { display: block; }
+</style>
 </head>
-<body class="cp-arch">
-
-<header class="cp-pagehead">
-  <div class="info">
-    <span class="title"><?php echo xlt('Coding & Lists'); ?></span>
-    <span class="meta">8 <?php echo xlt('lists'); ?> • 5 <?php echo xlt('synced from external'); ?> • 3 <?php echo xlt('local'); ?></span>
-  </div>
-  <button type="button" class="cp-btn ghost">↻ <?php echo xlt('Sync all'); ?></button>
-  <button type="button" class="cp-btn primary">+ <?php echo xlt('New list'); ?></button>
-</header>
-
-<div class="cp-shell">
-  <?php echo cp_admin_sidebar('coding_lists'); ?>
-  <main class="cp-content tight">
-    <div class="cp-tbl">
-      <table>
-        <thead><tr>
-          <th><?php echo xlt('NAME'); ?></th>
-          <th><?php echo xlt('TYPE'); ?></th>
-          <th><?php echo xlt('SIZE'); ?></th>
-          <th><?php echo xlt('VERSION'); ?></th>
-          <th><?php echo xlt('STATUS'); ?></th>
-          <th><?php echo xlt('ACTIONS'); ?></th>
-        </tr></thead>
-        <tbody>
-          <?php foreach ($lists as [$n, $t, $s, $v, $st, $tone]): ?>
-            <tr>
-              <td class="bold"><?php echo text($n); ?></td>
-              <td class="muted"><?php echo text($t); ?></td>
-              <td class="muted"><?php echo text($s); ?></td>
-              <td class="muted"><?php echo text($v); ?></td>
-              <td><span class="cp-status-pill <?php echo attr($tone); ?>"><?php echo text($st); ?></span></td>
-              <td><button type="button" class="cp-btn ghost" style="padding:5px 10px;"><?php echo xlt('Edit'); ?></button></td>
-            </tr>
-          <?php endforeach; ?>
-        </tbody>
-      </table>
-    </div>
-  </main>
+<body>
+<div id="cp-root"
+     data-page="coding_lists"
+     data-csrf="<?php echo attr($csrfToken); ?>"
+     data-user-id="<?php echo attr($authUserId); ?>"
+     data-patient-id="<?php echo attr($patientId); ?>"
+     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+<?php if ($jsHref !== null): ?>
+<script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
+<?php else: ?>
+<div class="cp-boot-error">
+  <?php echo xlt('Coding & Lists UI bundle not found. Run "npm run build" in the /frontend directory to generate it.'); ?>
 </div>
-
+<?php endif; ?>
 </body>
 </html>
