@@ -124,6 +124,11 @@ type RecentRow = {
   readonly tag: RxTag;
 };
 
+export type PrescriptionPayload = {
+  readonly rows: readonly RecentRow[];
+  readonly total: number;
+};
+
 // Every row, in order, taken from Figma nodes 92:176–92:264.
 const RECENT: readonly RecentRow[] = [
   { time: '04/30 14:22', patient: 'Margaret Chen', drug: 'Metformin 1000 mg',    note: 'Refill x90d',           provider: 'Dr. Rivera', tag: null },
@@ -142,10 +147,13 @@ const RECENT: readonly RecentRow[] = [
 
 type PrescriptionReportProps = {
   readonly boot: BootContext;
+  readonly payload: PrescriptionPayload;
 };
 
-export function PrescriptionReport(_props: PrescriptionReportProps): JSX.Element {
+export function PrescriptionReport({ payload }: PrescriptionReportProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<RecentTab>('all');
+  const liveRows = payload.rows;
+  const recent: readonly RecentRow[] = liveRows.length > 0 ? liveRows : RECENT;
 
   return (
     <div className={styles.shell}>
@@ -254,7 +262,7 @@ export function PrescriptionReport(_props: PrescriptionReportProps): JSX.Element
 
               <table className={styles.table}>
                 <tbody>
-                  {RECENT.map((r, i) => (
+                  {recent.map((r, i) => (
                     <tr
                       key={`${r.time}-${r.patient}`}
                       className={i % 2 === 1 ? styles.rowAlt : undefined}

@@ -25,6 +25,7 @@
 declare(strict_types=1);
 
 require_once(__DIR__ . "/../globals.php");
+require_once(__DIR__ . "/../main/copilot_helpers.php");
 
 use OpenEMR\Common\Csrf\CsrfUtils;
 use OpenEMR\Common\Session\SessionWrapperFactory;
@@ -55,6 +56,60 @@ $session     = SessionWrapperFactory::getInstance()->getActiveSession();
 $authUserId  = (string)($session->get('authUserID') ?? '');
 $patientId   = (string)($session->get('pid') ?? '');
 $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
+
+// ---------------------------------------------------------------------------
+// Live prescription rows. Joins prescriptions -> patient_data + users
+// (provider_id) and surfaces the most recent 25 events. KPI tiles, top-10
+// chart and tab strip stay demo-mode for now.
+// ---------------------------------------------------------------------------
+
+$rxRecent = [];
+$rxTotal  = (int)(sqlQuery("SELECT COUNT(*) AS c FROM prescriptions")['c'] ?? 0);
+
+$rs = sqlStatement(
+    "SELECT p.id, p.patient_id, p.drug, p.dosage, p.date_added,
+            p.provider_id, p.active,
+            pd.fname AS pf, pd.lname AS pl,
+            u.username AS uu, u.fname AS uf, u.lname AS ul, u.title AS ut
+       FROM prescriptions p
+       LEFT JOIN patient_data pd ON pd.pid = p.patient_id
+       LEFT JOIN users u ON u.id = p.provider_id
+      ORDER BY p.date_added DESC, p.id DESC
+      LIMIT 25"
+);
+while ($r = sqlFetchArray($rs)) {
+    $ts = strtotime((string)($r['date_added'] ?? '')) ?: time();
+    $patientName = trim((string)($r['pf'] ?? '') . ' ' . (string)($r['pl'] ?? ''));
+    if ($patientName === '') {
+        $patientName = 'Patient #' . (int)($r['patient_id'] ?? 0);
+    }
+    $providerName = cp_format_provider_name([
+        'username' => $r['uu'] ?? '', 'fname' => $r['uf'] ?? '',
+        'lname'    => $r['ul'] ?? '', 'title' => $r['ut'] ?? '',
+    ]);
+
+    $drug = trim((string)($r['drug'] ?? ''));
+    $dose = trim((string)($r['dosage'] ?? ''));
+    $drugLabel = $drug !== '' && $dose !== '' && stripos($drug, $dose) === false
+        ? $drug . ' ' . $dose
+        : ($drug !== '' ? $drug : '—');
+
+    $rxRecent[] = [
+        'time'     => date('m/d H:i', $ts),
+        'patient'  => $patientName,
+        'patientId'=> (int)($r['patient_id'] ?? 0),
+        'drug'     => $drugLabel,
+        'note'     => (int)($r['active'] ?? 1) === 1 ? 'Active' : 'Inactive',
+        'provider' => $providerName,
+        'tag'      => null,
+    ];
+}
+
+$prescriptionPayload = [
+    'rows'  => $rxRecent,
+    'total' => $rxTotal,
+];
+$prescriptionJson = json_encode($prescriptionPayload, JSON_THROW_ON_ERROR);
 ?><!DOCTYPE html>
 <html lang="en">
 <head>
@@ -98,7 +153,8 @@ $csrfToken   = CsrfUtils::collectCsrfToken(session: $session);
      data-csrf="<?php echo attr($csrfToken); ?>"
      data-user-id="<?php echo attr($authUserId); ?>"
      data-patient-id="<?php echo attr($patientId); ?>"
-     data-api-base="<?php echo attr($webroot); ?>/apis"></div>
+     data-api-base="<?php echo attr($webroot); ?>/apis"
+     data-prescriptions="<?php echo attr($prescriptionJson); ?>"></div>
 <?php if ($jsHref !== null): ?>
 <script type="module" src="<?php echo attr($webroot . $jsHref); ?>"></script>
 <?php else: ?>
