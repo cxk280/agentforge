@@ -44,6 +44,12 @@ type ListRow = {
   readonly tone: StatusTone;
 };
 
+export type CodingListsPayload = {
+  readonly codeSystems: readonly ListRow[];
+  readonly lists: readonly ListRow[];
+  readonly totalLists: number;
+};
+
 const SIDEBAR_GROUPS: readonly SidebarGroup[] = [
   { topLabel: 'ADMIN', items: [] },
   {
@@ -104,16 +110,26 @@ type SourceFilter = 'all' | 'external' | 'inhouse';
 
 type CodingListsProps = {
   readonly boot: BootContext;
+  readonly payload: CodingListsPayload;
 };
 
-export function CodingLists(_props: CodingListsProps): JSX.Element {
+export function CodingLists({ payload }: CodingListsProps): JSX.Element {
   const [q, setQ]                       = useState<string>('');
   const [typeFilter, setTypeFilter]     = useState<TypeFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>('all');
 
+  // Live data: code-system rows (curated) + in-house lists from list_options.
+  // Demo fallback when the wrapper hands us nothing.
+  const allRows: readonly ListRow[] = (payload.codeSystems.length > 0 || payload.lists.length > 0)
+    ? [...payload.codeSystems, ...payload.lists]
+    : ALL_LISTS;
+  const syncedCount = allRows.filter((r) => r.status === 'Synced').length;
+  const localCount  = allRows.filter((r) => r.status === 'Local').length;
+  const headerMeta  = `${allRows.length} lists · ${syncedCount} synced from external · ${localCount} local`;
+
   const visible = useMemo<readonly ListRow[]>(() => {
-    return ALL_LISTS.filter((r) => {
+    return allRows.filter((r) => {
       if (typeFilter === 'code' && r.type !== 'Code system') return false;
       if (typeFilter === 'list' && r.type !== 'List') return false;
       if (statusFilter === 'synced' && r.status !== 'Synced') return false;
@@ -127,7 +143,7 @@ export function CodingLists(_props: CodingListsProps): JSX.Element {
       }
       return true;
     });
-  }, [q, typeFilter, statusFilter, sourceFilter]);
+  }, [q, typeFilter, statusFilter, sourceFilter, allRows]);
 
   return (
     <>
@@ -135,9 +151,7 @@ export function CodingLists(_props: CodingListsProps): JSX.Element {
         <div className={styles.titleBlock}>
           <span className={styles.title}>Coding &amp; Lists</span>
           <span className={styles.dot}>•</span>
-          <span className={styles.metaLight}>
-            8 lists · 5 synced from external · 3 local
-          </span>
+          <span className={styles.metaLight}>{headerMeta}</span>
         </div>
         <div className={styles.spacer} />
         <button type="button" className={styles.btnGhost}>
