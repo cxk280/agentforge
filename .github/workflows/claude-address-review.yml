@@ -1,0 +1,58 @@
+name: Claude Address Review Feedback
+
+# Pattern C — when a human reviewer submits a "changes requested" review
+# without typing @claude, Claude reads the review + inline comments and
+# pushes fixes back to the PR branch automatically. Pattern A (auto-review
+# on PR open) and Pattern B (@claude mention) handle the other two flows.
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  address:
+    # Only fire on changes-requested reviews from a human. The bot-author
+    # check stops Claude from trying to address its own auto-review if it
+    # ever lands as changes-requested for some reason.
+    if: |
+      github.event.review.state == 'changes_requested' &&
+      github.event.review.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: read
+      id-token: write
+      actions: read
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+
+      - name: Address review feedback
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          additional_permissions: |
+            actions: read
+          prompt: |
+            A reviewer just submitted a "changes requested" review on this PR.
+            Read the review body and every inline review comment, then address
+            the feedback by editing the relevant files and committing the
+            changes to this PR branch.
+
+            Rules:
+            - Fix or explicitly push back on every comment. Don't merely
+              acknowledge feedback — either change the code or reply to the
+              comment with a specific reason you disagree.
+            - Keep changes scoped to what the reviewer asked for. Do not
+              refactor adjacent code or add features.
+            - Use Conventional Commits (`fix:`, `refactor:`, etc.) and add an
+              `Assisted-by: Claude Code` trailer per the repo's CLAUDE.md.
+            - If the review asks for tests, run the relevant suite locally
+              (composer phpunit-isolated, agent unit tests, etc.) before
+              committing — see CLAUDE.md for command list.
+          claude_args: '--max-turns 12'
