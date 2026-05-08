@@ -14,6 +14,7 @@
 // (copilot_documents_upload.php, _delete.php, _serve.php) and the
 // child viewer (copilot_doc_viewer.php) are untouched.
 
+import { useRef, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './Documents.module.css';
 
@@ -71,7 +72,62 @@ type DocumentsProps = {
   readonly boot: BootContext;
 };
 
-export function Documents(_props: DocumentsProps): JSX.Element {
+type UploadState =
+  | { kind: 'idle' }
+  | { kind: 'uploading' }
+  | { kind: 'done'; docId: number }
+  | { kind: 'error'; message: string };
+
+export function Documents({ boot }: DocumentsProps): JSX.Element {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [upload, setUpload] = useState<UploadState>({ kind: 'idle' });
+
+  const onUploadClick = (): void => {
+    if (!boot.patientId) {
+      // Mirror the PHP "open a patient first" behavior. The upload endpoint
+      // files documents against $_SESSION['pid'].
+      window.alert('Open a patient chart first — uploads are filed against an active patient.');
+      return;
+    }
+    fileRef.current?.click();
+  };
+
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUpload({ kind: 'uploading' });
+    const fd = new FormData();
+    fd.append('file', file);
+    if (boot.csrf) fd.append('csrf', boot.csrf);
+    try {
+      const resp = await fetch('./copilot_documents_upload.php', {
+        method: 'POST',
+        body: fd,
+      });
+      const data = (await resp.json().catch(() => ({}))) as {
+        ok?: boolean;
+        doc_id?: number;
+        error?: string;
+      };
+      if (!resp.ok || data.ok === false) {
+        throw new Error(data.error ?? `HTTP ${resp.status}`);
+      }
+      setUpload({ kind: 'done', docId: Number(data.doc_id ?? 0) });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setUpload({ kind: 'error', message });
+      window.alert(`Upload failed: ${message}`);
+    } finally {
+      // Reset the file input so the same file can be re-selected if needed.
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const uploadLabel =
+    upload.kind === 'uploading' ? 'Uploading…'
+    : upload.kind === 'done'    ? `✓ Uploaded #${upload.docId}`
+    : 'Upload';
+
   return (
     <>
       <header className={styles.head}>
@@ -87,10 +143,26 @@ export function Documents(_props: DocumentsProps): JSX.Element {
           <span className={styles.pillIcon}>⇅</span>
           <span>Recent first</span>
         </button>
-        <button type="button" className={styles.upload}>
-          <span className={styles.uploadIcon}>⬆</span>
-          <span>Upload</span>
+        <button
+          type="button"
+          className={styles.upload}
+          onClick={onUploadClick}
+          disabled={upload.kind === 'uploading'}
+        >
+          <span className={styles.uploadIcon}>
+            {upload.kind === 'done' ? '' : '⬆'}
+          </span>
+          <span>{uploadLabel}</span>
         </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf,application/pdf,image/*"
+          onChange={onFileChange}
+          style={{ display: 'none' }}
+          aria-hidden="true"
+          tabIndex={-1}
+        />
       </header>
 
       <div className={styles.body}>

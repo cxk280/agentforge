@@ -425,7 +425,7 @@
                         "label": "Payment",
                         "menu_id": "pay1",
                         "target": "enc",
-                        "url": "/interface/patient_file/front_payment.php",
+                        "url": "/interface/billing/copilot_payment.php",
                         "children": [],
                         "requirement": 1,
                         "acl_req": [
@@ -451,7 +451,7 @@
                         "label": "Billing Manager",
                         "menu_id": "bil0",
                         "target": "bil0",
-                        "url": "/interface/billing/billing_report.php",
+                        "url": "/interface/billing/copilot_billing.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -472,7 +472,7 @@
                         "label": "Batch Payments",
                         "menu_id": "npa0",
                         "target": "pay",
-                        "url": "/interface/billing/new_payment.php",
+                        "url": "/interface/billing/copilot_payment.php",
                         "children": [],
                         "requirement": 0,
                         "acl_req": [
@@ -1039,7 +1039,7 @@
                     {
                         "label": "Payment",
                         "menu_id": "Popup:Payment",
-                        "url": "/interface/patient_file/front_payment.php",
+                        "url": "/interface/billing/copilot_payment.php",
                         "target": "pop",
                         "children": [],
                         "requirement": 1,
