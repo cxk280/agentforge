@@ -158,6 +158,15 @@ This is a one-week demo. Some honesty about scope:
   - Module Installer (Screen 106 → `modules`)
   - Coding & Lists (Screen 53 → `list_options` with per-list
     COUNT(\*))
+  - Patient Results (Screen 36 → `procedure_result` join
+    `procedure_report` + `procedure_order`, abnormal flagging)
+  - Lab Overview (Screen 37 → procedure_result trended series
+    per LOINC concept; ↑/↓/→ tag computed from the series)
+  - Aging (Screen 56 → `billing` reconciled per-bucket against
+    `ar_activity` for 0-30 / 31-60 / 61-90 / 91-120 / >120)
+  - Billing Manager (Screen 57 → `billing` with patient/provider
+    joins + ar_session deposits)
+  - Inventory (Screen 60 → `drug_inventory` join `drugs`)
 - CRUD flows that write to the DB and persist across reload:
   - Create patient (Screen 22 → `patient_data` insert)
   - Post office note (Screen 49 → `onotes`)
@@ -174,11 +183,10 @@ This is a one-week demo. Some honesty about scope:
 
 **Mocked (visually faithful but synthetic / static):**
 - Pages whose backing tables aren't seeded in the demo DB show
-  plausible synthetic data instead of empty state — Patient Tracker
-  (no recent encounters), Lab Overview / Patient Results / Pending
-  Review / Lab Documents (`procedure_result` empty), Aging /
-  Billing Manager (`billing` empty), Inventory (`drug_inventory`
-  empty), Quality Measures, Electronic Reports, e-Rx queue.
+  plausible synthetic data instead of empty state — Patient
+  Tracker, Pending Review (cross-patient queue), Lab Documents
+  (`documents` table empty for the demo), Quality Measures,
+  Electronic Reports, e-Rx queue.
 - KPI tiles on dashboard archetypes (Recalls KPIs, Aging buckets,
   Pending Review counts) — the underlying schema doesn't carry
   these aggregates.

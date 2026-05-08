@@ -1,27 +1,30 @@
 // LabOverview — Figma "Screen 37 — Lab Overview".
 //
-// Patient-scoped lab trends dashboard. Renders four trended panels (HbA1c,
-// LDL, Microalbumin, Creatinine) for the active patient with latest value,
-// trend tag, reference range and an inline SVG line of historical results.
-// A time-range pill toggle (6m / 1y / 2y / 5y / All) at the top filters the
-// query window.
+// Patient-scoped lab trends dashboard. Renders one trended panel per known
+// LOINC concept (HbA1c, LDL, Microalbumin, Creatinine) for the active
+// patient with latest value, trend tag, reference range, and an inline SVG
+// line of historical results. A time-range pill toggle at the top filters
+// the query window client-side using each panel's per-point dates.
 //
-// This is a 1:1 port of the PHP-rendered mock previously at
-// /interface/orders/copilot_lab_overview.php — a static demo with hardcoded
-// series matching the Figma design (no DB queries). Wiring to a real
-// /apis/copilot/labs endpoint is a follow-up.
+// The PHP wrapper at /interface/orders/copilot_lab_overview.php queries
+// procedure_result -> procedure_report -> procedure_order for the active
+// patient and JSON-encodes the typed payload onto data-overview. The
+// component renders panels straight from that payload (no hardcoded
+// series). When a patient has no readings for a panel, that panel renders
+// in an empty state with a flat axis and a neutral "single reading"/"—"
+// pill — present for visual consistency, not synthetic data.
 //
 // The chrome (top nav, demographics banner, navtab strip) is rendered by
 // the parent shell — this page renders only the body.
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { BootContext } from '../../shared/lib/bootContext';
 import styles from './LabOverview.module.css';
 
 type RangeKey = '6m' | '1y' | '2y' | '5y' | 'all';
 type Tone = 'good' | 'warn' | 'danger';
 
-type Panel = {
+export type Panel = {
   readonly name: string;
   readonly tag: string;
   readonly tone: Tone;
@@ -29,6 +32,13 @@ type Panel = {
   readonly unit: string;
   readonly ref: string;
   readonly series: readonly number[];
+  readonly dates: readonly string[];
+};
+
+export type OverviewPayload = {
+  readonly patientName: string;
+  readonly panels: readonly Panel[];
+  readonly xLabels: readonly string[];
 };
 
 const RANGE_OPTIONS: ReadonlyArray<{ readonly key: RangeKey; readonly label: string }> = [
@@ -39,55 +49,15 @@ const RANGE_OPTIONS: ReadonlyArray<{ readonly key: RangeKey; readonly label: str
   { key: 'all', label: 'All' },
 ];
 
-const PATIENT_NAME = 'Margaret Chen';
 const HELP_HREF = 'https://www.open-emr.org/wiki/index.php/Laboratory_Module';
 
-// X-axis tick labels — match the Figma 9-tick layout (10/22 → 04/26).
-const X_LABELS: readonly string[] = [
-  '10/22', '01/23', '06/23', '01/24', '06/24', '11/24', '05/25', '11/25', '04/26',
-];
-
-// Static demo series — each panel has 9 points matching the Figma chart shape.
-// HbA1c: rising (red); LDL: improving down (green); Microalbumin: trending up
-// (orange); Creatinine: stable (green).
-const PANELS: readonly Panel[] = [
-  {
-    name: 'HbA1c',
-    tag: '↑ rising',
-    tone: 'danger',
-    latest: '7.9',
-    unit: '%',
-    ref: '<7.0',
-    series: [6.4, 6.6, 6.8, 6.9, 7.0, 7.2, 7.4, 7.6, 7.9],
-  },
-  {
-    name: 'LDL',
-    tag: '↓ improving',
-    tone: 'good',
-    latest: '98',
-    unit: 'mg/dL',
-    ref: '<100',
-    series: [142, 134, 125, 117, 112, 107, 103, 100, 98],
-  },
-  {
-    name: 'Microalbumin',
-    tag: '↑ trending up',
-    tone: 'warn',
-    latest: '32',
-    unit: 'mg/g',
-    ref: '<30',
-    series: [12, 14, 16, 19, 22, 24, 26, 28, 32],
-  },
-  {
-    name: 'Creatinine',
-    tag: '→ stable',
-    tone: 'good',
-    latest: '1.04',
-    unit: 'mg/dL',
-    ref: '0.6–1.2',
-    series: [0.95, 0.97, 0.99, 1.01, 1.02, 1.03, 1.04, 1.04, 1.04],
-  },
-];
+const RANGE_MS: Record<RangeKey, number | null> = {
+  '6m': 1000 * 60 * 60 * 24 * 183,
+  '1y': 1000 * 60 * 60 * 24 * 365,
+  '2y': 1000 * 60 * 60 * 24 * 365 * 2,
+  '5y': 1000 * 60 * 60 * 24 * 365 * 5,
+  all: null,
+};
 
 const TONE_COLOR: Record<Tone, string> = {
   good: '#33A666',
@@ -95,12 +65,43 @@ const TONE_COLOR: Record<Tone, string> = {
   danger: '#D93838',
 };
 
+// Filter a panel's series + dates by a range cutoff. Returns the same
+// panel shape with the truncated arrays so downstream rendering is
+// uniform whether or not we filtered.
+function filterByRange(panel: Panel, cutoffMs: number | null): Panel {
+  if (cutoffMs === null || panel.series.length === 0) return panel;
+  const now = Date.now();
+  const limit = now - cutoffMs;
+  const keptSeries: number[] = [];
+  const keptDates: string[] = [];
+  for (let i = 0; i < panel.series.length; i++) {
+    const dRaw = panel.dates[i] ?? '';
+    const t = Date.parse(dRaw);
+    if (Number.isNaN(t) || t >= limit) {
+      keptSeries.push(panel.series[i] as number);
+      keptDates.push(dRaw);
+    }
+  }
+  return { ...panel, series: keptSeries, dates: keptDates };
+}
+
 type LabOverviewProps = {
   readonly boot: BootContext;
+  readonly payload: OverviewPayload;
 };
 
-export function LabOverview(_props: LabOverviewProps): JSX.Element {
+export function LabOverview({ payload }: LabOverviewProps): JSX.Element {
   const [activeRange, setActiveRange] = useState<RangeKey>('2y');
+
+  const cutoffMs = RANGE_MS[activeRange];
+  const filteredPanels = useMemo(
+    () => payload.panels.map((p) => filterByRange(p, cutoffMs)),
+    [payload.panels, cutoffMs],
+  );
+
+  const subMeta = payload.patientName !== ''
+    ? `Visualize key labs over time · ${payload.patientName}`
+    : 'Visualize key labs over time';
 
   return (
     <>
@@ -108,7 +109,7 @@ export function LabOverview(_props: LabOverviewProps): JSX.Element {
         <div className={styles.info}>
           <span className={styles.titleLg}>Lab Trends</span>
           <span className={styles.dot}>&middot;</span>
-          <span className={styles.subMeta}>Visualize key labs over time &middot; {PATIENT_NAME}</span>
+          <span className={styles.subMeta}>{subMeta}</span>
         </div>
         <div className={styles.spacer} />
         <div className={styles.rangeToggle} role="tablist">
@@ -137,11 +138,17 @@ export function LabOverview(_props: LabOverviewProps): JSX.Element {
       </header>
 
       <main className={styles.content}>
-        <div className={styles.grid}>
-          {PANELS.map((p) => (
-            <TrendCard key={p.name} panel={p} />
-          ))}
-        </div>
+        {filteredPanels.length === 0 ? (
+          <div className={styles.empty}>
+            No lab results on file for this patient yet.
+          </div>
+        ) : (
+          <div className={styles.grid}>
+            {filteredPanels.map((p) => (
+              <TrendCard key={p.name} panel={p} xLabels={payload.xLabels} />
+            ))}
+          </div>
+        )}
       </main>
     </>
   );
@@ -149,9 +156,10 @@ export function LabOverview(_props: LabOverviewProps): JSX.Element {
 
 type TrendCardProps = {
   readonly panel: Panel;
+  readonly xLabels: readonly string[];
 };
 
-function TrendCard({ panel }: TrendCardProps): JSX.Element {
+function TrendCard({ panel, xLabels }: TrendCardProps): JSX.Element {
   const tagClass = `${styles.trendTag} ${styles[`tone_${panel.tone}`] ?? ''}`;
   const valClass = `${styles.statVal} ${styles[`tone_${panel.tone}`] ?? ''}`;
 
@@ -182,8 +190,8 @@ function TrendCard({ panel }: TrendCardProps): JSX.Element {
       </div>
 
       <div className={styles.xAxis}>
-        {X_LABELS.map((lbl) => (
-          <span key={lbl}>{lbl}</span>
+        {xLabels.map((lbl, i) => (
+          <span key={`${i}-${lbl}`}>{lbl}</span>
         ))}
       </div>
     </div>
