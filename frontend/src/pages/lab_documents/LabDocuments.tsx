@@ -247,32 +247,34 @@ const CBC_ROWS: readonly CbcRow[] = [
 // Window globals — same pattern Finder uses for tab navigation.
 // ─────────────────────────────────────────────────────────────────────────
 
-declare global {
-  interface Window {
-    navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
-    activateTabByName?: (name: string, hideOthers?: boolean) => void;
-    webroot_url?: string;
-  }
-}
+// LabDocuments runs INSIDE the #maimain iframe; the shell's navigateTab
+// helper lives on `window.parent`, not on the iframe's own `window`.
+type Win = Window & {
+  navigateTab?: (url: string, name: string, afterLoad?: () => void) => void;
+  activateTabByName?: (name: string, hideOthers?: boolean) => void;
+  webroot_url?: string;
+};
 
 function openOriginalDoc(docId: number): void {
-  const webroot = window.webroot_url ?? '';
-  // Use the existing PHP doc viewer at copilot_doc_viewer.php; it expects
-  // ?docref=<id>. The pre-migration PHP linked to view.php?doc_id=… as a
-  // last-resort "Open original"; the copilot viewer is the project's
-  // canonical viewer URL and takes the same identifier under a different
-  // query name.
+  const self = window as Win;
+  const parent = (self.parent !== self ? self.parent : self) as Win;
+  const top = (self.top !== null && self.top !== self ? self.top : self) as Win;
+
+  const webroot = parent.webroot_url ?? top.webroot_url ?? self.webroot_url ?? '';
   const url = `${webroot}/interface/patient_file/documents/copilot_doc_viewer.php?docref=${docId}`;
-  if (typeof window.navigateTab === 'function') {
-    window.navigateTab(url, 'pat', () => {
-      window.activateTabByName?.('pat', true);
+
+  const navigateTab = parent.navigateTab ?? top.navigateTab;
+  const activateTabByName = parent.activateTabByName ?? top.activateTabByName;
+  if (typeof navigateTab === 'function') {
+    navigateTab(url, 'pat', () => {
+      activateTabByName?.('pat', true);
     });
-  } else {
-    // Fallback: hard-navigate. Should not happen in the live shell.
-    window.top !== null && window.top !== window
-      ? (window.top.location.href = url)
-      : (window.location.href = url);
+    return;
   }
+
+  // Fallback: navigate just THIS iframe (preserves the parent shell + nav).
+  // Never replace window.top — that would destroy the navy header.
+  self.location.href = url;
 }
 
 // ─────────────────────────────────────────────────────────────────────────
