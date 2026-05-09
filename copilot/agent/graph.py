@@ -34,6 +34,7 @@ import time
 from typing import Any, AsyncIterator, Literal, TypedDict
 
 from langgraph.graph import END, START, StateGraph
+from pydantic import BaseModel, ConfigDict, Field
 
 from agent import run_agent_stream
 
@@ -116,13 +117,30 @@ def _needs_evidence(state: AgentState) -> bool:
     return any(k in text for k in _EVIDENCE_KEYWORDS)
 
 
+class HandoffLogEntry(BaseModel):
+    """Schema for one entry in AgentState.handoff_log.
+
+    Constructed by _log_handoff() — every entry in the audit log goes
+    through this model, so a malformed handoff is caught at the source
+    (ValidationError) instead of surfacing later as a confusing missing
+    key in trace inspection.
+    """
+
+    from_node: str = Field(alias="from", min_length=1)
+    to_node: str = Field(alias="to", min_length=1)
+    reason: str = Field(min_length=1)
+    ts: int = Field(gt=0)
+
+    model_config = ConfigDict(populate_by_name=True, extra="forbid")
+
+
 def _log_handoff(state: AgentState, *, from_node: str, to_node: str, reason: str) -> dict[str, Any]:
-    return {
-        "from": from_node,
-        "to": to_node,
-        "reason": reason,
-        "ts": int(time.time() * 1000),
-    }
+    return HandoffLogEntry(
+        from_node=from_node,
+        to_node=to_node,
+        reason=reason,
+        ts=int(time.time() * 1000),
+    ).model_dump(by_alias=True)
 
 
 def _user_query(state: AgentState) -> str:
@@ -358,27 +376,27 @@ async def critic_node(state: AgentState) -> AgentState:
     events.append({"type": "handoff", "from": "final_answer", "to": "critic",
                    "reason": "validate citations + safety on draft"})
 
-    # Soft-import rubrics (the critic is optional and we don't want a
-    # missing eval-suite checkout to break /chat/graph).
+    # Citation enforcement is schema-driven (CitedReply in agent_schemas).
+    # safe_refusal still comes from the eval rubric — soft-import so a
+    # missing eval-suite checkout doesn't break /chat/graph.
+    try:
+        from agent_schemas import parse_reply
+    except ImportError:
+        from copilot.agent.agent_schemas import parse_reply  # type: ignore[no-redef]
+    safe_refusal = None
     try:
         try:
-            from copilot.agent.evals.rubrics import (  # type: ignore
-                citation_present, safe_refusal,
-            )
+            from copilot.agent.evals.rubrics import safe_refusal  # type: ignore
         except ImportError:
             import sys
             from pathlib import Path as _P
             sys.path.insert(0, str(_P(__file__).resolve().parent / "evals"))
-            from rubrics import citation_present, safe_refusal  # type: ignore[no-redef]
+            from rubrics import safe_refusal  # type: ignore[no-redef]
     except Exception as exc:
-        events.append({"type": "critic_skip", "reason": f"rubrics import failed: {exc}"})
-        return {**state, "critic_pass": True, "events": events,
-                "handoff_log": (state.get("handoff_log") or []) + [
-                    _log_handoff(state, from_node="final_answer", to_node="critic",
-                                 reason="skipped — rubrics unavailable"),
-                ]}
+        events.append({"type": "critic_skip_safe_refusal",
+                       "reason": f"rubric import failed: {exc}"})
 
-    # We synthesize a "case" so we can call the rubric functions directly.
+    # Determine refusal target from the latest user message.
     last_user = None
     for m in reversed(state.get("messages") or []):
         if m.get("role") == "user":
@@ -391,19 +409,21 @@ async def critic_node(state: AgentState) -> AgentState:
             "falsify", "delete the diagnosis", "remove the diagnosis",
             "email", "send to", "share with my friend",
         ))
-    synthetic_case = {
-        "category": "refusal" if is_refusal_target else "clinical_lookup",
-        "expected": {"must_refuse": is_refusal_target},
-    }
-
-    cit_result = citation_present(synthetic_case, reply)
-    refusal_result = safe_refusal(synthetic_case, reply) if is_refusal_target else None
 
     failures: list[str] = []
-    if not cit_result.passed:
-        failures.append(f"citation_present: {cit_result.reason}")
-    if refusal_result is not None and not refusal_result.passed:
-        failures.append(f"safe_refusal: {refusal_result.reason}")
+    # Schema-level citation check.
+    try:
+        parse_reply(reply)
+    except Exception as exc:
+        # ValidationError from Pydantic; flatten to a single line.
+        failures.append(f"citation_required: {exc}".replace("\n", " ")[:240])
+
+    if is_refusal_target and safe_refusal is not None:
+        synthetic_case = {"category": "refusal",
+                          "expected": {"must_refuse": True}}
+        refusal_result = safe_refusal(synthetic_case, reply)
+        if not refusal_result.passed:
+            failures.append(f"safe_refusal: {refusal_result.reason}")
 
     retries_used = int(state.get("retry_count") or 0)
     if not failures:

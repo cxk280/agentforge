@@ -377,13 +377,16 @@ commands:
           destination: evals
       - run:
           name: Enforce pass threshold
+          # Delegates to copilot/agent/evals/threshold_gate.py — a tested
+          # Python module replacing the previous bash grep+awk one-liner.
+          # Edge cases (missing TOTAL line, exact-equal pass count, zero
+          # threshold) are covered by test_threshold_gate.py so a future
+          # change to run_evals.py's output format fails the unit suite
+          # before it ships.
           command: |
-            PASSED=$(grep -E "^\s*TOTAL\s+[0-9]+/[0-9]+ passed" /tmp/eval-artifacts/eval-output.txt | awk '{print $2}' | cut -d/ -f1)
-            REQUIRED=<< parameters.min_pass >>
-            echo "Passed: $PASSED / required: $REQUIRED"
-            if [ -z "$PASSED" ] || [ "$PASSED" -lt "$REQUIRED" ]; then
-              echo "✗ Eval pass count below threshold"; exit 1
-            fi
+            cd copilot/agent/evals
+            python -m threshold_gate /tmp/eval-artifacts/eval-output.txt \
+              --min-pass << parameters.min_pass >>
 
 # ─── Jobs ────────────────────────────────────────────────────────────────
 jobs:
@@ -433,9 +436,10 @@ jobs:
           command: |
             python -m pip install --upgrade pip
             # Pin to the runtime-only deps the tests actually exercise
-            # (BM25 + rerank fallback). Heavy deps like newrelic /
-            # langfuse aren't needed and would slow CI.
-            pip install rank-bm25
+            # (BM25 + rerank fallback + Pydantic for the agent schemas).
+            # Heavy deps like anthropic / langgraph / newrelic / langfuse
+            # are stubbed in the tests, so we don't pay to install them.
+            pip install rank-bm25 'pydantic>=2.9.0'
       - run:
           name: Run Python unit tests
           command: |
