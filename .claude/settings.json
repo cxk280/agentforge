@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(railway ssh:*)",
+      "Bash(railway ssh -s openemr:*)",
+      "Bash(railway link:*)",
+      "Bash(railway variables:*)"
+    ]
+  }
+}
