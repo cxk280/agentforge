@@ -103,17 +103,32 @@ class CitedReply(BaseModel):
 
 
 def _extract_citations(text: str) -> list[Citation]:
+    """Pull citation markers out of an agent reply.
+
+    Empty matches are dropped silently. Citation.text has min_length=1,
+    so a pathological regex hit (e.g. a Sources-line at the very end
+    of a string with nothing after the colon, where the substring after
+    .strip() ends up empty) would otherwise raise ValidationError and
+    the caller would have to special-case it. The defensive
+    `if marker:` checks here keep parse_reply()'s only failure mode as
+    "no citations found", which the caller already knows how to handle.
+    """
     out: list[Citation] = []
     match = _SOURCES_LINE.search(text)
     if match is not None:
         line_end = text.find("\n", match.start())
         line_end = len(text) if line_end == -1 else line_end
-        out.append(Citation(kind="sources_line",
-                            text=text[match.start():line_end].strip()))
+        marker = text[match.start():line_end].strip()
+        if marker:
+            out.append(Citation(kind="sources_line", text=marker))
     for m in _INLINE_CITATION.finditer(text):
-        out.append(Citation(kind="inline_ref", text=m.group(0)))
+        marker = m.group(0)
+        if marker:
+            out.append(Citation(kind="inline_ref", text=marker))
     for m in _PROVIDER_TOOL_REF.finditer(text):
-        out.append(Citation(kind="tool_ref", text=m.group(0)))
+        marker = m.group(0)
+        if marker:
+            out.append(Citation(kind="tool_ref", text=marker))
     return out
 
 

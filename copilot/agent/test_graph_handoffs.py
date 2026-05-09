@@ -268,6 +268,28 @@ class WorkerHandoffEmissionTests(unittest.TestCase):
         last = out["handoff_log"][-1]
         self.assertIn("retry", last["reason"].lower())
 
+    def test_critic_max_retries_clears_feedback(self):
+        # Regression: when retries are exhausted, critic_node took the
+        # warning path but left `critic_feedback` set. route_after_critic
+        # then routed back to final_answer (because its predicate
+        # `if state.get("critic_feedback")` was True), causing
+        # final_answer to be invoked a 3rd time with messages ending in
+        # `assistant` — Anthropic 400'd as "model does not support
+        # assistant message prefill". 2026-05-09. critic_node now
+        # explicitly clears critic_feedback in the warning path.
+        uncited = "The patient's HbA1c is 8.2% — start metformin 500mg BID."
+        s = _state(
+            messages=[{"role": "user", "content": "what should we do?"}],
+            reply_text=uncited,
+            retry_count=graph._MAX_CRITIC_RETRIES,
+            critic_feedback="citation_required: stale from prior bounce",
+        )
+        out = self._run(graph.critic_node(s))
+        self.assertEqual(out["critic_feedback"], "",
+                         "critic must clear feedback when retries are "
+                         "exhausted so route_after_critic ends the graph")
+        self.assertFalse(out["critic_pass"])
+
 
 if __name__ == "__main__":
     unittest.main()

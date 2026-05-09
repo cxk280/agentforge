@@ -159,6 +159,18 @@ class RouteAfterCriticTests(unittest.TestCase):
         s = _state(critic_pass=False, retry_count=graph._MAX_CRITIC_RETRIES + 1)
         self.assertEqual(graph.route_after_critic(s), END)
 
+    def test_retry_count_at_cap_ends_graph(self):
+        # Regression: prior `> _MAX_CRITIC_RETRIES` (strict) let the
+        # workflow loop back to final_answer when retry_count had hit
+        # the cap and the critic had emitted a warning rather than
+        # incrementing — that put `messages` into a state ending with
+        # `assistant`, which 400'd as "model does not support assistant
+        # message prefill". 2026-05-09. Now `>= _MAX_CRITIC_RETRIES`.
+        from langgraph.graph import END
+        s = _state(critic_pass=False, retry_count=graph._MAX_CRITIC_RETRIES,
+                   critic_feedback="citation_required: missing")
+        self.assertEqual(graph.route_after_critic(s), END)
+
     def test_feedback_with_retries_left_loops_back(self):
         s = _state(critic_pass=False, retry_count=0,
                    critic_feedback="citation_present: missing")
