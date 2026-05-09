@@ -1,5 +1,16 @@
 name: Claude Code
 
+# Triggers Claude on @claude mentions in PR comments / review
+# comments / review bodies / issue bodies/titles. Used for "address
+# the review", "fix the failing test", "implement this issue", etc.
+# Companion to claude-code-review.yml, which posts the initial
+# review automatically on every PR.
+#
+# Permissions are intentionally write-scoped so Claude can push
+# fix commits to the PR's head branch — without that, the workflow
+# could only respond with comments, not actually resolve review
+# feedback. Loop prevention is via the sender.type guard below.
+
 on:
   issue_comment:
     types: [created]
@@ -12,23 +23,31 @@ on:
 
 jobs:
   claude:
+    # Skip when the triggering event was authored by a bot. Without
+    # this guard, claude[bot]'s own status comments (which may quote
+    # the original "@claude ..." text) re-fire the workflow → infinite
+    # review/fix/re-review loop. Humans @claude → workflow runs;
+    # claude[bot] @claude → workflow skips.
     if: |
-      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
-      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
-      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      github.event.sender.type != 'Bot' && (
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+        (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+      )
     runs-on: ubuntu-latest
     permissions:
-      contents: read
-      pull-requests: read
-      issues: read
+      contents: write          # push fix commits to the PR's head branch
+      pull-requests: write     # post status / summary comments, react
+      issues: write            # react to the triggering comment, edit issue bodies
       id-token: write
-      actions: read # Required for Claude to read CI results on PRs
+      actions: read            # read CI results so Claude can fix failing checks
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0       # full history — Claude may need to inspect
+                               # parents or do a multi-commit fix
 
       - name: Run Claude Code
         id: claude
@@ -36,15 +55,14 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
-          # This is an optional setting that allows Claude to read CI results on PRs
+          # Lets Claude read CI run/job results on PRs so it can
+          # diagnose failing checks rather than guessing.
           additional_permissions: |
             actions: read
 
-          # Optional: Give a custom prompt to Claude. If this is not specified, Claude will perform the instructions specified in the comment that tagged it.
-          # prompt: 'Update the pull request description to include a summary of changes.'
-
-          # Optional: Add claude_args to customize behavior and configuration
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
-          # claude_args: '--allowed-tools Bash(gh pr *)'
+          # Default mode (no prompt:, no plugins:): the action reads
+          # the triggering comment body, runs Claude Code against the
+          # PR's head branch with Edit/Write/Bash tool access, and
+          # pushes any changes back as new commits. See
+          # https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
 
