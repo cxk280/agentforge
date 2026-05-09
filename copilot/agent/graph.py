@@ -354,6 +354,25 @@ async def final_answer_node(state: AgentState) -> AgentState:
     reply_parts: list[str] = []
     final_history = state.get("messages", [])
 
+    # DEBUG (temporary — remove after bug investigation 2026-05-09):
+    # log the messages shape so we can pin down why /chat/graph
+    # produces a prefill error on tool-using queries.
+    import json as _dbg_json
+    import logging as _dbg_log
+    _dbg_msgs = state.get("messages", [])
+    try:
+        _dbg_log.getLogger("agentforge.debug").warning(
+            "DBG_FA n=%d roles=%s last_role=%s last_content_type=%s extra_len=%d last_msg=%s",
+            len(_dbg_msgs),
+            [m.get("role") for m in _dbg_msgs],
+            _dbg_msgs[-1].get("role") if _dbg_msgs else "<empty>",
+            type(_dbg_msgs[-1].get("content")).__name__ if _dbg_msgs else "<empty>",
+            len(extra),
+            _dbg_json.dumps(_dbg_msgs[-1], default=str)[:400] if _dbg_msgs else "<empty>",
+        )
+    except Exception:
+        pass
+
     async for event in run_agent_stream(
         state["fhir_patient_id"],
         state.get("messages", []),
