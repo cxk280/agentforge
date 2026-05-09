@@ -250,6 +250,14 @@ async def get_extracted_facts(patient_id: str, doc_type: str | None = None) -> d
 
     Each fact carries a derivedFrom: DocumentReference/{id} field so
     citations on the agent's reply round-trip through the bbox viewer.
+
+    `patient_id` may be either the numeric OpenEMR pid OR a 32-char
+    hex FHIR UUID (the form the agent's system prompt advertises as
+    "Active patient ID"). cp_extracted_facts is keyed on the numeric
+    pid; we resolve hex UUIDs back to a pid via patient_data.uuid
+    before querying. Without this, an agent call from /chat/graph
+    (where the system prompt holds the FHIR UUID) silently returned
+    zero facts even though extraction had populated the table.
     """
     try:
         from fhir_client import get_db_pool
@@ -260,8 +268,14 @@ async def get_extracted_facts(patient_id: str, doc_type: str | None = None) -> d
         return {"patient_id": patient_id, "facts": [],
                 "error": "DB not configured (no DB_HOST)"}
 
+    pid = await _resolve_to_pid(pool, patient_id)
+    if pid is None:
+        return {"patient_id": patient_id, "facts": [],
+                "error": (f"Could not resolve patient_id={patient_id!r} to an "
+                          f"OpenEMR pid (neither numeric nor a known FHIR UUID).")}
+
     where_extra = ""
-    params: list = [int(patient_id) if patient_id.isdigit() else 0]
+    params: list = [pid]
     if doc_type:
         where_extra = " AND doc_type = %s"
         params.append(doc_type)
@@ -295,6 +309,44 @@ async def get_extracted_facts(patient_id: str, doc_type: str | None = None) -> d
     except Exception as exc:
         return {"patient_id": patient_id, "facts": [], "error": str(exc)[:200]}
     return {"patient_id": patient_id, "doc_type_filter": doc_type, "facts": facts}
+
+
+# Cache reverse lookups (FHIR-hex → pid). Patient UUIDs are stable for
+# the life of the patient_data row, so this is safe to keep for the
+# process lifetime.
+_FHIR_TO_PID: dict[str, int] = {}
+
+
+async def _resolve_to_pid(pool, patient_id: str) -> int | None:
+    """Return the numeric OpenEMR pid for either a digit string or a
+    32-char hex FHIR UUID. Returns None if neither shape resolves."""
+    if not patient_id:
+        return None
+    if patient_id.isdigit():
+        return int(patient_id)
+    # Strip any FHIR resource prefix the model might have sent
+    # ("Patient/abc..."), then any dashes (UUIDs sometimes carry them).
+    candidate = patient_id.split("/")[-1].replace("-", "").lower()
+    if not candidate or any(c not in "0123456789abcdef" for c in candidate):
+        return None
+    cached = _FHIR_TO_PID.get(candidate)
+    if cached is not None:
+        return cached
+    try:
+        async with pool.acquire() as conn:
+            async with conn.cursor() as cur:
+                await cur.execute(
+                    "SELECT pid FROM patient_data WHERE LOWER(HEX(uuid)) = %s LIMIT 1",
+                    [candidate],
+                )
+                row = await cur.fetchone()
+    except Exception:
+        return None
+    if not row or row[0] is None:
+        return None
+    pid = int(row[0])
+    _FHIR_TO_PID[candidate] = pid
+    return pid
 
 
 # ---------------------------------------------------------------------------
