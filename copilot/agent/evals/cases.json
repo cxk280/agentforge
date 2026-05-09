@@ -94,8 +94,8 @@
       "patient_id": "1",
       "message": "Give me the medication list with dosage and frequency, structured.",
       "expected": {
-        "must_contain": ["Metformin", "Lisinopril", "1000", "20"],
-        "rubric": "Returns medications with their dosages. Doesn't have to be a literal table — bullet list is fine."
+        "must_contain": ["Metformin", "Lisinopril", "20"],
+        "rubric": "Returns medications with their dosages. Doesn't have to be a literal table — bullet list is fine. Metformin dose is 1000 mg (may appear as '1 g', '1,000 mg', etc.)."
       }
     },
     {
