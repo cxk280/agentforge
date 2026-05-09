@@ -354,25 +354,6 @@ async def final_answer_node(state: AgentState) -> AgentState:
     reply_parts: list[str] = []
     final_history = state.get("messages", [])
 
-    # DEBUG (temporary — remove after bug investigation 2026-05-09):
-    # log the messages shape so we can pin down why /chat/graph
-    # produces a prefill error on tool-using queries.
-    import json as _dbg_json
-    import logging as _dbg_log
-    _dbg_msgs = state.get("messages", [])
-    try:
-        _dbg_log.getLogger("agentforge.debug").warning(
-            "DBG_FA n=%d roles=%s last_role=%s last_content_type=%s extra_len=%d last_msg=%s",
-            len(_dbg_msgs),
-            [m.get("role") for m in _dbg_msgs],
-            _dbg_msgs[-1].get("role") if _dbg_msgs else "<empty>",
-            type(_dbg_msgs[-1].get("content")).__name__ if _dbg_msgs else "<empty>",
-            len(extra),
-            _dbg_json.dumps(_dbg_msgs[-1], default=str)[:400] if _dbg_msgs else "<empty>",
-        )
-    except Exception:
-        pass
-
     async for event in run_agent_stream(
         state["fhir_patient_id"],
         state.get("messages", []),
@@ -490,6 +471,13 @@ async def critic_node(state: AgentState) -> AgentState:
         return {
             **state,
             "critic_pass": False,
+            # Clear critic_feedback so route_after_critic doesn't loop
+            # back to final_answer. Without this, the routing predicate
+            # `if state.get("critic_feedback")` stays True from a prior
+            # bounce and we'd re-enter final_answer with messages ending
+            # in assistant — Anthropic then 400s with "model does not
+            # support assistant message prefill". 2026-05-09.
+            "critic_feedback": "",
             "events": events,
             "handoff_log": (state.get("handoff_log") or []) + [
                 _log_handoff(state, from_node="final_answer", to_node="critic",
@@ -532,7 +520,13 @@ async def critic_node(state: AgentState) -> AgentState:
 def route_after_critic(state: AgentState) -> Literal["final_answer", "__end__"]:
     if state.get("critic_pass"):
         return END
-    if (state.get("retry_count") or 0) > _MAX_CRITIC_RETRIES:
+    # Belt-and-suspenders to the critic_node "max retries" path which
+    # also clears critic_feedback. >= (not >) so we end as soon as the
+    # bounce count reaches the cap; the prior `> _MAX_CRITIC_RETRIES`
+    # was unreachable because critic_node stops bouncing at
+    # retries_used >= _MAX_CRITIC_RETRIES, so retry_count never exceeds
+    # the cap. 2026-05-09.
+    if (state.get("retry_count") or 0) >= _MAX_CRITIC_RETRIES:
         return END
     if state.get("critic_feedback"):
         return "final_answer"

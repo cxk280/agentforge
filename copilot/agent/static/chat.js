@@ -362,7 +362,7 @@ async function send(text) {
   }
 
   try {
-    const res = await fetch(`${BACKEND}/chat/stream`, {
+    const res = await fetch(`${BACKEND}/chat/graph`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
