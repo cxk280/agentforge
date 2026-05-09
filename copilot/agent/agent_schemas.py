@@ -104,13 +104,12 @@ class CitedReply(BaseModel):
 
 def _extract_citations(text: str) -> list[Citation]:
     out: list[Citation] = []
-    if _SOURCES_LINE.search(text):
-        match = _SOURCES_LINE.search(text)
-        if match is not None:
-            line_end = text.find("\n", match.start())
-            line_end = len(text) if line_end == -1 else line_end
-            out.append(Citation(kind="sources_line",
-                                text=text[match.start():line_end].strip()))
+    match = _SOURCES_LINE.search(text)
+    if match is not None:
+        line_end = text.find("\n", match.start())
+        line_end = len(text) if line_end == -1 else line_end
+        out.append(Citation(kind="sources_line",
+                            text=text[match.start():line_end].strip()))
     for m in _INLINE_CITATION.finditer(text):
         out.append(Citation(kind="inline_ref", text=m.group(0)))
     for m in _PROVIDER_TOOL_REF.finditer(text):
