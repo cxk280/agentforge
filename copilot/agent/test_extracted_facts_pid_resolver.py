@@ -14,15 +14,54 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import types
 import unittest
 from pathlib import Path
 
-# Set required env so importing tools.py doesn't fail at config load
+# Set required env so importing tools.py / config.py doesn't fail at
+# Settings instantiation time.
 os.environ.setdefault("ANTHROPIC_API_KEY", "test")
 os.environ.setdefault("OPENEMR_BASE_URL", "http://localhost:8300")
 os.environ.setdefault("OPENEMR_PASSWORD", "pass")
 os.environ.setdefault("COPILOT_INTERNAL_TOKEN", "test")
 
+
+def _install_fhir_client_stub() -> None:
+    """Stub `fhir_client` so importing `tools` doesn't pull in
+    aiomysql.
+
+    CI's agent-unit-test executor (.circleci/config.yml) only installs
+    rank-bm25 + pydantic. tools.py does
+    `from fhir_client import fhir_get, bundle_entries` at module
+    import time, and fhir_client.py imports aiomysql at the top —
+    which 404s in CI. The stub satisfies the import without dragging
+    in DB drivers; _resolve_to_pid takes its `pool` argument
+    directly, so the test fakes a pool per-test rather than going
+    through the stubbed module."""
+    if "fhir_client" in sys.modules:
+        return
+    stub = types.ModuleType("fhir_client")
+
+    async def _fhir_get(*a, **kw):  # noqa: D401, ARG001
+        return {}
+
+    def _bundle_entries(*a, **kw):  # noqa: ARG001
+        return []
+
+    async def _get_db_pool(*a, **kw):  # noqa: ARG001
+        return None
+
+    async def _resolve_patient(*a, **kw):  # noqa: ARG001
+        return {"fhir_id": "stub", "fname": "stub", "lname": "stub"}
+
+    stub.fhir_get = _fhir_get
+    stub.bundle_entries = _bundle_entries
+    stub.get_db_pool = _get_db_pool
+    stub.resolve_patient = _resolve_patient
+    sys.modules["fhir_client"] = stub
+
+
+_install_fhir_client_stub()
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import tools  # noqa: E402
