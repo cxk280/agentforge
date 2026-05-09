@@ -31,6 +31,9 @@
 #                                   previous-env verifications pass.
 #   5.  promote-{qa,prod}         — single git push that triggers BOTH Railway
 #                                   services' auto-deploy on the env branch.
+#                                   Also tags the SHA <env>-YYYY-MM-DD-N for
+#                                   audit history (Railway can't watch tags;
+#                                   the tag is purely a chronological log).
 #   6.  eval-full-agent-{qa,prod} — full 50-case eval; threshold 46/50.
 #                                   Polls /version for SHA match before evaluating.
 #   7.  smoke-openemr-{qa,prod}   — same shape as dev, against the env's openemr.
@@ -99,8 +102,14 @@ executors:
 commands:
   promote-to-env-branch:
     description: |
-      Push the current commit to a target env branch (qa/prod).
-      Railway services watching that branch auto-deploy on push.
+      Push the current commit to a target env branch (qa/prod) AND
+      tag it as <env>-YYYY-MM-DD-N for audit history.
+
+      The branch push is the deploy trigger — Railway services watch
+      qa/prod and auto-deploy on push. Railway can't watch tags
+      (verified 2026-05-09 via Railway docs/dashboard), so the tag is
+      audit-only: `git tag -l 'qa-*'` enumerates every promotion in
+      chronological order.
 
       Auth: GitHub App installation token (NOT a user PAT). The App
       identity is the only one allowed to push to qa/prod under branch
@@ -142,6 +151,27 @@ commands:
               "https://x-access-token:${GH_INSTALLATION_TOKEN}@github.com/cxk280/agentforge.git" \
               "${CIRCLE_SHA1}:refs/heads/<< parameters.env_branch >>"
             echo "✓ Pushed ${CIRCLE_SHA1} → << parameters.env_branch >>"
+      - run:
+          name: Tag promotion as << parameters.env_branch >>-YYYY-MM-DD-N
+          command: |
+            ENV="<< parameters.env_branch >>"
+            TODAY=$(date -u +%Y-%m-%d)
+            AUTH_URL="https://x-access-token:${GH_INSTALLATION_TOKEN}@github.com/cxk280/agentforge.git"
+            # Count today's existing tags for this env via ls-remote
+            # (server-authoritative — survives parallel/retried jobs
+            # better than a local tag list). grep exits 1 when zero
+            # matches, hence the `|| true`.
+            EXISTING=$(git ls-remote --tags "$AUTH_URL" \
+              | grep -cE "refs/tags/${ENV}-${TODAY}-[0-9]+\$" \
+              || true)
+            N=$((EXISTING + 1))
+            TAG="${ENV}-${TODAY}-${N}"
+            git -c user.email="ci@agentforge.local" \
+                -c user.name="AgentForge CI Promoter" \
+                tag -a "${TAG}" "${CIRCLE_SHA1}" \
+                -m "Promote ${CIRCLE_SHA1:0:7} → ${ENV}"
+            git push "$AUTH_URL" "refs/tags/${TAG}"
+            echo "✓ Tagged ${CIRCLE_SHA1:0:7} as ${TAG}"
 
   wait-for-agent-sha:
     description: |
