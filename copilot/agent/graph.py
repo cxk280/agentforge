@@ -30,6 +30,7 @@ Handoffs are explicit:
 
 from __future__ import annotations
 
+import functools
 import time
 from typing import Any, AsyncIterator, Literal, TypedDict
 
@@ -37,6 +38,28 @@ from langgraph.graph import END, START, StateGraph
 from pydantic import BaseModel, ConfigDict, Field
 
 from agent import run_agent_stream
+from observability import span_graph_node, trace_request
+
+
+def _traced_node(name: str):
+    """Decorator: wrap an async worker node body in a Langfuse span.
+
+    Without this, the worker's internal LLM/tool spans would be the
+    only visible observations under the request trace and the
+    supervisor → worker structure would be lost. With it, the trace
+    tree shows `node:supervisor`, `node:evidence_retriever`, etc. as
+    nested children of the request-level span set up by trace_request().
+    """
+
+    def decorator(fn):
+        @functools.wraps(fn)
+        async def wrapper(state: AgentState) -> AgentState:
+            with span_graph_node(name):
+                return await fn(state)
+
+        return wrapper
+
+    return decorator
 
 
 # ---------------------------------------------------------------------------
@@ -185,6 +208,7 @@ def _format_evidence_context(chunks: list[dict[str, Any]]) -> str:
 # Worker: intake_extractor
 # ---------------------------------------------------------------------------
 
+@_traced_node("intake_extractor")
 async def intake_extractor_node(state: AgentState) -> AgentState:
     """Run attach_and_extract for any queued doc uploads.
 
@@ -255,6 +279,7 @@ async def intake_extractor_node(state: AgentState) -> AgentState:
 # Worker: evidence_retriever
 # ---------------------------------------------------------------------------
 
+@_traced_node("evidence_retriever")
 async def evidence_retriever_node(state: AgentState) -> AgentState:
     """Hybrid sparse+dense retrieval over the guideline corpus
     (BM25 + Voyage → RRF → optional Cohere Rerank).
@@ -308,6 +333,7 @@ async def evidence_retriever_node(state: AgentState) -> AgentState:
 # Worker: final_answer
 # ---------------------------------------------------------------------------
 
+@_traced_node("final_answer")
 async def final_answer_node(state: AgentState) -> AgentState:
     """Stream the final reply through the W1 single-loop, augmented with
     extraction + evidence context in the system prompt.
@@ -362,6 +388,7 @@ async def final_answer_node(state: AgentState) -> AgentState:
 _MAX_CRITIC_RETRIES = 1
 
 
+@_traced_node("critic")
 async def critic_node(state: AgentState) -> AgentState:
     """Reject uncited clinical claims and unsafe-action surfaces.
 
@@ -497,6 +524,7 @@ def route_after_critic(state: AgentState) -> Literal["final_answer", "__end__"]:
 # Supervisor — deterministic router
 # ---------------------------------------------------------------------------
 
+@_traced_node("supervisor")
 async def supervisor_node(state: AgentState) -> AgentState:
     """No-op state pass-through; routing is handled by route_after_supervisor.
 
@@ -598,9 +626,21 @@ async def run_graph_stream(
         "handoff_log": [],
     }
 
-    final_state: AgentState | None = None
-    async for chunk in graph.astream(initial, stream_mode="values"):
-        final_state = chunk
+    # Top-level Langfuse trace for the graph turn. Every node:* span
+    # opened by _traced_node nests under this; the inner
+    # copilot_chat_turn_stream span opened by run_agent_stream inside
+    # final_answer also nests, so the full call tree is visible in
+    # one trace.
+    async with trace_request(
+        name="copilot_chat_graph_turn",
+        session_id=session_id,
+        user_id=active_user or "anonymous",
+        patient_id=patient_id,
+        extra={"pending_uploads": len(pending_doc_uploads or [])},
+    ):
+        final_state: AgentState | None = None
+        async for chunk in graph.astream(initial, stream_mode="values"):
+            final_state = chunk
 
     if final_state is None:
         return

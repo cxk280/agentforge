@@ -25,14 +25,16 @@ from pathlib import Path
 
 
 def _install_stubs() -> None:
-    """Stub `agent` + `langgraph` so graph.py imports in CI's
-    agent-unit-test executor (which only has rank-bm25 + pydantic).
+    """Stub `agent` + `langgraph` + `observability` so graph.py imports
+    in CI's agent-unit-test executor (which only has rank-bm25 +
+    pydantic).
 
     `rag.retriever` is intentionally NOT stubbed at the module level —
     that would leak across test modules (test_retriever_hybrid /
     test_retriever_rerank both import the real retriever). Tests that
     need to control retriever output do it via a per-test
     monkey-patch (see _patch_search_with_meta below)."""
+    import contextlib
 
     agent_stub = types.ModuleType("agent")
 
@@ -58,6 +60,20 @@ def _install_stubs() -> None:
     lg_graph.StateGraph = _StateGraph
     sys.modules["langgraph"] = lg
     sys.modules["langgraph.graph"] = lg_graph
+
+    obs = types.ModuleType("observability")
+
+    @contextlib.asynccontextmanager
+    async def _trace_request(*args, **kwargs):
+        yield None
+
+    @contextlib.contextmanager
+    def _span_graph_node(*args, **kwargs):
+        yield None
+
+    obs.trace_request = _trace_request
+    obs.span_graph_node = _span_graph_node
+    sys.modules["observability"] = obs
 
 
 _install_stubs()

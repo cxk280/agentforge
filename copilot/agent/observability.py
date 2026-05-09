@@ -165,6 +165,32 @@ def span_generation(
         yield gen
 
 
+@contextmanager
+def span_graph_node(name: str) -> Iterator[Any]:
+    """Span around a single LangGraph worker node invocation.
+
+    Wrap the body of supervisor_node / intake_extractor_node /
+    evidence_retriever_node / final_answer_node / critic_node so the
+    supervisor → worker structure shows up in Langfuse as nested
+    observations under the request-level trace (see trace_request).
+
+    Without this the trace tree was flat — only the inner
+    `copilot_chat_turn_stream` span (opened by run_agent_stream inside
+    final_answer_node) was visible, and reviewers couldn't see which
+    worker fired or in what order.
+    """
+    lf = get_langfuse()
+    if lf is None:
+        yield None
+        return
+    with lf.start_as_current_observation(
+        name=f"node:{name}",
+        as_type="span",
+        input={"node": name},
+    ) as span:
+        yield span
+
+
 def flush() -> None:
     """Force-flush queued events. Call at process shutdown."""
     lf = get_langfuse()
