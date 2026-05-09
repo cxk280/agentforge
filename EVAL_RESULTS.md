@@ -75,7 +75,7 @@
 
 ```bash
 # 1. Make sure the local stack is up.
-cd docker/development-easy && docker compose up --detach --wait
+cd docker/development-easy-light && docker compose up --detach --wait
 
 # 2. If vitals are missing from FHIR (one-time, idempotent — see EVAL findings above):
 scripts/fix-vitals-seed.sh
