@@ -21,13 +21,15 @@ from pathlib import Path
 
 
 def _install_stubs() -> None:
-    """Inject no-op `agent` + `langgraph` modules so graph.py imports
-    without anthropic / langgraph installed.
+    """Inject no-op `agent` + `langgraph` + `observability` modules so
+    graph.py imports without anthropic / langgraph / langfuse installed.
 
-    The CI agent-unit-test executor only installs rank-bm25 (see
-    .circleci/config.yml). We exercise pure routing functions here —
-    no real graph compilation, no real LLM calls — so deterministic
-    stubs are enough."""
+    The CI agent-unit-test executor only installs rank-bm25 + pydantic
+    (see .circleci/config.yml). We exercise pure routing functions here —
+    no real graph compilation, no real LLM calls, no real telemetry —
+    so deterministic stubs are enough."""
+    import contextlib
+
     agent_stub = types.ModuleType("agent")
 
     async def _run_agent_stream(*args, **kwargs):
@@ -52,6 +54,20 @@ def _install_stubs() -> None:
     lg_graph.StateGraph = _StateGraph
     sys.modules["langgraph"] = lg
     sys.modules["langgraph.graph"] = lg_graph
+
+    obs = types.ModuleType("observability")
+
+    @contextlib.asynccontextmanager
+    async def _trace_request(*args, **kwargs):
+        yield None
+
+    @contextlib.contextmanager
+    def _span_graph_node(*args, **kwargs):
+        yield None
+
+    obs.trace_request = _trace_request
+    obs.span_graph_node = _span_graph_node
+    sys.modules["observability"] = obs
 
 
 _install_stubs()
