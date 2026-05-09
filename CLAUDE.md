@@ -30,7 +30,7 @@
 See `CONTRIBUTING.md` for full setup instructions. Quick start:
 
 ```bash
-cd docker/development-easy
+cd docker/development-easy-light
 docker compose up --detach --wait
 ```
 
@@ -40,7 +40,7 @@ docker compose up --detach --wait
 
 ## Testing
 
-Tests run inside Docker via devtools. Run from `docker/development-easy/`:
+Tests run inside Docker via devtools. Run from `docker/development-easy-light/`:
 
 ```bash
 # Run all tests

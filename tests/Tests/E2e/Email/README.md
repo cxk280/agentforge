@@ -50,8 +50,11 @@ The email testing infrastructure allows you to:
 ### Start the Environment
 
 ```bash
-cd docker/development-easy
+cd docker/development-easy-light
 docker compose up -d
+# NOTE: development-easy-light does not include Mailpit. To exercise email
+# tests locally you'll need to run Mailpit yourself:
+#   docker run -d --rm -p 1025:1025 -p 8025:8025 axllent/mailpit
 ```
 
 This will start:
@@ -101,7 +104,7 @@ The tests run on all configured PHP/database combinations defined in `.github/wo
 
 ### Development Environment
 
-Email settings are configured in `docker/development-easy/docker-compose.yml`:
+Email settings are configured in `docker/development-easy-light/docker-compose.yml` (or your own Mailpit container — see above):
 
 ```yaml
 OPENEMR_SETTING_EMAIL_METHOD: SMTP

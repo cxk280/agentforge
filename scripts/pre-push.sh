@@ -37,7 +37,7 @@ else
     if ! docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
         echo "✗ pre-push: docker container '${CONTAINER}' is not running." >&2
         echo "  Start the dev stack:" >&2
-        echo "    cd docker/development-easy && docker compose up --detach --wait" >&2
+        echo "    cd docker/development-easy-light && docker compose up --detach --wait" >&2
         echo "  Or set COPILOT_SKIP_PRE_PUSH=1 to skip (only when you have a good reason)." >&2
         exit 1
     fi

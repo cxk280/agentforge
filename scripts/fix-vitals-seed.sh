@@ -30,7 +30,7 @@ if ! command -v docker >/dev/null 2>&1; then
 fi
 if ! docker ps --format '{{.Names}}' | grep -q "^${DB_CONTAINER}$"; then
     echo "✗ DB container '${DB_CONTAINER}' is not running." >&2
-    echo "  Start it: cd docker/development-easy && docker compose up --detach --wait" >&2
+    echo "  Start it: cd docker/development-easy-light && docker compose up --detach --wait" >&2
     exit 1
 fi
 if ! docker ps --format '{{.Names}}' | grep -q "^${PHP_CONTAINER}$"; then
