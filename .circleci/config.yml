@@ -504,6 +504,23 @@ jobs:
 # ─── Workflows ───────────────────────────────────────────────────────────
 workflows:
   test-deploy-promote:
+    # Skip CI entirely on qa/prod pushes. Those pushes come from
+    # promote-{qa,prod} jobs in the master pipeline (or a manual
+    # `git push <sha>:qa`) and exist purely to trigger Railway's
+    # GitHub-source auto-deploy on the env branch. The QA/prod
+    # verification jobs (eval-full-agent-{qa,prod}, smoke-openemr-
+    # {qa,prod}) run inside the master pipeline after promote-{qa,
+    # prod}, polling /version until Railway has rolled out the new
+    # SHA — they don't need to run a second time on the qa/prod
+    # branch's own pipeline. Without this gate, every promotion
+    # spawns a redundant CI run that only re-executes unit-test +
+    # agent-unit-test against the same SHA already verified on
+    # master.
+    when:
+      not:
+        or:
+          - equal: [ qa, << pipeline.git.branch >> ]
+          - equal: [ prod, << pipeline.git.branch >> ]
     jobs:
       # ── Unit tests gate every promotion ────────────────────────
       # Isolated PHPUnit Copilot suite + Python agent unit tests.
