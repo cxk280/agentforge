@@ -38,6 +38,16 @@
 #                                   Polls /version for SHA match before evaluating.
 #   7.  smoke-openemr-{qa,prod}   — same shape as dev, against the env's openemr.
 #
+# Auto-rollback (prod only):
+#   If eval-full-agent-prod or smoke-openemr-prod fails, that job's
+#   `rollback-to-previous-tag` step (when: on_fail) force-pushes the
+#   previous prod-YYYY-MM-DD-N tag's SHA back to the `prod` branch.
+#   Railway redeploys the prior known-good state automatically. The
+#   rollback itself is audit-tagged `prod-rollback-YYYY-MM-DD-<build>`.
+#   QA has NO auto-rollback by design — qa is "staging where you catch
+#   things," and leaving the broken SHA up briefly is useful for
+#   inspection.
+#
 # Required CircleCI project env vars (Settings → Environment Variables):
 #   ANTHROPIC_API_KEY              — for Haiku judge in evals
 #   GITHUB_APP_ID                  — numeric App ID of the AgentForge CI
@@ -172,6 +182,88 @@ commands:
                 -m "Promote ${CIRCLE_SHA1:0:7} → ${ENV}"
             git push "$AUTH_URL" "refs/tags/${TAG}"
             echo "✓ Tagged ${CIRCLE_SHA1:0:7} as ${TAG}"
+
+  rollback-to-previous-tag:
+    description: |
+      Roll an env branch back to the second-most-recent promotion
+      tag. Pairs with promote-to-env-branch — its audit tags
+      (<env>-YYYY-MM-DD-N) are the rollback source. Railway redeploys
+      automatically once the branch tip moves.
+
+      The single inner step is gated `when: on_fail`, so calling this
+      command at the end of a verification job is a no-op on success
+      and fires the rollback only when an earlier step in the same
+      job failed.
+
+      Concurrency: when eval-full + smoke-openemr both fail in the
+      same workflow, both jobs compute the same previous SHA and
+      force-push it idempotently. Each rollback tag uses
+      CIRCLE_BUILD_NUM as its suffix so the parallel audit records
+      don't collide on the remote.
+
+      Auth: same GitHub App installation token the forward promote
+      uses. The App identity is the only one allowed to push to
+      qa/prod under branch protection.
+    parameters:
+      env_branch:
+        type: string
+    steps:
+      - run:
+          name: Roll << parameters.env_branch >> back to previous audit tag
+          when: on_fail
+          command: |
+            ENV="<< parameters.env_branch >>"
+            # cimg/base lacks python3 by default; install on the fly so
+            # this command works on either executor (the forward promote
+            # only runs on cimg/python and could rely on it being there).
+            if ! command -v python3 >/dev/null 2>&1; then
+              sudo apt-get update -qq && sudo apt-get install -qq -y python3 python3-pip
+            fi
+            for var in GITHUB_APP_ID GITHUB_APP_PRIVATE_KEY GITHUB_APP_INSTALLATION_ID; do
+              if [ -z "$(eval echo \$$var)" ]; then
+                echo "✗ $var not set — cannot rollback ${ENV}." >&2
+                exit 1
+              fi
+            done
+            python3 -m pip install --quiet 'PyJWT[crypto]'
+            TOKEN=$(python3 scripts/mint-github-installation-token.py)
+            if [ -z "$TOKEN" ]; then
+              echo "✗ Token mint returned empty — see stderr above." >&2
+              exit 1
+            fi
+            AUTH_URL="https://x-access-token:${TOKEN}@github.com/cxk280/agentforge.git"
+            # ls-remote output is "<sha>\trefs/tags/<name>"; awk to
+            # "<sha> <ref>" so sort -V on -k2 orders by tag name with
+            # numeric awareness (so qa-...-10 sorts after qa-...-2,
+            # not after qa-...-1).
+            TAGS=$(git ls-remote --tags "$AUTH_URL" \
+              | grep -E "refs/tags/${ENV}-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]+\$" \
+              | awk '{print $1" "$2}' \
+              | sort -k2 -V)
+            COUNT=$(printf '%s\n' "$TAGS" | grep -cv '^$')
+            if [ "$COUNT" -lt 2 ]; then
+              echo "✗ only ${COUNT} promotion tag(s) for ${ENV} — no rollback target." >&2
+              echo "  Manual recovery required (no prior known-good state to revert to)." >&2
+              exit 1
+            fi
+            PREV_LINE=$(printf '%s\n' "$TAGS" | tail -2 | head -1)
+            PREV_SHA=$(echo "$PREV_LINE" | awk '{print $1}')
+            PREV_TAG=$(echo "$PREV_LINE" | awk '{print $2}' | sed 's|refs/tags/||')
+            echo "↩ Rolling ${ENV} back to ${PREV_TAG} (${PREV_SHA:0:7})..."
+            # Force-push the previous SHA as the env branch tip.
+            # Railway autodeploys on push.
+            git push --force "$AUTH_URL" "${PREV_SHA}:refs/heads/${ENV}"
+            # Tag this rollback so `git tag -l '<env>-rollback-*'`
+            # enumerates rollback events. CIRCLE_BUILD_NUM keeps the
+            # name unique when parallel jobs both fail.
+            TODAY=$(date -u +%Y-%m-%d)
+            ROLLBACK_TAG="${ENV}-rollback-${TODAY}-${CIRCLE_BUILD_NUM}"
+            git -c user.email="ci@agentforge.local" \
+                -c user.name="AgentForge CI Promoter" \
+                tag -a "${ROLLBACK_TAG}" "${PREV_SHA}" \
+                -m "Roll back ${ENV} to ${PREV_TAG} after post-deploy failure (build ${CIRCLE_BUILD_NUM})"
+            git push "$AUTH_URL" "refs/tags/${ROLLBACK_TAG}"
+            echo "✓ Rolled back ${ENV} to ${PREV_SHA:0:7} as ${ROLLBACK_TAG}"
 
   wait-for-agent-sha:
     description: |
@@ -498,6 +590,11 @@ jobs:
           endpoint: "https://copilot-agent-production-41de.up.railway.app/chat"
           smoke: false
           min_pass: 46
+      # Auto-rollback prod if any of the steps above failed. The
+      # rollback step is gated `when: on_fail`, so this is a no-op
+      # when evals pass. See rollback-to-previous-tag (commands).
+      - rollback-to-previous-tag:
+          env_branch: prod
 
   # ─── OpenEMR lane ────────────────────────────────────────────────────
   #
@@ -534,6 +631,11 @@ jobs:
       - checkout
       - openemr-smoke:
           base_url: "https://openemr-production-971e.up.railway.app"
+      # Auto-rollback prod if the smoke failed. cimg/base lacks
+      # python3, but rollback-to-previous-tag installs it on the
+      # fly. See rollback-to-previous-tag (commands).
+      - rollback-to-previous-tag:
+          env_branch: prod
 
 # ─── Workflows ───────────────────────────────────────────────────────────
 workflows:
