@@ -50,6 +50,13 @@
 #
 # Required CircleCI project env vars (Settings → Environment Variables):
 #   ANTHROPIC_API_KEY              — for Haiku judge in evals
+#   ADVERSARY_API_TOKEN            — bearer for the adversary-agent's
+#                                    /regression-runs API. Used by the
+#                                    adversary-gate-dev job to launch a
+#                                    promotion-gate-v1 campaign against the
+#                                    just-deployed dev Co-Pilot, and to fail
+#                                    the gate if new high-severity exploits
+#                                    appear vs. the baseline.
 #   GITHUB_APP_ID                  — numeric App ID of the AgentForge CI
 #                                    Promoter App. App needs Contents:
 #                                    Read & Write on cxk280/agentforge.
@@ -480,6 +487,133 @@ commands:
             python -m threshold_gate /tmp/eval-artifacts/eval-output.txt \
               --min-pass << parameters.min_pass >>
 
+  adversary-gate:
+    description: |
+      Launch a promotion-gate-v1 campaign against the just-deployed
+      Co-Pilot via the adversary platform's /regression-runs API, then
+      poll the run until it terminates and exit on the gate verdict.
+      Lives in the separate `adversarial_ai_security_agentforge` repo;
+      its dev surface is reachable at
+      https://adversary-agent-dev.up.railway.app.
+
+      The gate fails when the run discovers one or more new high-
+      severity exploits vs. the baseline target SHA. A `pass` verdict
+      means the deployed agent held all attacks at or above its 7-day
+      baseline; `error` is treated as a hard fail too (treat infra
+      breakage as gate failure rather than silently proceeding).
+
+      Auth: ADVERSARY_API_TOKEN must be set on the CircleCI project
+      (bearer for the adversary-agent's bearer-token middleware). The
+      adversary platform enforces a target-host allowlist server-
+      side; sending a non-allowlisted target_url returns 422 before
+      any HTTP call leaves the platform.
+
+      Budget cap: the adversary-agent's own /regression-runs gate at
+      $5/day per env applies regardless of what we pass here.
+    parameters:
+      target_url:
+        type: string
+      adversary_base:
+        type: string
+        default: "https://adversary-agent-dev.up.railway.app"
+      suite_ref:
+        type: string
+        default: "promotion-gate-v1"
+      timeout_seconds:
+        type: integer
+        default: 900
+      budget_usd:
+        type: string
+        default: "0.50"
+    steps:
+      - run:
+          name: Verify ADVERSARY_API_TOKEN is set
+          command: |
+            if [ -z "${ADVERSARY_API_TOKEN}" ]; then
+              echo "✗ ADVERSARY_API_TOKEN not set — cannot run adversary gate." >&2
+              echo "  Set it under CircleCI project Settings → Environment Variables." >&2
+              exit 1
+            fi
+            echo "✓ ADVERSARY_API_TOKEN present (length=${#ADVERSARY_API_TOKEN})"
+      - run:
+          name: Launch adversary regression run against << parameters.target_url >>
+          command: |
+            BODY=$(python3 -c "
+            import json
+            print(json.dumps({
+                'target_url': '<< parameters.target_url >>',
+                'suite_ref': '<< parameters.suite_ref >>',
+                'source': 'circleci',
+                'commit_sha': '${CIRCLE_SHA1}',
+                'max_seconds': << parameters.timeout_seconds >>,
+                'budget_usd': float('<< parameters.budget_usd >>'),
+            }))")
+            RESP=$(curl -sS -X POST "<< parameters.adversary_base >>/regression-runs" \
+              -H "Authorization: Bearer ${ADVERSARY_API_TOKEN}" \
+              -H "Content-Type: application/json" \
+              -d "$BODY")
+            RUN_ID=$(echo "$RESP" | python3 -c "
+            import sys, json
+            try:
+                d = json.load(sys.stdin)
+                rid = d.get('run_id')
+                if not rid:
+                    sys.stderr.write('No run_id in response: ' + json.dumps(d) + chr(10))
+                    sys.exit(1)
+                print(rid)
+            except json.JSONDecodeError:
+                sys.stderr.write('Non-JSON response from /regression-runs' + chr(10))
+                sys.exit(1)
+            ")
+            if [ -z "$RUN_ID" ]; then
+              echo "✗ Failed to launch adversary run. Response: $RESP" >&2
+              exit 1
+            fi
+            echo "✓ Launched run_id=${RUN_ID}"
+            echo "  Dashboard: << parameters.adversary_base >>/runs/${RUN_ID}"
+            echo "export ADVERSARY_RUN_ID=${RUN_ID}" >> "$BASH_ENV"
+      - run:
+          name: Poll run until gate verdict (timeout << parameters.timeout_seconds >>s)
+          no_output_timeout: << parameters.timeout_seconds >>s
+          command: |
+            DEADLINE=$(($(date +%s) + << parameters.timeout_seconds >>))
+            while true; do
+              RESP=$(curl -sS \
+                -H "Authorization: Bearer ${ADVERSARY_API_TOKEN}" \
+                "<< parameters.adversary_base >>/regression-runs/${ADVERSARY_RUN_ID}")
+              STATE=$(echo "$RESP" | python3 -c "import sys,json; print(json.load(sys.stdin).get('state','unknown'))" 2>/dev/null || echo unknown)
+              case "$STATE" in
+                completed|failed|cancelled)
+                  echo "↳ run terminal: state=${STATE}"
+                  echo "$RESP" | python3 -m json.tool | head -40
+                  VERDICT=$(echo "$RESP" | python3 -c "import sys,json; d=json.load(sys.stdin); print((d.get('gate') or {}).get('verdict','error'))")
+                  echo "$RESP" | python3 -c "
+            import sys, json
+            d = json.load(sys.stdin)
+            t = d.get('totals') or {}
+            spend = d.get('spend_usd') or 0
+            print(f\"  totals: pass={t.get('pass',0)} fail={t.get('fail',0)} partial={t.get('partial',0)} inconclusive={t.get('inconclusive',0)}\")
+            print(f\"  spend:  \${spend:.4f}\")
+            for r in ((d.get('gate') or {}).get('reasons') or []):
+                print(f\"  reason: {r}\")
+            "
+                  if [ "$VERDICT" = "pass" ]; then
+                    echo "✓ adversary-gate PASS"
+                    exit 0
+                  fi
+                  echo "✗ adversary-gate FAIL (verdict=${VERDICT})" >&2
+                  echo "  See << parameters.adversary_base >>/runs/${ADVERSARY_RUN_ID} for per-attempt detail." >&2
+                  exit 1
+                  ;;
+              esac
+              if [ "$(date +%s)" -ge "$DEADLINE" ]; then
+                echo "✗ Timeout waiting for run ${ADVERSARY_RUN_ID} (last state=${STATE})" >&2
+                exit 1
+              fi
+              echo "  waiting… state=${STATE}"
+              sleep 20
+            done
+
 # ─── Jobs ────────────────────────────────────────────────────────────────
 jobs:
   unit-test:
@@ -556,6 +690,22 @@ jobs:
           endpoint: "https://copilot-agent-dev.up.railway.app/chat"
           smoke: true
           min_pass: 4
+
+  adversary-gate-dev:
+    # Multi-agent adversarial regression suite against the just-
+    # deployed dev Co-Pilot. Gate verdict is read from the W3
+    # platform's /regression-runs API; the run record + per-attempt
+    # response evidence persist in adversary-agent's own SQLite DB
+    # for audit. Runs in parallel with eval-smoke-agent-dev and
+    # smoke-openemr-dev; gates hold-qa.
+    executor: python
+    steps:
+      - checkout
+      - wait-for-agent-sha:
+          base_url: "https://adversary-agent-dev.up.railway.app"
+      - adversary-gate:
+          target_url: "https://copilot-agent-dev.up.railway.app"
+          adversary_base: "https://adversary-agent-dev.up.railway.app"
 
   promote-qa:
     executor: python
@@ -675,11 +825,20 @@ workflows:
           filters:
             branches:
               only: master
+      # ── Adversary regression gate (W3 platform) ──────────────
+      # Launched in parallel with eval-smoke-agent-dev; both lanes
+      # must clear before promotion. See the `adversary-gate`
+      # command bundle for the full request/poll/verdict flow.
+      - adversary-gate-dev:
+          requires: [unit-test, agent-unit-test]
+          filters:
+            branches:
+              only: master
 
-      # ── QA gate: BOTH lanes' dev verifications must pass ──────
+      # ── QA gate: ALL dev verifications must pass ─────────────
       - hold-qa:
           type: approval
-          requires: [eval-smoke-agent-dev, smoke-openemr-dev]
+          requires: [eval-smoke-agent-dev, smoke-openemr-dev, adversary-gate-dev]
 
       # ── QA promotion: single git push to qa branch triggers
       #    BOTH Railway services' auto-deploy ──────────────────
