@@ -698,11 +698,21 @@ jobs:
     # response evidence persist in adversary-agent's own SQLite DB
     # for audit. Runs in parallel with eval-smoke-agent-dev and
     # smoke-openemr-dev; gates hold-qa.
+    #
+    # Cross-repo note: this job lives in the W2 (agentforge) pipeline
+    # but calls the adversary platform in the *separate* W3 repo
+    # (adversarial_ai_security_agentforge). CIRCLE_SHA1 here is a W2
+    # commit, so wait-for-agent-sha (which expects /version to report
+    # CIRCLE_SHA1) would never match. Instead we use wait-for-url to
+    # confirm the adversary-agent is reachable, then launch the gate
+    # campaign. Adversary platform's own pipeline gates its own SHA
+    # matching.
     executor: python
     steps:
       - checkout
-      - wait-for-agent-sha:
-          base_url: "https://adversary-agent-dev.up.railway.app"
+      - wait-for-url:
+          url: "https://adversary-agent-dev.up.railway.app/health"
+          timeout_seconds: 120
       - adversary-gate:
           target_url: "https://copilot-agent-dev.up.railway.app"
           adversary_base: "https://adversary-agent-dev.up.railway.app"
