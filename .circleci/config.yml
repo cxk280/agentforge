@@ -519,9 +519,14 @@ commands:
       suite_ref:
         type: string
         default: "promotion-gate-v1"
+      # Mutation-enabled campaigns (ENABLE_MUTATIONS=1 on adversary-agent
+      # adds N_MUTATIONS variants per seed) take materially longer than
+      # seed-only runs. Observed clean run: 565s for 54 attempts. Raise
+      # to 1500s (25 min) to leave headroom for retries and Anthropic
+      # rate-limit backoff inside the judges.
       timeout_seconds:
         type: integer
-        default: 900
+        default: 1500
       budget_usd:
         type: string
         default: "0.50"
