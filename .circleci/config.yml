@@ -543,11 +543,24 @@ commands:
       - run:
           name: Launch adversary regression run against << parameters.target_url >>
           command: |
+            # Scope the CI gate to the three TOP-priority categories from
+            # THREAT_MODEL.md (priority ≥ 6.3). Full-corpus coverage is
+            # what manual campaigns are for; the gate's job is to catch
+            # regressions on the highest-risk attack surfaces quickly,
+            # not to exhaustively re-run every subcategory on every
+            # deploy. With ENABLE_MUTATIONS=1 + N_MUTATIONS=2 this lands
+            # ~6-9 minutes per run — well under the 25-minute budget,
+            # leaving headroom for judge rate-limit backoff.
             BODY=$(python3 -c "
             import json
             print(json.dumps({
                 'target_url': '<< parameters.target_url >>',
                 'suite_ref': '<< parameters.suite_ref >>',
+                'categories': [
+                    'data_exfil_authorization_bypass',
+                    'data_exfil_cross_patient',
+                    'prompt_injection_indirect',
+                ],
                 'source': 'circleci',
                 'commit_sha': '${CIRCLE_SHA1}',
                 'max_seconds': << parameters.timeout_seconds >>,
